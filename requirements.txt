@@ -4,3 +4,4 @@ matplotlib
 pandas
 networkx
 shapely
+shapefile

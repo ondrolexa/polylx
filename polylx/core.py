@@ -24,8 +24,13 @@ from shapely.geometry import shape
 import networkx as nx
 import pandas as pd
 import itertools
-from utils import natural_breaks, fisher_jenks
-from utils import PolygonPath
+import os
+
+from .shapefile import Reader
+from .utils import natural_breaks, fisher_jenks
+from .utils import PolygonPath
+
+from pkg_resources import resource_filename
 
 # lambda funkce
 sind = lambda x: np.sin(np.deg2rad(x))
@@ -459,9 +464,8 @@ class Grains(PolySet):
         return {key: g.phase for (key, g) in enumerate(self)}
 
     @classmethod
-    def from_shp(self, filename='m1-p.shp', phasefield='phase'):
-        import shapefile
-        sf = shapefile.Reader(filename)
+    def from_shp(self, filename=os.path.join(resource_filename(__name__, 'example'), 'sg2.shp'), phasefield='phase'):
+        sf = Reader(filename)
         if sf.shapeType == 5:
             fieldnames = [field[0].lower() for field in sf.fields[1:]]
             if phasefield in fieldnames:
@@ -632,7 +636,7 @@ class Sample(object):
         return 'Sample with %s grains and %s boundaries.' % (len(self.g.polys),len(self.b.polys))
 
     @classmethod
-    def from_shp(cls, filename='m1-p.shp', phasefield='phase'):
+    def from_shp(cls, filename=os.path.join(resource_filename(__name__, 'example'), 'sg2.shp'), phasefield='phase'):
         return cls.from_grains(Grains.from_shp(filename, phasefield))
 
     @classmethod
