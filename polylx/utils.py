@@ -2,10 +2,11 @@
 """
 Created on Wed Feb  5 21:42:54 2014
 
-@author: ondro
+@author: Ondrej Lexa
 
-Examples:
-from utils import optimize_colormap
+Example:
+
+from polylx.utils import optimize_colormap
 g.plot(cmap=optimize_colormap('jet'))
 """
 import numpy as np

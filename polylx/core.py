@@ -2,7 +2,7 @@
 """
 Created on Wed Feb  5 21:42:54 2014
 
-@author: ondro
+@author: Ondrej Lexa
 
 Example:
 
@@ -15,6 +15,9 @@ from shapely.geometry import Polygon
 g = Grain('rect',Polygon([(2, 0), (0, 4), (8, 8), (10,4)]))
 
 """
+import os
+import itertools
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -23,8 +26,6 @@ from matplotlib.path import Path
 from shapely.geometry import shape
 import networkx as nx
 import pandas as pd
-import itertools
-import os
 
 from .shapefile import Reader
 from .utils import natural_breaks, fisher_jenks
@@ -32,7 +33,7 @@ from .utils import PolygonPath
 
 from pkg_resources import resource_filename
 
-# lambda funkce
+# lambda degree based functions
 sind = lambda x: np.sin(np.deg2rad(x))
 cosd = lambda x: np.cos(np.deg2rad(x))
 tand = lambda x: np.tan(np.deg2rad(x))

@@ -1,23 +1,30 @@
 # -*- coding: utf-8 -*-
 """
+Generate simple pdf reports.
+Need rst2pdf tool (https://code.google.com/p/rst2pdf) to be intalled.
+
 Created on Wed Feb  5 21:42:54 2014
 
-@author: ondro
+@author: Ondrej Lexa
 
 Example:
->>> import numpy as np
->>> import matplotlib.pyplot as plt
->>> from reports import Report
 
->>> fig, ax = plt.subplots()
->>> x = np.linspace(-8,8,200)
->>> ax.plot(x,np.sin(x))
+import numpy as np
+import matplotlib.pyplot as plt
+from polylx.reports import Report
 
->>> r = Report('Test report')
->>> r.add_chapter('Things will start here')
->>> r.savefig(fig, width='75%')
->>> r.table([[1,2,120],[2,6,213],[3,4,118]], title='Tabulka', header=['No','Val','Age'])
->>> r.write_pdf()
+g = Grains.from_shp()
+
+fig, ax = plt.subplots()
+x = np.linspace(-8,8,200)
+ax.plot(x,np.sin(x))
+
+r = Report('Test report')
+r.add_chapter('Things will start here')
+r.savefig(fig, width='75%')
+r.table([[1,2,120],[2,6,213],[3,4,118]], title='Table example', header=['No','Val','Age'])
+r.grainmap(g, width='75%')
+r.write_pdf()
 """
 import tempfile
 import subprocess
@@ -73,7 +80,7 @@ class Report(object):
         self.figure(f.name, width, height)
         self.images.append(f)
 
-    def grainmap(self, g, legend=None, loc=1, alpha=0.8, dpi=150, width=None, height=None):
+    def grainmap(self, g, legend=None, loc='auto', alpha=0.8, dpi=150, width=None, height=None):
         f = tempfile.NamedTemporaryFile(suffix='.png')
         g.savefig(f, legend, loc, alpha, dpi)
         self.figure(f.name, width, height)
