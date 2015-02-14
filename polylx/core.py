@@ -12,7 +12,7 @@ b = Boundaries.from_grains(g)
 
 from core import *
 from shapely.geometry import Polygon
-g = Grain('rect',Polygon([(2, 0), (0, 4), (8, 8), (10,4)]))
+g = Grain(Polygon([(2, 0), (0, 4), (8, 8), (10,4)]), 'rect')
 
 """
 import os
@@ -45,40 +45,6 @@ atan2d = lambda x1, x2: np.rad2deg(np.arctan2(x1, x2))
 
 class PolyShape(object):
 
-    def __init__(self):
-        self.shape_method = 'maxferet'
-        # x, y = self.xy
-        # x = x - x.mean()
-        # y = y - y.mean()
-        # xl = np.roll(x, -1)
-        # yl = np.roll(y, -1)
-        # v = xl*y - x*yl
-        # A = np.sum(v)/2
-        # if A != 0:
-        #     a10 = np.sum(v*(xl + x))/(6*A)
-        #     a01 = np.sum(v*(yl + y))/(6*A)
-        #     a20 = np.sum(v*(xl**2 + xl*x + x**2))/(12*A)
-        #     a11 = np.sum(v*(2*xl*yl + xl*y + x*yl + 2*x*y))/(24*A)
-        #     a02 = np.sum(v*(yl**2 + yl*y + y**2))/(12*A)
-
-        #     m20 = a20 - a10**2
-        #     m11 = a11 - a10*a01
-        #     m02 = a02 - a01**2
-
-        #     CM = np.array([[m02, -m11], [-m11, m20]])/(4*(m20*m02 - m11**2))
-        #     evals, evecs = np.linalg.eig(CM)
-        #     idx = evals.argsort()
-        #     self.evals = evals[idx]
-        #     self.evecs = evecs[:, idx].T
-        # else:
-        #     v1 = np.array([x[-1] - x[0], y[-1] - y[0]])
-        #     v1 = v1/np.sqrt(v1.dot(v1))
-        #     v2 = np.roll(v1, 1)
-        #     v2[0] = -v2[0]
-        #     CM = np.zeros((2, 2))
-        #     self.evals = np.zeros(2)
-        #     self.evecs = np.array([v1, v2])
-
     def __getattr__(self, attr):
         if hasattr(self.shape, attr):
             return getattr(self.shape, attr)
@@ -92,7 +58,6 @@ class PolyShape(object):
     @shape_method.setter
     def shape_method(self, value):
         getattr(self, value)()   # to evaluate and check validity
-        self._shape_method = value
 
     @property
     def ar(self):
@@ -110,24 +75,11 @@ class PolyShape(object):
         pp = np.dot(self.hull.T, np.array([sind(angle), cosd(angle)]))
         return pp.max(axis=0) - pp.min(axis=0)
 
-    ###############################################################
-    #       Shape methods (should modify sa, la, sao, lao, xc, yc)
-    ###############################################################
-    def minferet(self):
-        # return tuple of minimum feret and orientation
-        xy = self.hull.T
-        dxy = xy[1:]-xy[:-1]
-        ang = (atan2d(*dxy.T) + 90) % 180
-        pp = np.dot(xy, np.array([sind(ang), cosd(ang)]))
-        d = pp.max(axis=0) - pp.min(axis=0)
-        self.sa = np.min(d)
-        self.sao = ang[d.argmin()]
-        self.lao = (self.sao + 90) % 180
-        self.la = self.feret(self.lao)
-        self.xc, self.yc = self.shape.centroid.coords[0]
-
+    #################################################################
+    # Common shape methods (should modify sa, la, sao, lao, xc, yc) #
+    #################################################################
     def maxferet(self):
-        # return tuple of maximum feret and orientation
+        # longest diameter
         xy = self.hull.T
         pa = np.array(list(itertools.combinations(range(len(xy)), 2)))
         d2 = np.sum((xy[pa[:, 0]] - xy[pa[:, 1]])**2, axis=1)
@@ -138,19 +90,21 @@ class PolyShape(object):
         self.sao = (self.lao + 90) % 180
         self.sa = self.feret(self.sao)
         self.xc, self.yc = self.shape.centroid.coords[0]
-    ###############################################################
+        self._shape_method = 'maxferet'
 
 
 class Grain(PolyShape):
 
-    def __init__(self, phase, shape):
+    def __init__(self, shape, phase='None', fid=0):
         self.shape = shape
         self.phase = phase
+        self.fid = fid
+        self.shape_method = 'moment'
         super(Grain, self).__init__()
 
     def __repr__(self):
-        return 'Grain [%s] la:%g, sa:%g, lao:%g, sao:%g (%s)' % \
-            (self.phase, self.la, self.sa, self.lao, self.sao, self.shape_method)
+        return 'Grain %d [%s]: la:%g, sa:%g, lao:%g, sao:%g (%s)' % \
+            (self.fid, self.phase, self.la, self.sa, self.lao, self.sao, self.shape_method)
 
     @property
     def xy(self):
@@ -183,20 +137,137 @@ class Grain(PolyShape):
         d2 = np.sum((hull.T[pa[:, 0]] - hull.T[pa[:, 1]])**2, axis=1)
         ix = d2.argmax()
         ax.plot(*hull.T[pa[ix]].T, ls=':', lw=2, c='r')
+        R = np.linspace(0, 360, 361)
+        cr, sr = cosd(R), sind(R)
+        cl, sl = cosd(self.lao), sind(self.lao)
+        xx = self.xc + self.la*cr*cl/2 - self.sa*sr*sl/2
+        yy = self.yc + self.la*cr*sl/2 + self.sa*sr*cl/2
+        ax.plot(xx, yy, color='green')
         ax.autoscale_view(None, True, True)
+        plt.title('Shape method: {}'.format(self.shape_method))
         plt.show()
+
+    ################################################################
+    # Grain shape methods (should modify sa, la, sao, lao, xc, yc) #
+    ################################################################
+    def moment(self):
+        x, y = self.xy[:,:-1]
+        x = x - x.mean()
+        y = y - y.mean()
+        xl = np.roll(x, -1)
+        yl = np.roll(y, -1)
+        v = xl*y - x*yl
+        A = round(1e14*np.sum(v)/2)/1e14
+
+        if A != 0:
+            a10 = np.sum(v*(xl + x))/(6*A)
+            a01 = np.sum(v*(yl + y))/(6*A)
+            a20 = np.sum(v*(xl**2 + xl*x + x**2))/(12*A)
+            a11 = np.sum(v*(2*xl*yl + xl*y + x*yl + 2*x*y))/(24*A)
+            a02 = np.sum(v*(yl**2 + yl*y + y**2))/(12*A)
+
+            m20 = a20 - a10**2
+            m11 = a11 - a10*a01
+            m02 = a02 - a01**2
+
+            CM = np.array([[m02, -m11], [-m11, m20]])/(4*(m20*m02 - m11**2))
+            evals, evecs = np.linalg.eig(CM)
+            idx = evals.argsort()
+            evals = evals[idx]
+            evecs = evecs[:, idx]
+            self.la, self.sa = 2/np.sqrt(evals)
+            self.lao, self.sao = np.mod(atan2d(evecs[0,:],evecs[1,:]), 180)
+            self.xc, self.yc = self.shape.centroid.coords[0]
+            self._shape_method = 'moment'
+        else:
+            print('Moment fit failed for grain fid={}. Fallback to maxferet.'.format(self.fid))
+            self.maxferet()
+
+    def minferet(self):
+        # return tuple of minimum feret and orientation
+        xy = self.hull.T
+        dxy = xy[1:]-xy[:-1]
+        ang = (atan2d(*dxy.T) + 90) % 180
+        pp = np.dot(xy, np.array([sind(ang), cosd(ang)]))
+        d = pp.max(axis=0) - pp.min(axis=0)
+        self.sa = np.min(d)
+        self.sao = ang[d.argmin()]
+        self.lao = (self.sao + 90) % 180
+        self.la = self.feret(self.lao)
+        self.xc, self.yc = self.shape.centroid.coords[0]
+        self._shape_method = 'minferet'
+
+    def direct(self):
+        # direct ellipse fit
+        def find_ellipse(x, y):
+            xmean = x.mean()
+            ymean = y.mean()
+            x -= xmean
+            y -= ymean
+            x = x[:, np.newaxis]
+            y = y[:, np.newaxis]
+            D = np.hstack((x*x, x*y, y*y, x, y, np.ones_like(x)))
+            S = np.dot(D.T, D)
+            C = np.zeros([6, 6])
+            C[0, 2] = C[2, 0] = 2
+            C[1, 1] = -1
+            E, V = np.linalg.eig(np.dot(np.linalg.inv(S), C))
+            n = np.argmax(np.abs(E))
+            q = V[:, n]
+            # get parameters
+            b, c, d, f, g, a = q[1]/2, q[2], q[3]/2, q[4]/2, q[5], q[0]
+            num = b*b - a*c
+            xc = (c*d - b*f)/num + xmean
+            yc = (a*f - b*d)/num + ymean
+            phi = 0.5*np.arctan(2*b/(a - c))
+            up = 2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g)
+            down1 = (b*b - a*c)*((c - a)*np.sqrt(1 + 4*b*b/((a - c)*(a - c))) - (c + a))
+            down2 = (b*b - a*c)*((a - c)*np.sqrt(1 + 4*b*b/((a - c)*(a - c))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ) - (c + a))
+            a = np.sqrt(up/down1)
+            b = np.sqrt(up/down2)
+            return xc, yc, phi, a, b
+
+        def densify(x, y):
+            x1 = np.insert(x, np.s_[1:], x[:-1] + np.diff(x)/2)
+            y1 = np.insert(y, np.s_[1:], y[:-1] + np.diff(y)/2)
+            return x1, y1
+
+        x, y = self.xy
+        res = find_ellipse(x[:-1].copy(), y[:-1].copy())
+        err = 1
+        mx = 0
+        while ((err > 1e-8) or np.isnan(err)) and (mx < 10):
+            x, y = densify(x, y)
+            res1 = find_ellipse(x[:-1].copy(), y[:-1].copy())
+            err = np.sum((np.array(res1) - np.array(res))**2)
+            res = res1
+            mx += 1
+        if mx == 10:
+            print('Direct ellipse fit failed for grain fid={}. Fallback to moment.'.format(self.fid))
+            self.moment()
+        else:
+            xc, yc, phi, a, b = res
+            if a > b:
+                ori = np.pi/2 - phi
+            else:
+                ori = -phi
+                a, b = b, a
+            self.xc, self.yc, self.la, self.sa, self.lao, self.sao = xc, yc, 2*a, 2*b, np.rad2deg(ori) % 180, (np.rad2deg(ori) + 90) % 180
+            self._shape_method = 'direct'
 
 
 class Boundary(PolyShape):
 
-    def __init__(self, typ, shape):
+    def __init__(self, shape, typ='None-None', fid=0):
         self.shape = shape
         self.type = typ
+        self.fid = fid
+        self.shape_method = 'maxferet'
         super(Boundary, self).__init__()
 
     def __repr__(self):
-        return 'Boundary [%s] la:%g, sa:%g, lao:%g, sao:%g (%s)' % \
-            (self.type, self.la, self.sa, self.lao, self.sao, self.shape_method)
+        return 'Boundary %d [%s]: la:%g, sa:%g, lao:%g, sao:%g (%s)' % \
+            (self.fid, self.type, self.la, self.sa, self.lao, self.sao, self.shape_method)
 
     @property
     def xy(self):
@@ -226,13 +297,15 @@ class Boundary(PolyShape):
         ax.plot(*hull.T[pa[ix]].T, ls=':', lw=2, c='r')
         ax.autoscale_view(None, True, True)
         plt.show()
+    ###################################################################
+    # Boundary shape methods (should modify sa, la, sao, lao, xc, yc) #
+    ###################################################################
 
 
 class PolySet(object):
 
     def __init__(self, shapes):
         self.polys = shapes
-        self.shape_method = 'maxferet'
         gb = self.bounds
         self.extent = gb[:, 0].min(), gb[:, 1].min(), gb[:, 2].max(), gb[:, 3].max()
 
@@ -255,19 +328,18 @@ class PolySet(object):
         if attr == 'shape':
             res = np.array([getattr(p, attr) for p in self], dtype=object)
         else:
-            res = np.array([getattr(p, attr) for p in self])
+            try:
+                res = np.array([getattr(p, attr) for p in self])
+            except ValueError:
+                res = [getattr(p, attr) for p in self]
         return res
 
-    @property
-    def shape_method(self):
-        return self._shape_method
-
-    @shape_method.setter
-    def shape_method(self, value):
+    def set_shape_method(self, value):
         for p in self:
             if not hasattr(p, '_shape_method'):
                 p.shape_method = value
-        self._shape_method = value
+            if p._shape_method != value:
+                p.shape_method = value
 
     @property
     def width(self):
@@ -484,10 +556,10 @@ class Grains(PolySet):
                     if not geom.is_empty:
                         if geom.geom_type == 'MultiPolygon':
                             for g in geom:
-                                shapes.append(Grain(rec.record[phase_pos], g))
+                                shapes.append(Grain(g, rec.record[phase_pos], len(shapes)))
                             print('Multipolygon (FID={}) exploded.'.format(pos))
                         elif geom.geom_type == 'Polygon':
-                            shapes.append(Grain(rec.record[phase_pos], geom))
+                            shapes.append(Grain(geom, rec.record[phase_pos], len(shapes)))
                         else:
                             raise Exception('Unexpected geometry type (FID={})!'.format(pos))
                     else:
@@ -586,25 +658,25 @@ class Boundaries(PolySet):
             shared = grains[edge[0]].intersection(grains[edge[1]])
             typ = T[edge[0]][edge[1]]['type']
             if shared.geom_type == 'LineString':
-                shapes.append(Boundary(typ, shared))
+                shapes.append(Boundary(shared, typ, len(shapes)))
             elif shared.geom_type == 'MultiLineString':
                 shared = linemerge(shared)
                 if shared.geom_type == 'LineString':
-                    shapes.append(Boundary(typ, shared))
+                    shapes.append(Boundary(shared, typ, len(shapes)))
                 else:
                     for sub in list(shared):
-                        shapes.append(Boundary(typ, sub))
+                        shapes.append(Boundary(sub, typ, len(shapes)))
             elif shared.geom_type == 'GeometryCollection':
                 for sub in shared:
                     if sub.geom_type == 'LineString':
-                        shapes.append(Boundary(typ, sub))
+                        shapes.append(Boundary(sub, typ, len(shapes)))
                     elif sub.geom_type == 'MultiLineString':
                         sub = linemerge(sub)
                         if sub.geom_type == 'LineString':
-                            shapes.append(Boundary(typ, sub))
+                            shapes.append(Boundary(sub, typ, len(shapes)))
                         else:
                             for subsub in list(sub):
-                                shapes.append(Boundary(typ, subsub))
+                                shapes.append(Boundary(subsub, typ, len(shapes)))
         return self(shapes)
 
     def _plot(self, ax, legend, alpha):
