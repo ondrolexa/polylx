@@ -141,8 +141,8 @@ class Grain(PolyShape):
         R = np.linspace(0, 360, 361)
         cr, sr = cosd(R), sind(R)
         cl, sl = cosd(self.lao), sind(self.lao)
-        xx = self.xc + self.la*cr*cl/2 - self.sa*sr*sl/2
-        yy = self.yc + self.la*cr*sl/2 + self.sa*sr*cl/2
+        xx = self.xc + self.la*cr*sl/2 + self.sa*sr*cl/2
+        yy = self.yc + self.la*cr*cl/2 - self.sa*sr*sl/2
         ax.plot(xx, yy, color='green')
         ax.autoscale_view(None, True, True)
         plt.title('Shape method: {}'.format(self.shape_method))
