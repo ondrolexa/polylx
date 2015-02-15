@@ -23,6 +23,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.patches import PathPatch
 from matplotlib.path import Path
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from shapely.geometry import shape
 import networkx as nx
 import pandas as pd
@@ -413,47 +414,55 @@ class PolySet(object):
             pos = [127]
         return dict(zip(self.class_index, [cmap(int(i)) for i in pos]))
 
-    def _makelegend(self, ax, loc='auto', ncol=3):
-        if loc == 'auto':
+    def _makelegend(self, ax, pos='auto', ncol=3):
+        if pos == 'auto':
             if self.width > self.height:
-                loc = 'top'
+                pos = 'top'
                 ncol = 3
             else:
-                loc = 'right'
+                pos = 'right'
                 ncol = 1
-        if loc == 'top':
+        if pos == 'top':
             h, l = ax.get_legend_handles_labels()
-            lgd = plt.figlegend(h, l, loc='upper center', bbox_to_anchor=[0.5, 0.99], ncol=ncol)
-            plt.draw()
-            prop = lgd.get_window_extent().height/ax.get_figure().get_window_extent().height
-            ax.get_figure().tight_layout(rect=[0.02, 0.02, 0.98, 0.98 - prop])
-        elif loc == 'right':
-            h, l = ax.get_legend_handles_labels()
-            lgd = plt.figlegend(h, l, loc='center right', bbox_to_anchor=[0.99, 0.5], ncol=ncol)
-            plt.draw()
-            prop = lgd.get_window_extent().width/ax.get_figure().get_window_extent().width
-            ax.get_figure().tight_layout(rect=[0.02, 0.02, 0.98 - prop, 0.98])
-        else:
-            lgd = None
-        return lgd
+            # lgd = plt.figlegend(h, l, loc='upper center', bbox_to_anchor=[0.5, 0.99], ncol=ncol)
+            # plt.draw()
+            # prop = lgd.get_window_extent().height/ax.get_figure().get_window_extent().height
+            # ax.get_figure().tight_layout(rect=[0.02, 0.02, 0.98, 0.98 - prop])
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("top", size=0.25+0.25*np.ceil(len(h)/ncol))
+            cax.set_axis_off()
+            cax.legend(h, l, loc=9, borderaxespad=0., ncol=3, bbox_to_anchor=[0.5, 1.1])
+            plt.tight_layout()
 
-    def plot(self, legend=None, loc='auto', alpha=0.8, cmap='jet', ncol=1):
+        elif pos == 'right':
+            h, l = ax.get_legend_handles_labels()
+            # lgd = plt.figlegend(h, l, loc='center right', bbox_to_anchor=[0.99, 0.5], ncol=ncol)
+            # plt.draw()
+            # prop = lgd.get_window_extent().width/ax.get_figure().get_window_extent().width
+            # ax.get_figure().tight_layout(rect=[0.02, 0.02, 0.98 - prop, 0.98])
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size=0.2+1.6*ncol)
+            cax.set_axis_off()
+            cax.legend(h, l, loc=7, borderaxespad=0., bbox_to_anchor=[1.04, 0.5])
+            plt.tight_layout()
+
+    def plot(self, legend=None, pos='auto', alpha=0.8, cmap='jet', ncol=1):
         if legend is None:
             legend = self._autocolortable(cmap)
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
         self._plot(ax, legend, alpha)
         plt.setp(plt.yticks()[1], rotation=90)
-        self._makelegend(ax, loc, ncol)
+        self._makelegend(ax, pos, ncol)
 
-    def savefig(self, filename='grains.png', legend=None, loc='auto', alpha=0.8, cmap='jet', dpi=150, ncol=1):
+    def savefig(self, filename='grains.png', legend=None, pos='auto', alpha=0.8, cmap='jet', dpi=150, ncol=1):
         if legend is None:
             legend = self._autocolortable(cmap)
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
         self._plot(ax, legend, alpha)
         plt.setp(plt.yticks()[1], rotation=90)
-        self._makelegend(ax, loc, ncol)
+        self._makelegend(ax, pos, ncol)
         plt.savefig(filename, dpi=dpi)
         plt.close()
 
@@ -720,7 +729,7 @@ class Sample(object):
         obj.b = Boundaries.from_grains(grains, obj.T)
         return obj
 
-    def plot(self, legend=None, loc='auto', alpha=0.8, cmap='jet', ncol=1):
+    def plot(self, legend=None, pos='auto', alpha=0.8, cmap='jet', ncol=1):
         if legend is None:
             legend = dict(list(self.g._autocolortable().items()) + list(self.b._autocolortable().items()))
         fig = plt.figure()
@@ -728,4 +737,4 @@ class Sample(object):
         self.g._plot(ax, legend, alpha, ec='none')
         self.b._plot(ax, legend, 1)
         plt.setp(plt.yticks()[1], rotation=90)
-        self.g._makelegend(ax, loc, ncol)
+        self.g._makelegend(ax, pos, ncol)
