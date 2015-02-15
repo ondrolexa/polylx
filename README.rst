@@ -14,7 +14,7 @@ PolyLX
 
 A package to visualize and analyze microstructures.
 
-See it in action https://github.com/ondrolexa/polylx/blob/develop/polylx_tutorial.ipynb
+See it in action http://nbviewer.ipython.org/github/ondrolexa/polylx/blob/develop/polylx_tutorial.ipynb
 
 ..
     * Free software: BSD license
