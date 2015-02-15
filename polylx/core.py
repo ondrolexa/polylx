@@ -391,8 +391,13 @@ class PolySet(object):
             d[attr] = getattr(self, attr)
         return d
 
-    def agg(self, aggfunc, *attrs):
-        return getattr(self.groups(*attrs), aggfunc)().reindex(self.class_index)
+    def agg(self, *pairs):
+        pieces = []
+        for aggfunc, attr in zip(pairs[0::2], pairs[1::2]):
+            df = getattr(self.groups(attr), aggfunc)()
+            df.columns = ['{}_{}'.format(aggfunc, attr)]
+            pieces.append(df)
+        return pd.concat(pieces, axis=1).reindex(self.class_index)
 
     def groups(self, *attrs):
         df = self.df(*attrs)
