@@ -362,10 +362,12 @@ class PolySet(object):
             self.class_index, index = np.unique(vals, return_inverse=True)
             counts = np.bincount(index)
             self.class_legend = ['%s (%d)' % p for p in zip(self.class_index, counts)]
-        elif rule == 'equal':
+        elif rule == 'equal' or rule == 'user':
             counts, bins = np.histogram(vals, k)
             index = np.digitize(vals, bins) - 1
-            index[np.flatnonzero(index == k)] = k - 1
+            # if upper limit is maximum value, digitize it to last bin
+            edge = len(bins) - 1
+            index[np.flatnonzero(index == edge)] = edge - 1
             self.class_labels = ['%g-%g (%d)' % (bins[i], bins[i+1], count) for i, count in enumerate(counts)]
             self.class_index = ['%g-%g' % (bins[i], bins[i+1]) for i in range(len(counts))]
             self.classes = np.array([self.class_index[i] for i in index])
@@ -385,7 +387,14 @@ class PolySet(object):
             self.classes = np.array([self.class_index[i] for i in index])
 
     def df(self, *attrs):
-        d = pd.DataFrame()
+        attrs = list(attrs)
+        if 'classes' in attrs:
+            attrs[attrs.index('classes')] = 'class'
+        if 'class' in attrs:
+            attrs.remove('class')
+            d = pd.DataFrame({self.class_attr + '_class': self.classes})
+        else:
+            d = pd.DataFrame()
         for attr in attrs:
             #d[attr] = [getattr(p, attr) for p in self]
             d[attr] = getattr(self, attr)
@@ -402,12 +411,6 @@ class PolySet(object):
     def groups(self, *attrs):
         df = self.df(*attrs)
         return df.groupby(self.classes)
-
-    def df_c(self, *attrs):
-        d = pd.DataFrame({self.class_attr + '_class': self.classes})
-        for attr in attrs:
-            d[attr] = [getattr(p, attr) for p in self]
-        return d
 
     def _autocolortable(self, cmap='jet'):
         if isinstance(cmap, str):
