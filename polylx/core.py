@@ -24,13 +24,14 @@ import matplotlib.cm as cm
 from matplotlib.patches import PathPatch
 from matplotlib.path import Path
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from shapely.geometry import shape
+from shapely.geometry import shape, Polygon, LinearRing
 import networkx as nx
 import pandas as pd
 
 from .shapefile import Reader
-from .utils import natural_breaks, fisher_jenks
-from .utils import PolygonPath
+from .utils import natural_breaks, fisher_jenks, PolygonPath
+from .utils import find_ellipse, densify
+from .utils import _chaikin_ring, _spline_ring, _visvalingam_whyatt_ring
 
 from pkg_resources import resource_filename
 
@@ -148,6 +149,64 @@ class Grain(PolyShape):
         plt.title('Shape method: {}'.format(self.shape_method))
         plt.show()
 
+    #####################################################
+    # Grain smooth methods (should return Grain object) #
+    #####################################################
+    def spline(self, densify=5):
+        x, y = _spline_ring(*self.xy, densify=densify)
+        holes = []
+        for hole in self.interiors:
+            xh, yh = _spline_ring(*np.array(hole.xy), densify=densify)
+            holes.append(LinearRing(coordinates=np.c_[xh, yh]))
+        shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
+        if shape.is_valid:
+            res = Grain(shape, phase=self.phase, fid=self.fid)
+        else:
+            res = self
+            print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
+        return res
+
+    def chaikin(self, repeat=4):
+        x, y = _chaikin_ring(*self.xy, repeat=repeat)
+        holes = []
+        for hole in self.interiors:
+            xh, yh = _chaikin_ring(*np.array(hole.xy), repeat=repeat)
+            holes.append(LinearRing(coordinates=np.c_[xh, yh]))
+        shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
+        if shape.is_valid:
+            res = Grain(shape, phase=self.phase, fid=self.fid)
+        else:
+            res = self
+            print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
+        return res
+
+    def dpsimplify(self, tolerance=None, preserve_topology=True):
+        if tolerance is None:
+            x, y = self.xy
+            i1 = np.arange(len(x) - 2)
+            i2 = i1 + 2
+            i0 = i1 + 1
+            d = abs((y[i2] - y[i1])*x[i0] - (x[i2] - x[i1])*y[i0] + x[i2]*y[i1] - y[i2]*x[i1])/np.sqrt((y[i2]-y[i1])**2 + (x[i2]-x[i1])**2)
+            tolerance = d.mean()
+        shape = self.shape.simplify(tolerance, preserve_topology)
+        return Grain(shape, phase=self.phase, fid=self.fid)
+
+    def vwsimplify(self, frac=0.01):
+        x, y = _visvalingam_whyatt_ring(*self.xy, minarea=frac*self.area)
+        holes = []
+        for hole in self.interiors:
+            xh, yh = _visvalingam_whyatt_ring(*np.array(hole.xy), minarea=frac*self.area)
+            holes.append(LinearRing(coordinates=np.c_[xh, yh]))
+        shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
+        if shape.is_valid:
+            res = Grain(shape, phase=self.phase, fid=self.fid)
+        else:
+            res = self
+            print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
+        return res
+
+
+
     ################################################################
     # Grain shape methods (should modify sa, la, sao, lao, xc, yc) #
     ################################################################
@@ -199,40 +258,6 @@ class Grain(PolyShape):
         self._shape_method = 'minferet'
 
     def direct(self):
-        # direct ellipse fit
-        def find_ellipse(x, y):
-            xmean = x.mean()
-            ymean = y.mean()
-            x -= xmean
-            y -= ymean
-            x = x[:, np.newaxis]
-            y = y[:, np.newaxis]
-            D = np.hstack((x*x, x*y, y*y, x, y, np.ones_like(x)))
-            S = np.dot(D.T, D)
-            C = np.zeros([6, 6])
-            C[0, 2] = C[2, 0] = 2
-            C[1, 1] = -1
-            E, V = np.linalg.eig(np.dot(np.linalg.inv(S), C))
-            n = np.argmax(np.abs(E))
-            q = V[:, n]
-            # get parameters
-            b, c, d, f, g, a = q[1]/2, q[2], q[3]/2, q[4]/2, q[5], q[0]
-            num = b*b - a*c
-            xc = (c*d - b*f)/num + xmean
-            yc = (a*f - b*d)/num + ymean
-            phi = 0.5*np.arctan(2*b/(a - c))
-            up = 2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g)
-            down1 = (b*b - a*c)*((c - a)*np.sqrt(1 + 4*b*b/((a - c)*(a - c))) - (c + a))
-            down2 = (b*b - a*c)*((a - c)*np.sqrt(1 + 4*b*b/((a - c)*(a - c))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ) - (c + a))
-            a = np.sqrt(up/down1)
-            b = np.sqrt(up/down2)
-            return xc, yc, phi, a, b
-
-        def densify(x, y):
-            x1 = np.insert(x, np.s_[1:], x[:-1] + np.diff(x)/2)
-            y1 = np.insert(y, np.s_[1:], y[:-1] + np.diff(y)/2)
-            return x1, y1
-
         x, y = self.xy
         res = find_ellipse(x[:-1].copy(), y[:-1].copy())
         err = 1

@@ -219,3 +219,90 @@ def fisher_jenks(values, k=5):
         pNum -= 1
 
     return pivots
+
+def find_ellipse(x, y):
+    # direct ellipse fit
+    xmean = x.mean()
+    ymean = y.mean()
+    x -= xmean
+    y -= ymean
+    x = x[:, np.newaxis]
+    y = y[:, np.newaxis]
+    D = np.hstack((x*x, x*y, y*y, x, y, np.ones_like(x)))
+    S = np.dot(D.T, D)
+    C = np.zeros([6, 6])
+    C[0, 2] = C[2, 0] = 2
+    C[1, 1] = -1
+    E, V = np.linalg.eig(np.dot(np.linalg.inv(S), C))
+    n = np.argmax(np.abs(E))
+    q = V[:, n]
+    # get parameters
+    b, c, d, f, g, a = q[1]/2, q[2], q[3]/2, q[4]/2, q[5], q[0]
+    num = b*b - a*c
+    xc = (c*d - b*f)/num + xmean
+    yc = (a*f - b*d)/num + ymean
+    phi = 0.5*np.arctan(2*b/(a - c))
+    up = 2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g)
+    down1 = (b*b - a*c)*((c - a)*np.sqrt(1 + 4*b*b/((a - c)*(a - c))) - (c + a))
+    down2 = (b*b - a*c)*((a - c)*np.sqrt(1 + 4*b*b/((a - c)*(a - c))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ) - (c + a))
+    a = np.sqrt(up/down1)
+    b = np.sqrt(up/down2)
+    return xc, yc, phi, a, b
+
+def densify(x, y, repeat=1):
+    for i in range(repeat):
+        x = np.insert(x, np.s_[1:], x[:-1] + np.diff(x)/2)
+        y = np.insert(y, np.s_[1:], y[:-1] + np.diff(y)/2)
+    return x, y
+
+def _chaikin_ring(x, y, repeat=4):
+    # Chaikin's corner cutting algorithm
+    for i in range(repeat):
+        x, y = densify(x, y, 2)
+        x = np.append(x[1::2], x[1])
+        y = np.append(y[1::2], y[1])
+    return x, y
+
+def _spline_ring(x, y, densify=5, pad=5):
+    from scipy.interpolate import spline
+    num = len(x)
+    # padding
+    x = np.concatenate((x[-pad:-1], x, x[1:pad]))
+    y = np.concatenate((y[-pad:-1], y, y[1:pad]))
+    # distance parameter normalized on beginning and end
+    t = np.zeros(x.shape)
+    t[1:] = np.sqrt((x[1:] - x[:-1])**2 + (y[1:] - y[:-1])**2)
+    t = np.cumsum(t)
+    t -= t[pad-1]
+    t /= t[-pad]
+    nt = np.linspace(0, 1, num*densify)
+    x = spline(t, x, nt)
+    y = spline(t, y, nt)
+    x[-1] = x[0]
+    y[-1] = y[0]
+    return x, y
+
+def _visvalingam_whyatt_ring(x, y, minarea=None):
+    do = True
+    tot = 0
+    while do:
+        xx = np.concatenate((x[-2:-1], x, x[1:2]))
+        yy = np.concatenate((y[-2:-1], y, y[1:2]))
+        i0 = np.arange(len(xx)-2)
+        i1 = i0 + 1
+        i2 = i0 + 2
+        a = abs(xx[i0]*(yy[i1] - yy[i2]) + xx[i1]*(yy[i2] - yy[i0]) + xx[i2]*(yy[i0] - yy[i1]))/2
+        ix = a.argmin()
+        mn = min(a)
+        if (tot + mn) < minarea:
+            if ix==0 or ix==len(x)-1:
+                x = np.concatenate((x[1:-1], x[1:2]))
+                y = np.concatenate((y[1:-1], y[1:2]))
+            else:
+                x = np.delete(x, ix)
+                y = np.delete(y, ix)
+            tot += mn
+        else:
+            do = False
+    return x, y
+
