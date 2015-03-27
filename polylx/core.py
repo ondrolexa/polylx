@@ -149,14 +149,14 @@ class Grain(PolyShape):
         plt.title('Shape method: {}'.format(self.shape_method))
         plt.show()
 
-    #####################################################
-    # Grain smooth methods (should return Grain object) #
-    #####################################################
-    def spline(self, densify=5):
-        x, y = _spline_ring(*self.xy, densify=densify)
+    #################################################################
+    # Grain smooth and siplify methods (should return Grain object) #
+    #################################################################
+    def spline(self, **kwargs):
+        x, y = _spline_ring(*self.xy, densify=kwargs.get('densify', 5))
         holes = []
         for hole in self.interiors:
-            xh, yh = _spline_ring(*np.array(hole.xy), densify=densify)
+            xh, yh = _spline_ring(*np.array(hole.xy), densify=kwargs.get('densify', 5))
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
@@ -166,11 +166,11 @@ class Grain(PolyShape):
             print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
         return res
 
-    def chaikin(self, repeat=4):
-        x, y = _chaikin_ring(*self.xy, repeat=repeat)
+    def chaikin(self, **kwargs):
+        x, y = _chaikin_ring(*self.xy, repeat=kwargs.get('repeat', 4))
         holes = []
         for hole in self.interiors:
-            xh, yh = _chaikin_ring(*np.array(hole.xy), repeat=repeat)
+            xh, yh = _chaikin_ring(*np.array(hole.xy), repeat=kwargs.get('repeat', 4))
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
@@ -180,22 +180,23 @@ class Grain(PolyShape):
             print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
         return res
 
-    def dpsimplify(self, tolerance=None, preserve_topology=True):
-        if tolerance is None:
+    def dp(self, **kwargs):
+        if 'tolerance' not in kwargs:
             x, y = self.xy
             i1 = np.arange(len(x) - 2)
             i2 = i1 + 2
             i0 = i1 + 1
             d = abs((y[i2] - y[i1])*x[i0] - (x[i2] - x[i1])*y[i0] + x[i2]*y[i1] - y[i2]*x[i1])/np.sqrt((y[i2]-y[i1])**2 + (x[i2]-x[i1])**2)
             tolerance = d.mean()
-        shape = self.shape.simplify(tolerance, preserve_topology)
+        shape = self.shape.simplify(tolerance=kwargs.get('tolerance', tolerance),
+                                    preserve_topology=kwargs.get('preserve_topology', False))
         return Grain(shape, phase=self.phase, fid=self.fid)
 
-    def vwsimplify(self, frac=0.01):
-        x, y = _visvalingam_whyatt_ring(*self.xy, minarea=frac*self.area)
+    def vw(self, **kwargs):
+        x, y = _visvalingam_whyatt_ring(*self.xy, minarea=kwargs.get('minarea', 0.01*self.area))
         holes = []
         for hole in self.interiors:
-            xh, yh = _visvalingam_whyatt_ring(*np.array(hole.xy), minarea=frac*self.area)
+            xh, yh = _visvalingam_whyatt_ring(*np.array(hole.xy), minarea=kwargs.get('minarea', 0.01*Polygon(hole).area))
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
@@ -204,7 +205,6 @@ class Grain(PolyShape):
             res = self
             print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
         return res
-
 
 
     ################################################################
@@ -487,6 +487,7 @@ class PolySet(object):
         self._plot(ax, legend, alpha)
         plt.setp(plt.yticks()[1], rotation=90)
         self._makelegend(ax, pos, ncol)
+        #return ax
 
     def savefig(self, filename='grains.png', legend=None, pos='auto', alpha=0.8, cmap='jet', dpi=150, ncol=1):
         if legend is None:
@@ -625,6 +626,12 @@ class Grains(PolySet):
         ax.get_yaxis().set_tick_params(which='both', direction='out')
         ax.get_xaxis().set_tick_params(which='both', direction='out')
         return ax
+
+    def simplify(self, method='vw', **kwargs):
+        return Grains([getattr(s, method)(**kwargs) for s in self])
+
+    def smooth(self, method='chaikin', **kwargs):
+        return Grains([getattr(s, method)(**kwargs) for s in self])
 
 
 class Boundaries(PolySet):

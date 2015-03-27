@@ -244,7 +244,7 @@ def find_ellipse(x, y):
     phi = 0.5*np.arctan(2*b/(a - c))
     up = 2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g)
     down1 = (b*b - a*c)*((c - a)*np.sqrt(1 + 4*b*b/((a - c)*(a - c))) - (c + a))
-    down2 = (b*b - a*c)*((a - c)*np.sqrt(1 + 4*b*b/((a - c)*(a - c))                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ) - (c + a))
+    down2 = (b*b - a*c)*((a - c)*np.sqrt(1 + 4*b*b/((a - c)*(a - c))) - (c + a))
     a = np.sqrt(up/down1)
     b = np.sqrt(up/down2)
     return xc, yc, phi, a, b
@@ -291,10 +291,10 @@ def _visvalingam_whyatt_ring(x, y, minarea=None):
         i0 = np.arange(len(xx)-2)
         i1 = i0 + 1
         i2 = i0 + 2
-        a = abs(xx[i0]*(yy[i1] - yy[i2]) + xx[i1]*(yy[i2] - yy[i0]) + xx[i2]*(yy[i0] - yy[i1]))/2
-        ix = a.argmin()
-        mn = min(a)
-        if (tot + mn) < minarea:
+        a = (xx[i0]*(yy[i1] - yy[i2]) + xx[i1]*(yy[i2] - yy[i0]) + xx[i2]*(yy[i0] - yy[i1]))/2
+        ix = abs(a).argmin()
+        mn = a[ix]
+        if abs(tot + mn) < minarea and len(x) > 4:
             if ix==0 or ix==len(x)-1:
                 x = np.concatenate((x[1:-1], x[1:2]))
                 y = np.concatenate((y[1:-1], y[1:2]))
