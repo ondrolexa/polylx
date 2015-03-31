@@ -43,6 +43,12 @@ asind = lambda x: np.rad2deg(np.arcsin(x))
 acosd = lambda x: np.rad2deg(np.arccos(x))
 atand = lambda x: np.rad2deg(np.arctan(x))
 atan2d = lambda x1, x2: np.rad2deg(np.arctan2(x1, x2))
+fixzero = lambda x: x*(x > np.finfo(float).eps)
+def fixratio(x, y):
+    if y == 0:
+        return np.inf
+    else:
+        return x/y
 
 
 class PolyShape(object):
@@ -63,7 +69,7 @@ class PolyShape(object):
 
     @property
     def ar(self):
-        return self.la/self.sa
+        return fixratio(self.la, self.sa)
 
     @property
     def ma(self):
@@ -90,7 +96,7 @@ class PolyShape(object):
         self.la = np.sqrt(np.max(d2))
         self.lao = atan2d(*dxy) % 180
         self.sao = (self.lao + 90) % 180
-        self.sa = self.feret(self.sao)
+        self.sa = fixzero(self.feret(self.sao))
         self.xc, self.yc = self.shape.centroid.coords[0]
         self._shape_method = 'maxferet'
 
@@ -135,18 +141,17 @@ class Grain(PolyShape):
         ax.plot(*hull, ls='--', c='g')
         ax.add_patch(PathPatch(PolygonPath(self.shape),
                      fc='blue', ec='#000000', alpha=0.5, zorder=2))
-        pa = np.array(list(itertools.combinations(range(len(hull.T)), 2)))
-        d2 = np.sum((hull.T[pa[:, 0]] - hull.T[pa[:, 1]])**2, axis=1)
-        ix = d2.argmax()
-        ax.plot(*hull.T[pa[ix]].T, ls=':', lw=2, c='r')
+        ax.plot(*self.centroid, color='red', marker='o')
         R = np.linspace(0, 360, 361)
         cr, sr = cosd(R), sind(R)
         cl, sl = cosd(self.lao), sind(self.lao)
         xx = self.xc + self.la*cr*sl/2 + self.sa*sr*cl/2
         yy = self.yc + self.la*cr*cl/2 - self.sa*sr*sl/2
         ax.plot(xx, yy, color='green')
+        ax.plot(xx[[0,180]], yy[[0,180]], color='green')
+        ax.plot(xx[[90,270]], yy[[90,270]], color='green')
         ax.autoscale_view(None, True, True)
-        plt.title('Shape method: {}'.format(self.shape_method))
+        plt.title('Shape method: {} LAO: {:.2f} AR: {:.4f}'.format(self.shape_method, self.lao, self.ar))
         plt.show()
 
     #################################################################
@@ -210,8 +215,22 @@ class Grain(PolyShape):
     ################################################################
     # Grain shape methods (should modify sa, la, sao, lao, xc, yc) #
     ################################################################
+    def minferet(self):
+        # return tuple of minimum feret and orientation
+        xy = self.hull.T
+        dxy = xy[1:]-xy[:-1]
+        ang = (atan2d(*dxy.T) + 90) % 180
+        pp = np.dot(xy, np.array([sind(ang), cosd(ang)]))
+        d = pp.max(axis=0) - pp.min(axis=0)
+        self.sa = np.min(d)
+        self.sao = ang[d.argmin()]
+        self.lao = (self.sao + 90) % 180
+        self.la = self.feret(self.lao)
+        self.xc, self.yc = self.shape.centroid.coords[0]
+        self._shape_method = 'minferet'
+
     def moment(self):
-        x, y = self.xy[:,:-1]
+        x, y = self.xy[:, :-1]
         x = x - x.mean()
         y = y - y.mean()
         xl = np.roll(x, -1)
@@ -243,20 +262,6 @@ class Grain(PolyShape):
             print('Moment fit failed for grain fid={}. Fallback to maxferet.'.format(self.fid))
             self.maxferet()
 
-    def minferet(self):
-        # return tuple of minimum feret and orientation
-        xy = self.hull.T
-        dxy = xy[1:]-xy[:-1]
-        ang = (atan2d(*dxy.T) + 90) % 180
-        pp = np.dot(xy, np.array([sind(ang), cosd(ang)]))
-        d = pp.max(axis=0) - pp.min(axis=0)
-        self.sa = np.min(d)
-        self.sao = ang[d.argmin()]
-        self.lao = (self.sao + 90) % 180
-        self.la = self.feret(self.lao)
-        self.xc, self.yc = self.shape.centroid.coords[0]
-        self._shape_method = 'minferet'
-
     def direct(self):
         x, y = self.xy
         res = find_ellipse(x[:-1].copy(), y[:-1].copy())
@@ -280,6 +285,20 @@ class Grain(PolyShape):
                 a, b = b, a
             self.xc, self.yc, self.la, self.sa, self.lao, self.sao = xc, yc, 2*a, 2*b, np.rad2deg(ori) % 180, (np.rad2deg(ori) + 90) % 180
             self._shape_method = 'direct'
+
+    def cov(self):
+        x, y = self.xy[:, :-1]
+        x = x - x.mean()
+        y = y - y.mean()
+        s = np.cov(x, y)
+        evals, evecs = np.linalg.eig(s)
+        idx = evals.argsort()
+        evals = evals[idx]
+        evecs = evecs[:, idx]
+        self.sa, self.la = np.sqrt(8)*np.sqrt(evals)
+        self.sao, self.lao = np.mod(atan2d(evecs[0,:],evecs[1,:]), 180)
+        self.xc, self.yc = self.shape.centroid.coords[0]
+        self._shape_method = 'cov'
 
 
 class Boundary(PolyShape):
@@ -322,10 +341,27 @@ class Boundary(PolyShape):
         ix = d2.argmax()
         ax.plot(*hull.T[pa[ix]].T, ls=':', lw=2, c='r')
         ax.autoscale_view(None, True, True)
+        plt.title('Shape method: {} LAO: {:.2f} AR: {:.4f}'.format(self.shape_method, self.lao, self.ar))
         plt.show()
+  
+
     ###################################################################
     # Boundary shape methods (should modify sa, la, sao, lao, xc, yc) #
     ###################################################################
+    def cov(self):
+        x, y = self.xy
+        x = x - x.mean()
+        y = y - y.mean()
+        s = np.cov(x, y)
+        evals, evecs = np.linalg.eig(s)
+        idx = evals.argsort()
+        evals = evals[idx]
+        evecs = evecs[:, idx]
+        self.sa, self.la = np.sqrt(2)*np.sqrt(evals)
+        self.sa = fixzero(self.sa)
+        self.sao, self.lao = np.mod(atan2d(evecs[0,:],evecs[1,:]), 180)
+        self.xc, self.yc = self.shape.centroid.coords[0]
+        self._shape_method = 'cov'
 
 
 class PolySet(object):
@@ -360,7 +396,12 @@ class PolySet(object):
                 res = [getattr(p, attr) for p in self]
         return res
 
-    def set_shape_method(self, value):
+    @property
+    def shape_method(self):
+        return [p.shape_method for p in self]
+
+    @shape_method.setter
+    def shape_method(self, value):
         for p in self:
             if not hasattr(p, '_shape_method'):
                 p.shape_method = value
@@ -489,6 +530,10 @@ class PolySet(object):
         self._makelegend(ax, pos, ncol)
         #return ax
 
+    def show(self):
+        self.plot()
+        plt.show()
+
     def savefig(self, filename='grains.png', legend=None, pos='auto', alpha=0.8, cmap='jet', dpi=150, ncol=1):
         if legend is None:
             legend = self._autocolortable(cmap)
@@ -578,6 +623,10 @@ class Grains(PolySet):
 
     def phase_dict(self):
         return {key: g.phase for (key, g) in enumerate(self)}
+
+    @property
+    def boundaries(self):
+        return Boundaries.from_grains(self)
 
     @classmethod
     def from_shp(self, filename=os.path.join(resource_filename(__name__, 'example'), 'sg2.shp'), phasefield='phase'):
