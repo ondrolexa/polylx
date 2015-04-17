@@ -1,18 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed Feb  5 21:42:54 2014
+Python module to visualize and analyze digitized 2D microstructures.
 
 @author: Ondrej Lexa
 
-Example:
-
-from core import *
-g = Grains.from_shp('m1-p')
-b = Boundaries.from_grains(g)
-
-from core import *
-from shapely.geometry import Polygon
-g = Grain(Polygon([(2, 0), (0, 4), (8, 8), (10,4)]), 'rect')
+Examples:
+  >>> from core import *
+  >>> g = Grains.from_shp('')
+  >>> b = Boundaries.from_grains(g)
 
 """
 import os
@@ -35,6 +30,8 @@ from .utils import _chaikin_ring, _spline_ring, _visvalingam_whyatt_ring
 
 from pkg_resources import resource_filename
 
+__all__ = ['Grain', 'Boundary', 'Grains', 'Boundaries', 'Sample']
+
 # lambda degree based functions
 sind = lambda x: np.sin(np.deg2rad(x))
 cosd = lambda x: np.cos(np.deg2rad(x))
@@ -44,6 +41,7 @@ acosd = lambda x: np.rad2deg(np.arccos(x))
 atand = lambda x: np.rad2deg(np.arctan(x))
 atan2d = lambda x1, x2: np.rad2deg(np.arctan2(x1, x2))
 fixzero = lambda x: x*(x > np.finfo(float).eps)
+
 def fixratio(x, y):
     if y == 0:
         return np.inf
@@ -52,7 +50,9 @@ def fixratio(x, y):
 
 
 class PolyShape(object):
+    """Base class to store polygon or polyline
 
+    """
     def __getattr__(self, attr):
         if hasattr(self.shape, attr):
             return getattr(self.shape, attr)
@@ -61,25 +61,52 @@ class PolyShape(object):
 
     @property
     def shape_method(self):
+        """Returns shape method in use
+
+        """
         return self._shape_method
 
     @shape_method.setter
     def shape_method(self, value):
+        """Sets shape method
+
+        """
         getattr(self, value)()   # to evaluate and check validity
 
     @property
     def ar(self):
+        """Returns axial ratio
+        
+        Note that axial ratio is calculated from long and short axes
+        calculated by actual ``shape method``.
+
+        """
         return fixratio(self.la, self.sa)
 
     @property
     def ma(self):
+        """Returns mean axis
+        
+        Mean axis is calculated as square root of long axis multiplied by short axis.
+        Both long and short axes are calculated by actual ``shape method``.
+
+        """
         return np.sqrt(self.la*self.sa)
 
     @property
     def centroid(self):
+        """Returns the geometric center of the object
+
+        """
         return self.shape.centroid.coords[0]
 
     def feret(self, angle=0):
+        """Returns the ferret diameter for given angle
+
+        Args:
+          angle: angle of caliper rotation
+
+        """
         pp = np.dot(self.hull.T, np.array([sind(angle), cosd(angle)]))
         return pp.max(axis=0) - pp.min(axis=0)
 
@@ -87,7 +114,13 @@ class PolyShape(object):
     # Common shape methods (should modify sa, la, sao, lao, xc, yc) #
     #################################################################
     def maxferet(self):
-        # longest diameter
+        """`shape_method`: maxferet
+
+        Long axis is defined as the maximum caliper of the polygon/polyline.
+        Short axis correspond to caliper orthogonal to long axis.
+        Center coordinates are set to centroid.
+
+        """
         xy = self.hull.T
         pa = np.array(list(itertools.combinations(range(len(xy)), 2)))
         d2 = np.sum((xy[pa[:, 0]] - xy[pa[:, 1]])**2, axis=1)
@@ -216,7 +249,13 @@ class Grain(PolyShape):
     # Grain shape methods (should modify sa, la, sao, lao, xc, yc) #
     ################################################################
     def minferet(self):
-        # return tuple of minimum feret and orientation
+        """`shape_method`: minferet
+
+        Short axis is defined as the minimum caliper of the polygon.
+        Long axis correspond to caliper orthogonal to short axis.
+        Center coordinates are set to centroid.
+
+        """
         xy = self.hull.T
         dxy = xy[1:]-xy[:-1]
         ang = (atan2d(*dxy.T) + 90) % 180
@@ -230,6 +269,13 @@ class Grain(PolyShape):
         self._shape_method = 'minferet'
 
     def moment(self):
+        """`shape_method`: moment
+
+        Short and long axes are calculated from area moments of inertia.
+        Center coordinates are set to centroid. If moment fitting failed
+        silently fallback to maxferet.
+
+        """
         x, y = self.xy[:, :-1]
         x = x - x.mean()
         y = y - y.mean()
@@ -263,6 +309,13 @@ class Grain(PolyShape):
             self.maxferet()
 
     def direct(self):
+        """`shape_method`: direct
+
+        Short, long axes and centre coordinates are calculated from direct
+        least-square ellipse fitting. If direct fitting is not possible
+        silently fallback to moment. 
+
+        """
         x, y = self.xy
         res = find_ellipse(x[:-1].copy(), y[:-1].copy())
         err = 1
@@ -287,6 +340,12 @@ class Grain(PolyShape):
             self._shape_method = 'direct'
 
     def cov(self):
+        """`shape_method`: cov
+
+        Short and long axes are calculated from eigenvalue analysis
+        of coordinate covariance matrix.
+
+        """
         x, y = self.xy[:, :-1]
         x = x - x.mean()
         y = y - y.mean()

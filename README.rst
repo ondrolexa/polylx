@@ -2,19 +2,13 @@
 PolyLX
 ===============================
 
-.. image:: https://badge.fury.io/py/polylx.png
+.. image:: https://badge.fury.io/py/polylx.svg
     :target: http://badge.fury.io/py/polylx
 
-.. image:: https://travis-ci.org/ondrolexa/polylx.png?branch=master
-        :target: https://travis-ci.org/ondrolexa/polylx
+A package to visualize and analyze digitized 2D microstructures.
 
-.. image:: https://pypip.in/d/polylx/badge.png
-        :target: https://pypi.python.org/pypi/polylx
-
-
-A package to visualize and analyze microstructures.
-
-See it in action http://nbviewer.ipython.org/github/ondrolexa/polylx/blob/develop/polylx_tutorial.ipynb
+Documentation is in progress, but taste PolyLX in action in accompanied
+IPython notebook: http://nbviewer.ipython.org/github/ondrolexa/polylx/blob/develop/polylx_tutorial.ipynb
 
 ..
     * Free software: BSD license
