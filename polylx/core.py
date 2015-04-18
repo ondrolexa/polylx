@@ -31,7 +31,7 @@ from .utils import _chaikin_ring, _spline_ring, _visvalingam_whyatt_ring
 from pkg_resources import resource_filename
 
 __all__ = ['Grain', 'Boundary', 'Grains', 'Boundaries', 'Sample']
-
+respath = resource_filename(__name__, 'example')
 
 class PolyShape(object):
     """Base class to store polygon or polyline
@@ -521,12 +521,12 @@ class PolySet(object):
       extent: tuple of (xmin, ymin, xmax, ymax)
 
     """
-    def __init__(self, shapes):
+    def __init__(self, shapes, attr='name', rule='unique', k=5):
         if len(shapes) > 0:
             self.polys = shapes
             gb = self.bounds
             self.extent = gb[:, 0].min(), gb[:, 1].min(), gb[:, 2].max(), gb[:, 3].max()
-            self.classify('name', 'unique')
+            self.classify(attr, rule=rule, k=k)
         else:
             raise ValueError("No objects passed.")
 
@@ -680,25 +680,28 @@ class PolySet(object):
         if pos == 'top':
             h, l = ax.get_legend_handles_labels()
             divider = make_axes_locatable(ax)
-            cax = divider.append_axes("top", size=0.25+0.25*np.ceil(len(h)/ncol))
+            cax = divider.append_axes('top',
+                                      size=0.25+0.25*np.ceil(len(h)/ncol))
             cax.set_axis_off()
-            cax.legend(h, l, loc=9, borderaxespad=0., ncol=3, bbox_to_anchor=[0.5, 1.1])
+            cax.legend(h, l, loc=9, borderaxespad=0.,
+                       ncol=ncol, bbox_to_anchor=[0.5, 1.1])
             plt.tight_layout()
         elif pos == 'right':
             h, l = ax.get_legend_handles_labels()
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size=0.2+1.6*ncol)
             cax.set_axis_off()
-            cax.legend(h, l, loc=7, borderaxespad=0., bbox_to_anchor=[1.04, 0.5])
+            cax.legend(h, l, loc=7, borderaxespad=0.,
+                       bbox_to_anchor=[1.04, 0.5])
             plt.tight_layout()
 
-    def plot(self, legend=None, pos='auto', alpha=0.8, cmap='jet', ncol=1):
+    def plot(self, legend='auto', pos='auto', alpha=0.8, cmap='jet', ncol=1):
         """Plot set of ``Grains`` or ``Boundaries`` objects.
 
         Args:
           legend: dictionary with classes as keys and RGB tuples as values
-                  Default Auto (created by _autocolortable method)
-          pos: legend position "top" or "right". Defalt Auto
+                  Default "auto" (created by _autocolortable method)
+          pos: legend position "top", "right" or "none". Defalt "auto"
           alpha: transparency. Default 0.8
           cmap: colormap. Default "jet"
           ncol: number of columns for legend.
@@ -706,7 +709,7 @@ class PolySet(object):
         Returns matplotlib axes object.
 
         """
-        if legend is None:
+        if legend == 'auto':
             legend = self._autocolortable(cmap)
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
@@ -715,14 +718,15 @@ class PolySet(object):
         self._makelegend(ax, pos, ncol)
         return ax
 
-    def show(self):
+    def show(self, **kwargs):
         """Show plot of ``Grains`` or ``Boundaries`` objects.
 
         """
-        self.plot()
+        self.plot(**kwargs)
         plt.show()
 
-    def savefig(self, filename='figure.png', legend=None, pos='auto', alpha=0.8, cmap='jet', dpi=150, ncol=1):
+    def savefig(self, filename='figure.png', legend=None, pos='auto',
+                alpha=0.8, cmap='jet', dpi=150, ncol=1):
         """Save grains or boudaries plot to file.
 
         Args:
@@ -741,49 +745,43 @@ class PolySet(object):
         plt.savefig(filename, dpi=dpi)
         plt.close()
 
-    def rose(self, ang=None, bins=36, scaled=True, weights=None, density=False, arrow=0.95, rwidth=1, **kwargs):
+    def rose(self, ang=None, bins=36, scaled=True, weights=None,
+             density=False, arrow=0.95, rwidth=1,
+             pdf=False, kappa=250, **kwargs):
         if ang is None:
             ang = self.lao
-        #plot
         fig = plt.figure()
         ax = fig.add_subplot(111, polar=True)
         ax.set_theta_zero_location('N')
         ax.set_theta_direction(-1)
-        width = 360/bins
-        num, bin_edges = np.histogram(np.concatenate((ang, ang + 180)), bins=bins + 1, range=(-width/2, 360 + width/2), weights=weights, density=density)
-        num[0] += num[-1]
-        num = num[:-1]
+        if pdf:
+            from scipy.stats import vonmises
+            theta = np.linspace(-np.pi, np.pi, 1801)
+            radii = np.zeros_like(theta)
+            for a in ang:
+                radii += vonmises.pdf(theta, kappa, loc=np.radians(a))
+                radii += vonmises.pdf(theta, kappa, loc=np.radians(a + 180))
+
+            radii /= len(ang)
+        else:
+            width = 360/bins
+            num, bin_edges = np.histogram(np.concatenate((ang, ang + 180)),
+                                          bins=bins + 1,
+                                          range=(-width/2, 360 + width/2),
+                                          weights=weights, density=density)
+            num[0] += num[-1]
+            num = num[:-1]
+            theta = []
+            radii = []
+            for cc, val in zip(np.arange(0, 360, width), num):
+                theta.extend([cc - width/2, cc - rwidth*width/2, cc,
+                              cc + rwidth*width/2, cc + width/2, ])
+                radii.extend([0, val*arrow, val, val*arrow, 0])
+            theta = np.deg2rad(theta)
         if scaled:
-            num = np.sqrt(num)
-        theta = []
-        radii = []
-        for cc, val in zip(np.arange(0, 360, width), num):
-            theta.extend([cc - width/2, cc - rwidth*width/2, cc, cc + rwidth*width/2, cc + width/2, ])
-            radii.extend([0, val*arrow, val, val*arrow, 0])
-
-        ax.fill(np.deg2rad(theta), radii, **kwargs)
-        # IDEA
-
-        #ax = plt.axes([0.025, 0.025, 0.95, 0.95], polar=True)
-        #ax.set_theta_zero_location('N')
-        #ax.set_theta_direction(-1)
-        #bars = plt.bar(theta, radii, width=width*0.8, alpha=0.5, align='center')
-        #ax.set_yticklabels([])
-
-        # IDEA PDF
-        #x=np.linspace(-np.pi, np.pi, 1801)
-        #ax = plt.subplot(111, polar=True)
-        #kappa = 250
-        #pdf = np.zeros_like(x)
-        #for lao in g.lao:
-        #    pdf += vonmises.pdf(x, kappa, loc=np.radians(lao))
-        #    pdf += vonmises.pdf(x, kappa, loc=np.radians(lao+180))
-
-        #pdf /= len(g.lao)
-        #ax.plot(x+np.pi, np.sqrt(pdf), label='%s'%kappa)
-        #ax.set_theta_zero_location('N')
-        #ax.set_theta_direction(-1)
-        #ax.grid(True)
+            radii = np.sqrt(radii)
+        ax.fill(theta, radii, **kwargs)
+        return ax
 
 
 class Grains(PolySet):
@@ -818,16 +816,17 @@ class Grains(PolySet):
         """
         if isinstance(index, list) or isinstance(index, tuple):
             index = np.asarray(index)
-        if isinstance(index, int):
-            return self.polys[index]
-        elif isinstance(index, str):
-            return Grains([g for g in self.polys if g.name == index])
-        elif isinstance(index, np.ndarray):
+        if isinstance(index, str):
+            index = np.flatnonzero(self.name == index)
+        if isinstance(index, np.ndarray):
             if index.dtype == 'bool':
                 index = np.flatnonzero(index)
-            return Grains([self.polys[fid] for fid in index])
+            return Grains([self.polys[fid] for fid in index],
+                          self.class_attr,
+                          self.classes.rule,
+                          self.classes.k)
         else:
-            return Grains(self.polys[index])
+            return self.polys[index]
 
     @property
     def phase_list(self):
@@ -841,7 +840,8 @@ class Grains(PolySet):
         return Boundaries.from_grains(self)
 
     @classmethod
-    def from_shp(self, filename=os.path.join(resource_filename(__name__, 'example'), 'sg2.shp'), phasefield='phase'):
+    def from_shp(self, filename=os.path.join(respath, 'sg2.shp'),
+                 phasefield='phase'):
         """Create Grains from ESRI shapefile.
 
         Args:
@@ -884,12 +884,22 @@ class Grains(PolySet):
 
     def _plot(self, ax, legend, alpha, ec='#222222'):
         groups = self.groups('shape')
+        keys = groups.groups.keys()
         for key in self.classes.index:
-            group = groups.get_group(key)
             paths = []
-            for g in group['shape']:
-                paths.append(PolygonPath(g))
-            patch = PathPatch(Path.make_compound_path(*paths), fc=legend[key], ec=ec, alpha=alpha, zorder=2, label='{} ({})'.format(key, len(group)))
+            if key in keys:
+                group = groups.get_group(key)
+                for g in group['shape']:
+                    paths.append(PolygonPath(g))
+                patch = PathPatch(Path.make_compound_path(*paths),
+                                  fc=legend[key],
+                                  ec=ec, alpha=alpha, zorder=2,
+                                  label='{} ({})'.format(key, len(group)))
+            else:
+                patch = PathPatch(Path([[None, None]]),
+                                  fc=legend[key],
+                                  ec=ec, alpha=alpha, zorder=2,
+                                  label='{} ({})'.format(key, 0))
             ax.add_patch(patch)
         ax.margins(0.025, 0.025)
         ax.get_yaxis().set_tick_params(which='both', direction='out')
@@ -935,17 +945,17 @@ class Boundaries(PolySet):
         """
         if isinstance(index, list) or isinstance(index, tuple):
             index = np.asarray(index)
-        if isinstance(index, int):
-            return self.polys[index]
-        elif isinstance(index, str):
-            okindex = '%s-%s' % tuple(sorted(index.split('-')))
-            return Boundaries([b for b in self.polys if b.name == okindex])
-        elif isinstance(index, np.ndarray):
+        if isinstance(index, str):
+            index = np.flatnonzero(self.name == index)
+        if isinstance(index, np.ndarray):
             if index.dtype == 'bool':
                 index = np.flatnonzero(index)
-            return Boundaries([self.polys[fid] for fid in index])
+            return Boundaries([self.polys[fid] for fid in index],
+                              self.class_attr,
+                              self.classes.rule,
+                              self.classes.k)
         else:
-            return Boundaries(self.polys[index])
+            return self.polys[index]
 
     @property
     def type_list(self):
@@ -1057,7 +1067,8 @@ class Sample(object):
         return 'Sample with %s grains and %s boundaries.' % (len(self.g.polys),len(self.b.polys))
 
     @classmethod
-    def from_shp(cls, filename=os.path.join(resource_filename(__name__, 'example'), 'sg2.shp'), phasefield='phase'):
+    def from_shp(cls, filename=os.path.join(respath, 'sg2.shp'),
+                 phasefield='phase'):
         return cls.from_grains(Grains.from_shp(filename, phasefield))
 
     @classmethod

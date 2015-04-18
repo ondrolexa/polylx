@@ -55,10 +55,9 @@ class deg(object):
 
 class Classify(object):
     def __init__(self, vals, rule='natural', k=5):
-        if rule == 'unique':
-            self.index = np.unique(vals)
-            self.names = np.asarray(vals)
-        elif rule == 'equal' or rule == 'user':
+        self.rule = rule
+        self.k = k
+        if rule == 'equal' or rule == 'user':
             counts, bins = np.histogram(vals, k)
             index = np.digitize(vals, bins) - 1
             # if upper limit is maximum value, digitize it to last bin
@@ -78,10 +77,12 @@ class Classify(object):
             counts = np.bincount(index)
             self.index = ['%g-%g' % (bins[i], bins[i+1]) for i in range(len(counts))]
             self.names = np.array([self.index[i] for i in index])
+        else:  #unique
+            self.index = np.unique(vals)
+            self.names = np.asarray(vals)
 
     def __call__(self, num):
-        where = self.index[num] == self.names
-        return np.flatnonzero(where)
+        return np.flatnonzero(self.names == self.index[num])
 
     @property
     def labels(self):
