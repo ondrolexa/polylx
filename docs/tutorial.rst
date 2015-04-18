@@ -23,7 +23,7 @@ Basic usage
 To start working with **PolyLX** we need to import polylx package. For
 convinience, we will import polylx into actual namespace::
 
-    >>> from apsg import *
+    >>> from polylx import *
 
 To read example data, we can use ``Grains.from_shp`` method without
 arguments. Note that we create new ``Grains`` object, which store all
