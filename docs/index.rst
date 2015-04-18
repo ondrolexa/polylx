@@ -12,6 +12,7 @@ Contents:
    :maxdepth: 2
 
    automodules
+   tutorial
    installation
    usage
    contributing

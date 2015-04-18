@@ -11,22 +11,105 @@ g.plot(cmap=optimize_colormap('jet'))
 """
 import numpy as np
 
+
+def fixzero(x):
+    return x*(x > np.finfo(float).eps)
+
+
+def fixratio(x, y):
+    if y == 0:
+        return np.inf
+    else:
+        return x/y
+
+
+class deg(object):
+    @staticmethod
+    def sin(x):
+        return np.sin(np.deg2rad(x))
+
+    @staticmethod
+    def cos(x):
+        return np.cos(np.deg2rad(x))
+
+    @staticmethod
+    def tan(x):
+        return np.tan(np.deg2rad(x))
+
+    @staticmethod
+    def asin(x):
+        return np.rad2deg(np.arcsin(x))
+
+    @staticmethod
+    def acos(x):
+        return np.rad2deg(np.arccos(x))
+
+    @staticmethod
+    def atan(x):
+        return np.rad2deg(np.arctan(x))
+
+    @staticmethod
+    def atan2(x1, x2):
+        return np.rad2deg(np.arctan2(x1, x2))
+
+
+class Classify(object):
+    def __init__(self, vals, rule='natural', k=5):
+        if rule == 'unique':
+            self.index = np.unique(vals)
+            self.names = np.asarray(vals)
+        elif rule == 'equal' or rule == 'user':
+            counts, bins = np.histogram(vals, k)
+            index = np.digitize(vals, bins) - 1
+            # if upper limit is maximum value, digitize it to last bin
+            edge = len(bins) - 1
+            index[np.flatnonzero(index == edge)] = edge - 1
+            self.index = ['%g-%g' % (bins[i], bins[i+1]) for i in range(len(counts))]
+            self.names = np.array([self.index[i] for i in index])
+        elif rule == 'natural':
+            index, bins = natural_breaks(vals, k=k)
+            counts = np.bincount(index)
+            self.index = ['%g-%g' % (bins[i], bins[i+1]) for i in range(len(counts))]
+            self.names = np.array([self.index[i] for i in index])
+        elif rule == 'jenks':
+            bins = fisher_jenks(vals, k=k)
+            index = np.digitize(vals, bins) - 1
+            index[np.flatnonzero(index == k)] = k - 1
+            counts = np.bincount(index)
+            self.index = ['%g-%g' % (bins[i], bins[i+1]) for i in range(len(counts))]
+            self.names = np.array([self.index[i] for i in index])
+
+    def __call__(self, num):
+        where = self.index[num] == self.names
+        return np.flatnonzero(where)
+
+    @property
+    def labels(self):
+        index, inverse = np.unique(self.names, return_inverse=True)
+        return ['%s (%d)' % p for p in zip(index, np.bincount(inverse))]
+
 def PolygonPath(polygon):
     """Constructs a compound matplotlib path from a Shapely object
        modified from descartes https://pypi.python.org/pypi/descartes
     """
     from matplotlib.path import Path
+
     def coding(ob):
         vals = np.ones(len(ob.coords), dtype=Path.code_type) * Path.LINETO
         vals[0] = Path.MOVETO
         return vals
-    vertices = np.concatenate([np.asarray(polygon.exterior)] + [np.asarray(r) for r in polygon.interiors])
-    codes = np.concatenate([coding(polygon.exterior)] + [coding(r) for r in polygon.interiors])
+
+    vertices = np.concatenate([np.asarray(polygon.exterior)] +
+                              [np.asarray(r) for r in polygon.interiors])
+    codes = np.concatenate([coding(polygon.exterior)] +
+                           [coding(r) for r in polygon.interiors])
     return Path(vertices, codes)
+
 
 def optimize_colormap(name):
     # optimize lightness to the desired value
     import matplotlib.cm as cm
+    from matplotlib.colors import LinearSegmentedColormap
     from colormath.color_objects import LabColor, sRGBColor
     from colormath.color_conversions import convert_color
     cmap = cm.get_cmap(name)
@@ -42,9 +125,13 @@ def optimize_colormap(name):
     # Go back to rbg.
     rgb_colors = [convert_color(_i, target_cs=sRGBColor) for _i in lab_colors]
     # Clamp values as colorspace of LAB is larger then sRGB.
-    rgb_colors = [(_i.clamped_rgb_r, _i.clamped_rgb_g, _i.clamped_rgb_b) for _i in rgb_colors]
-    cmap = cm.colors.LinearSegmentedColormap.from_list(name=name + "_optimized", colors=rgb_colors)
+    rgb_colors = [(_i.clamped_rgb_r,
+                   _i.clamped_rgb_g,
+                   _i.clamped_rgb_b) for _i in rgb_colors]
+    cmap = LinearSegmentedColormap.from_list(name=name + "_optimized",
+                                             colors=rgb_colors)
     return cmap
+
 
 def natural_breaks(values, k=5, itmax=100):
     """
@@ -65,7 +152,7 @@ def natural_breaks(values, k=5, itmax=100):
     c0 = diffs.argmin(axis=0)
     c0 = np.array(c0)[0]
     solving = True
-    solved = False
+#    solved = False
     rk = range(k)
     it = 0
     while solving:
@@ -81,7 +168,7 @@ def natural_breaks(values, k=5, itmax=100):
         d = abs(c1 - c0)
         if d.sum() == 0:
             solving = False
-            solved = True
+#            solved = True
         else:
             c0 = c1
         it += 1
@@ -89,6 +176,7 @@ def natural_breaks(values, k=5, itmax=100):
             solving = False
     cuts = [min(values)] + [max(values[c1 == c]) for c in rk]
     return c1, cuts
+
 
 def _fisher_jenks_means(values, classes=5, sort=True):
     """
@@ -157,6 +245,7 @@ def _fisher_jenks_means(values, classes=5, sort=True):
         countNum -= 1
     return kclass
 
+
 def fisher_jenks(values, k=5):
     """
     Our own version of Jenks Optimal (Natural Breaks) algorithm
@@ -220,6 +309,7 @@ def fisher_jenks(values, k=5):
 
     return pivots
 
+
 def find_ellipse(x, y):
     # direct ellipse fit
     xmean = x.mean()
@@ -249,11 +339,13 @@ def find_ellipse(x, y):
     b = np.sqrt(up/down2)
     return xc, yc, phi, a, b
 
+
 def densify(x, y, repeat=1):
     for i in range(repeat):
         x = np.insert(x, np.s_[1:], x[:-1] + np.diff(x)/2)
         y = np.insert(y, np.s_[1:], y[:-1] + np.diff(y)/2)
     return x, y
+
 
 def _chaikin_ring(x, y, repeat=4):
     # Chaikin's corner cutting algorithm
@@ -262,6 +354,7 @@ def _chaikin_ring(x, y, repeat=4):
         x = np.append(x[1::2], x[1])
         y = np.append(y[1::2], y[1])
     return x, y
+
 
 def _spline_ring(x, y, densify=5, pad=5):
     from scipy.interpolate import spline
@@ -282,6 +375,7 @@ def _spline_ring(x, y, densify=5, pad=5):
     y[-1] = y[0]
     return x, y
 
+
 def _visvalingam_whyatt_ring(x, y, minarea=None):
     do = True
     tot = 0
@@ -295,7 +389,7 @@ def _visvalingam_whyatt_ring(x, y, minarea=None):
         ix = abs(a).argmin()
         mn = a[ix]
         if abs(tot + mn) < minarea and len(x) > 4:
-            if ix==0 or ix==len(x)-1:
+            if ix == 0 or ix == len(x)-1:
                 x = np.concatenate((x[1:-1], x[1:2]))
                 y = np.concatenate((y[1:-1], y[1:2]))
             else:
@@ -305,4 +399,3 @@ def _visvalingam_whyatt_ring(x, y, minarea=None):
         else:
             do = False
     return x, y
-

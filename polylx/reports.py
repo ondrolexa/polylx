@@ -80,7 +80,7 @@ class Report(object):
         self.figure(f.name, width, height)
         self.images.append(f)
 
-    def grainmap(self, g, legend=None, loc='auto', alpha=0.8, dpi=150, width=None, height=None):
+    def plot(self, g, legend=None, loc='auto', alpha=0.8, dpi=150, width=None, height=None):
         f = tempfile.NamedTemporaryFile(suffix='.png')
         g.savefig(f, legend, loc, alpha, dpi)
         self.figure(f.name, width, height)

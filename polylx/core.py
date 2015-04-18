@@ -24,7 +24,7 @@ import networkx as nx
 import pandas as pd
 
 from .shapefile import Reader
-from .utils import natural_breaks, fisher_jenks, PolygonPath
+from .utils import fixratio, fixzero, deg, Classify, PolygonPath
 from .utils import find_ellipse, densify
 from .utils import _chaikin_ring, _spline_ring, _visvalingam_whyatt_ring
 
@@ -32,27 +32,23 @@ from pkg_resources import resource_filename
 
 __all__ = ['Grain', 'Boundary', 'Grains', 'Boundaries', 'Sample']
 
-# lambda degree based functions
-sind = lambda x: np.sin(np.deg2rad(x))
-cosd = lambda x: np.cos(np.deg2rad(x))
-tand = lambda x: np.tan(np.deg2rad(x))
-asind = lambda x: np.rad2deg(np.arcsin(x))
-acosd = lambda x: np.rad2deg(np.arccos(x))
-atand = lambda x: np.rad2deg(np.arctan(x))
-atan2d = lambda x1, x2: np.rad2deg(np.arctan2(x1, x2))
-fixzero = lambda x: x*(x > np.finfo(float).eps)
-
-def fixratio(x, y):
-    if y == 0:
-        return np.inf
-    else:
-        return x/y
-
 
 class PolyShape(object):
     """Base class to store polygon or polyline
 
+    Properties:
+      shape: ``shapely.geometry`` object
+      name: name of polygon or polyline.
+      fid: feature id
+
+    Note that all properties from ``shapely.geometry`` object are inherited.
+
     """
+    def __init__(self, shape, name, fid):
+        self.shape = shape
+        self.name = name
+        self.fid = fid
+
     def __getattr__(self, attr):
         if hasattr(self.shape, attr):
             return getattr(self.shape, attr)
@@ -76,7 +72,7 @@ class PolyShape(object):
     @property
     def ar(self):
         """Returns axial ratio
-        
+
         Note that axial ratio is calculated from long and short axes
         calculated by actual ``shape method``.
 
@@ -86,9 +82,9 @@ class PolyShape(object):
     @property
     def ma(self):
         """Returns mean axis
-        
-        Mean axis is calculated as square root of long axis multiplied by short axis.
-        Both long and short axes are calculated by actual ``shape method``.
+
+        Mean axis is calculated as square root of long axis multiplied by
+        short axis. Both axes are calculated by actual ``shape method``.
 
         """
         return np.sqrt(self.la*self.sa)
@@ -107,7 +103,7 @@ class PolyShape(object):
           angle: angle of caliper rotation
 
         """
-        pp = np.dot(self.hull.T, np.array([sind(angle), cosd(angle)]))
+        pp = np.dot(self.hull.T, np.array([deg.sin(angle), deg.cos(angle)]))
         return pp.max(axis=0) - pp.min(axis=0)
 
     #################################################################
@@ -127,7 +123,7 @@ class PolyShape(object):
         ix = d2.argmax()
         dxy = xy[pa[ix][1]]-xy[pa[ix][0]]
         self.la = np.sqrt(np.max(d2))
-        self.lao = atan2d(*dxy) % 180
+        self.lao = deg.atan2(*dxy) % 180
         self.sao = (self.lao + 90) % 180
         self.sa = fixzero(self.feret(self.sao))
         self.xc, self.yc = self.shape.centroid.coords[0]
@@ -141,28 +137,27 @@ class Grain(PolyShape):
     It may have one or more negative-space “holes” which are also bounded
     by linear rings.
 
-    Args:
+    Properties:
       shape: ``shapely.geometry.polygon.Polygon`` object
-      phase: string with phase name. Default "None"
+      name: string with phase name. Default "None"
       fid: feature id. Default 0
+      shape_method: Method to calculate axes and orientation
 
     """
-    def __init__(self, shape, phase='None', fid=0):
+    def __init__(self, shape, name='None', fid=0):
         """Create ``Grain`` object
 
         """
-        self.shape = shape
-        self.phase = phase
-        self.fid = fid
+        super(Grain, self).__init__(shape, name, fid)
         self.shape_method = 'moment'
-        super(Grain, self).__init__()
 
     def __repr__(self):
-        return 'Grain %d [%s]: la:%g, sa:%g, lao:%g, sao:%g (%s)' % \
-            (self.fid, self.phase, self.la, self.sa, self.lao, self.sao, self.shape_method)
+        return ('Grain {g.fid:d} [{g.name:s}] '
+                'A:{g.area:g}, AR:{g.ar:g}, '
+                'LAO:{g.lao:g} ({g.shape_method:s})').format(g=self)
 
     @classmethod
-    def from_coords(self, x, y, phase='None', fid=0):
+    def from_coords(self, x, y, name='None', fid=0):
         """Create ``Grain`` from coordinate arrays
 
         Example:
@@ -172,19 +167,19 @@ class Grain(PolyShape):
                  [ 0.,  1.,  1.,  0.,  0.]])
 
         """
-        geom = Polygon([(xx, yy) for xx, yy in zip(x, y)]) 
-        # try  to "clean" self-touching or self-crossing polygons such as the classic "bowtie".
+        geom = Polygon([(xx, yy) for xx, yy in zip(x, y)])
+        # try  to "clean" self-touching or self-crossing polygons
         if not geom.is_valid:
             geom = geom.buffer(0)
         if geom.is_valid and geom.geom_type == 'Polygon':
-            return self(geom, phase, fid)
+            return self(geom, name, fid)
         else:
-            print('Invalid geometry (FID={}) skipped.'.format(pos))
+            print('Invalid geometry.'.format(pos))
 
     @property
     def xy(self):
         """Returns array of vertex coordinate pair.
-        
+
         Note that only vertexes from exterior boundary are returned.
 
         """
@@ -192,19 +187,12 @@ class Grain(PolyShape):
 
     @property
     def hull(self):
-        """Returns convex hull of grain geometry.
-        
+        """Returns array of vertices on convex hull of grain geometry.
+
         Note that only vertexes from exterior boundary are used.
 
         """
         return np.array(self.shape.convex_hull.exterior.xy)
-
-    @property
-    def area(self):
-        """Returns area of grain
-
-        """
-        return self.shape.area
 
     @property
     def perimeter(self):
@@ -221,7 +209,7 @@ class Grain(PolyShape):
         return 2*np.sqrt(self.shape.area/np.pi)
 
     def show(self):
-        """Preview grain geometry.
+        """View grain geometry on figure.
 
         Note that plotted ellipse reflects actual shape method
 
@@ -234,21 +222,27 @@ class Grain(PolyShape):
                      fc='blue', ec='#000000', alpha=0.5, zorder=2))
         ax.plot(*self.centroid, color='red', marker='o')
         R = np.linspace(0, 360, 361)
-        cr, sr = cosd(R), sind(R)
-        cl, sl = cosd(self.lao), sind(self.lao)
+        cr, sr = deg.cos(R), deg.sin(R)
+        cl, sl = deg.cos(self.lao), deg.sin(self.lao)
         xx = self.xc + self.la*cr*sl/2 + self.sa*sr*cl/2
         yy = self.yc + self.la*cr*cl/2 - self.sa*sr*sl/2
         ax.plot(xx, yy, color='green')
-        ax.plot(xx[[0,180]], yy[[0,180]], color='green')
-        ax.plot(xx[[90,270]], yy[[90,270]], color='green')
+        ax.plot(xx[[0, 180]], yy[[0, 180]], color='green')
+        ax.plot(xx[[90, 270]], yy[[90, 270]], color='green')
         ax.autoscale_view(None, True, True)
-        plt.title('Shape method: {} LAO: {:.2f} AR: {:.4f}'.format(self.shape_method, self.lao, self.ar))
+        plt.title('LAO:{g.lao:g} AR:{g.ar} ({g.shape_method})'.format(g=self))
         plt.show()
 
-    #################################################################
-    # Grain smooth and siplify methods (should return Grain object) #
-    #################################################################
+    ##################################################################
+    # Grain smooth and simplify methods (should return Grain object) #
+    ##################################################################
     def spline(self, **kwargs):
+        """Spline based smoothing of grains.
+
+        Keywords:
+          densify: factor for geometry densification. Default 5
+
+        """
         x, y = _spline_ring(*self.xy, densify=kwargs.get('densify', 5))
         holes = []
         for hole in self.interiors:
@@ -256,13 +250,19 @@ class Grain(PolyShape):
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
-            res = Grain(shape, phase=self.phase, fid=self.fid)
+            res = Grain(shape, self.name, self.fid)
         else:
             res = self
             print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
         return res
 
     def chaikin(self, **kwargs):
+        """Chaikin corner-cutting smoothing algorithm.
+
+        Keywords:
+          repeat: Number of repetitions. Default 4
+
+        """
         x, y = _chaikin_ring(*self.xy, repeat=kwargs.get('repeat', 4))
         holes = []
         for hole in self.interiors:
@@ -270,13 +270,20 @@ class Grain(PolyShape):
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
-            res = Grain(shape, phase=self.phase, fid=self.fid)
+            res = Grain(shape, self.name, self.fid)
         else:
             res = self
             print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
         return res
 
     def dp(self, **kwargs):
+        """Douglas–Peucker simplification.
+
+        Keywords:
+          tolerance: All points in the simplified object will be within the
+          tolerance distance of the original geometry. Default Auto
+
+        """
         if 'tolerance' not in kwargs:
             x, y = self.xy
             i1 = np.arange(len(x) - 2)
@@ -286,9 +293,20 @@ class Grain(PolyShape):
             tolerance = d.mean()
         shape = self.shape.simplify(tolerance=kwargs.get('tolerance', tolerance),
                                     preserve_topology=kwargs.get('preserve_topology', False))
-        return Grain(shape, phase=self.phase, fid=self.fid)
+        return Grain(shape, self.name, self.fid)
 
     def vw(self, **kwargs):
+        """Visvalingam-Whyatt simplification.
+
+        The Visvalingam-Whyatt algorithm eliminates points based on their
+        effective area. A points effective area is defined as the change
+        in total area of the polygon by adding or removing that point.
+
+        Keywords:
+          minarea: Allowed total area change after simplification.
+          Default value is calculated as 10% of grain area.
+
+        """
         x, y = _visvalingam_whyatt_ring(*self.xy, minarea=kwargs.get('minarea', 0.01*self.area))
         holes = []
         for hole in self.interiors:
@@ -296,12 +314,11 @@ class Grain(PolyShape):
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
-            res = Grain(shape, phase=self.phase, fid=self.fid)
+            res = Grain(shape, self.name, self.fid)
         else:
             res = self
             print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
         return res
-
 
     ################################################################
     # Grain shape methods (should modify sa, la, sao, lao, xc, yc) #
@@ -316,8 +333,8 @@ class Grain(PolyShape):
         """
         xy = self.hull.T
         dxy = xy[1:]-xy[:-1]
-        ang = (atan2d(*dxy.T) + 90) % 180
-        pp = np.dot(xy, np.array([sind(ang), cosd(ang)]))
+        ang = (deg.atan2(*dxy.T) + 90) % 180
+        pp = np.dot(xy, np.array([deg.sin(ang), deg.cos(ang)]))
         d = pp.max(axis=0) - pp.min(axis=0)
         self.sa = np.min(d)
         self.sao = ang[d.argmin()]
@@ -359,7 +376,7 @@ class Grain(PolyShape):
             evals = evals[idx]
             evecs = evecs[:, idx]
             self.la, self.sa = 2/np.sqrt(evals)
-            self.lao, self.sao = np.mod(atan2d(evecs[0,:],evecs[1,:]), 180)
+            self.lao, self.sao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
             self.xc, self.yc = self.shape.centroid.coords[0]
             self._shape_method = 'moment'
         else:
@@ -413,41 +430,51 @@ class Grain(PolyShape):
         evals = evals[idx]
         evecs = evecs[:, idx]
         self.sa, self.la = np.sqrt(8)*np.sqrt(evals)
-        self.sao, self.lao = np.mod(atan2d(evecs[0,:],evecs[1,:]), 180)
+        self.sao, self.lao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
         self.xc, self.yc = self.shape.centroid.coords[0]
         self._shape_method = 'cov'
 
 
 class Boundary(PolyShape):
+    """Boundary class to store polyline boundary geometry
 
-    def __init__(self, shape, typ='None-None', fid=0):
-        self.shape = shape
-        self.type = typ
-        self.fid = fid
+    A two-dimensional linear ring.
+
+    """
+    def __init__(self, shape, name='None-None', fid=0):
+        """Create ``Boundary`` object
+
+        """
+        super(Boundary, self).__init__(shape, name, fid)
         self.shape_method = 'maxferet'
-        super(Boundary, self).__init__()
 
     def __repr__(self):
-        return 'Boundary %d [%s]: la:%g, sa:%g, lao:%g, sao:%g (%s)' % \
-            (self.fid, self.type, self.la, self.sa, self.lao, self.sao, self.shape_method)
+        return ('Boundary {b.fid:d} [{b.name:s}] '
+                'L:{b.length:g}, AR:{b.ar:g}, '
+                'LAO:{b.lao:g} ({b.shape_method:s})').format(b=self)
 
     @property
     def xy(self):
+        """Returns array of vertex coordinate pair.
+
+        """
         return np.array(self.shape.xy)
 
     @property
     def hull(self):
+        """Returns array of vertices on convex hull of boundary geometry.
+
+        """
         h = self.shape.convex_hull
         if h.geom_type == 'LineString':
             return np.array(h.xy)[:, [0, 1, 0]]
         else:
             return np.array(h.exterior.xy)
 
-    @property
-    def length(self):
-        return self.shape.length
-
     def show(self):
+        """View boundary geometry on figure.
+
+        """
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
         hull = self.hull
@@ -458,14 +485,19 @@ class Boundary(PolyShape):
         ix = d2.argmax()
         ax.plot(*hull.T[pa[ix]].T, ls=':', lw=2, c='r')
         ax.autoscale_view(None, True, True)
-        plt.title('Shape method: {} LAO: {:.2f} AR: {:.4f}'.format(self.shape_method, self.lao, self.ar))
+        plt.title('LAO:{b.lao:g} AR:{b.ar} ({b.shape_method})'.format(b=self))
         plt.show()
-  
 
     ###################################################################
     # Boundary shape methods (should modify sa, la, sao, lao, xc, yc) #
     ###################################################################
     def cov(self):
+        """`shape_method`: cov
+
+        Short and long axes are calculated from eigenvalue analysis
+        of coordinate covariance matrix.
+
+        """
         x, y = self.xy
         x = x - x.mean()
         y = y - y.mean()
@@ -476,17 +508,27 @@ class Boundary(PolyShape):
         evecs = evecs[:, idx]
         self.sa, self.la = np.sqrt(2)*np.sqrt(evals)
         self.sa = fixzero(self.sa)
-        self.sao, self.lao = np.mod(atan2d(evecs[0,:],evecs[1,:]), 180)
+        self.sao, self.lao = np.mod(deg.atan2(evecs[0,:],evecs[1,:]), 180)
         self.xc, self.yc = self.shape.centroid.coords[0]
         self._shape_method = 'cov'
 
 
 class PolySet(object):
+    """Base class to store set of ``Grains`` or ``Boundaries`` objects
 
+    Properties:
+      polys: list of objects
+      extent: tuple of (xmin, ymin, xmax, ymax)
+
+    """
     def __init__(self, shapes):
-        self.polys = shapes
-        gb = self.bounds
-        self.extent = gb[:, 0].min(), gb[:, 1].min(), gb[:, 2].max(), gb[:, 3].max()
+        if len(shapes) > 0:
+            self.polys = shapes
+            gb = self.bounds
+            self.extent = gb[:, 0].min(), gb[:, 1].min(), gb[:, 2].max(), gb[:, 3].max()
+            self.classify('name', 'unique')
+        else:
+            raise ValueError("No objects passed.")
 
     def __iter__(self):
         return self.polys.__iter__()
@@ -515,6 +557,9 @@ class PolySet(object):
 
     @property
     def shape_method(self):
+        """Set or returns shape methods of all objects.
+
+        """
         return [p.shape_method for p in self]
 
     @shape_method.setter
@@ -527,59 +572,62 @@ class PolySet(object):
 
     @property
     def width(self):
+        """Returns width of extent.
+
+        """
         return self.extent[2] - self.extent[0]
 
     @property
     def height(self):
+        """Returns height of extent.
+
+        """
         return self.extent[3] - self.extent[1]
 
     def feret(self, angle=0):
+        """Returns array of feret diameters.
+
+        Args:
+            angle: Caliper angle. Default 0
+
+        """
         return np.array([p.feret(angle) for p in self])
 
     def classify(self, attr, rule='natural', k=5):
+        """Define classification of objects.
+
+        Args:
+          attr: name of attribute used for classification
+          rule: type of classification
+            'unique': unique value mapping (for discrete values)
+            'equal': k equaly spaced bins (for continuos values)
+            'user': bins edges defined by array k (for continuos values)
+            'natural': natural breaks. Default rule
+            'jenks': fischer jenks scheme
+
+        Examples:
+          >>> g.classify('name', 'unique')
+
+        """
         self.class_attr = attr
-        #vals = [getattr(p, attr) for p in self]
-        vals = getattr(self, attr)
-        if rule == 'unique':
-            self.classes = vals
-            self.class_index, index = np.unique(vals, return_inverse=True)
-            counts = np.bincount(index)
-            self.class_legend = ['%s (%d)' % p for p in zip(self.class_index, counts)]
-        elif rule == 'equal' or rule == 'user':
-            counts, bins = np.histogram(vals, k)
-            index = np.digitize(vals, bins) - 1
-            # if upper limit is maximum value, digitize it to last bin
-            edge = len(bins) - 1
-            index[np.flatnonzero(index == edge)] = edge - 1
-            self.class_labels = ['%g-%g (%d)' % (bins[i], bins[i+1], count) for i, count in enumerate(counts)]
-            self.class_index = ['%g-%g' % (bins[i], bins[i+1]) for i in range(len(counts))]
-            self.classes = np.array([self.class_index[i] for i in index])
-        elif rule == 'natural':
-            index, bins = natural_breaks(vals, k=k)
-            counts = np.bincount(index)
-            self.class_labels = ['%g-%g (%d)' % (bins[i], bins[i+1], count) for i, count in enumerate(counts)]
-            self.class_index = ['%g-%g' % (bins[i], bins[i+1]) for i in range(len(counts))]
-            self.classes = np.array([self.class_index[i] for i in index])
-        elif rule == 'jenks':
-            bins = fisher_jenks(vals, k=k)
-            index = np.digitize(vals, bins) - 1
-            index[np.flatnonzero(index == k)] = k - 1
-            counts = np.bincount(index)
-            self.class_labels = ['%g-%g (%d)' % (bins[i], bins[i+1], count) for i, count in enumerate(counts)]
-            self.class_index = ['%g-%g' % (bins[i], bins[i+1]) for i in range(len(counts))]
-            self.classes = np.array([self.class_index[i] for i in index])
+        self.classes = Classify(getattr(self, attr), rule, k)
 
     def df(self, *attrs):
+        """Returns ``pandas.DataFrame`` of object attributes.
+
+        Example:
+          >>> g.df('ead', 'ar')
+
+        """
         attrs = list(attrs)
         if 'classes' in attrs:
             attrs[attrs.index('classes')] = 'class'
         if 'class' in attrs:
             attrs.remove('class')
-            d = pd.DataFrame({self.class_attr + '_class': self.classes})
+            d = pd.DataFrame({self.class_attr + '_class': self.classes.names})
         else:
             d = pd.DataFrame()
         for attr in attrs:
-            #d[attr] = [getattr(p, attr) for p in self]
             d[attr] = getattr(self, attr)
         return d
 
@@ -589,21 +637,36 @@ class PolySet(object):
             df = getattr(self.groups(attr), aggfunc)()
             df.columns = ['{}_{}'.format(aggfunc, attr)]
             pieces.append(df)
-        return pd.concat(pieces, axis=1).reindex(self.class_index)
+        return pd.concat(pieces, axis=1).reindex(self.classes.index)
 
     def groups(self, *attrs):
+        """Returns ``pandas.GroupBy`` of object attributes.
+
+        Note that grouping is based on actual classification.
+
+        Example:
+          >>> g.classify('ar', 'natural')
+          >>> g.groups('ead').mean()
+                                    ead
+              1.01765-1.31807  0.067772
+              1.31807-1.54201  0.076206
+              1.54201-1.82242  0.065400
+              1.82242-2.36773  0.073690
+              2.36773-12.1571  0.084016
+
+        """
         df = self.df(*attrs)
-        return df.groupby(self.classes)
+        return df.groupby(self.classes.names)
 
     def _autocolortable(self, cmap='jet'):
         if isinstance(cmap, str):
             cmap = cm.get_cmap(cmap)
-        n = len(self.class_index)
+        n = len(self.classes.index)
         if n > 1:
             pos = np.round(np.linspace(0, cmap.N - 1, n))
         else:
             pos = [127]
-        return dict(zip(self.class_index, [cmap(int(i)) for i in pos]))
+        return dict(zip(self.classes.index, [cmap(int(i)) for i in pos]))
 
     def _makelegend(self, ax, pos='auto', ncol=3):
         if pos == 'auto':
@@ -613,24 +676,16 @@ class PolySet(object):
             else:
                 pos = 'right'
                 ncol = 1
+
         if pos == 'top':
             h, l = ax.get_legend_handles_labels()
-            # lgd = plt.figlegend(h, l, loc='upper center', bbox_to_anchor=[0.5, 0.99], ncol=ncol)
-            # plt.draw()
-            # prop = lgd.get_window_extent().height/ax.get_figure().get_window_extent().height
-            # ax.get_figure().tight_layout(rect=[0.02, 0.02, 0.98, 0.98 - prop])
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("top", size=0.25+0.25*np.ceil(len(h)/ncol))
             cax.set_axis_off()
             cax.legend(h, l, loc=9, borderaxespad=0., ncol=3, bbox_to_anchor=[0.5, 1.1])
             plt.tight_layout()
-
         elif pos == 'right':
             h, l = ax.get_legend_handles_labels()
-            # lgd = plt.figlegend(h, l, loc='center right', bbox_to_anchor=[0.99, 0.5], ncol=ncol)
-            # plt.draw()
-            # prop = lgd.get_window_extent().width/ax.get_figure().get_window_extent().width
-            # ax.get_figure().tight_layout(rect=[0.02, 0.02, 0.98 - prop, 0.98])
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size=0.2+1.6*ncol)
             cax.set_axis_off()
@@ -638,6 +693,19 @@ class PolySet(object):
             plt.tight_layout()
 
     def plot(self, legend=None, pos='auto', alpha=0.8, cmap='jet', ncol=1):
+        """Plot set of ``Grains`` or ``Boundaries`` objects.
+
+        Args:
+          legend: dictionary with classes as keys and RGB tuples as values
+                  Default Auto (created by _autocolortable method)
+          pos: legend position "top" or "right". Defalt Auto
+          alpha: transparency. Default 0.8
+          cmap: colormap. Default "jet"
+          ncol: number of columns for legend.
+
+        Returns matplotlib axes object.
+
+        """
         if legend is None:
             legend = self._autocolortable(cmap)
         fig = plt.figure()
@@ -645,13 +713,24 @@ class PolySet(object):
         self._plot(ax, legend, alpha)
         plt.setp(plt.yticks()[1], rotation=90)
         self._makelegend(ax, pos, ncol)
-        #return ax
+        return ax
 
     def show(self):
+        """Show plot of ``Grains`` or ``Boundaries`` objects.
+
+        """
         self.plot()
         plt.show()
 
-    def savefig(self, filename='grains.png', legend=None, pos='auto', alpha=0.8, cmap='jet', dpi=150, ncol=1):
+    def savefig(self, filename='figure.png', legend=None, pos='auto', alpha=0.8, cmap='jet', dpi=150, ncol=1):
+        """Save grains or boudaries plot to file.
+
+        Args:
+          filename: file to save figure. Default "figure.png"
+          dpi: DPI of image. Default 150
+          See `plot` for other kwargs
+
+        """
         if legend is None:
             legend = self._autocolortable(cmap)
         fig = plt.figure()
@@ -708,11 +787,9 @@ class PolySet(object):
 
 
 class Grains(PolySet):
+    """Class to store set of ``Grains`` objects
 
-    def __init__(self, shapes):
-        super(Grains, self).__init__(shapes)
-        self.classify('phase', 'unique')
-
+    """
     def __repr__(self):
         return 'Set of %s grains.' % len(self.polys)
 
@@ -720,10 +797,31 @@ class Grains(PolySet):
         return Grains(self.polys + other.polys)
 
     def __getitem__(self, index):
+        """Fancy Grains indexing.
+
+        Grains could be indexed by several ways based on type of index.
+          int: returns Grain defined by index position
+          string: returns Grains with index name
+          list, tuple or np.array of int: returns Grains by index positions
+          np.array of bool: return Grains where index is True
+
+        Examples:
+          >>> g[10]
+          Grain 10 [qtz] A:0.0186429, AR:1.45201, LAO:39.6622 (moment)
+          >>> g['qtz']
+          Set of 155 grains.
+          >>> g[g.ar > 3]
+          Set of 41 grains.
+          >>> g[g.classes(0)]   #grains from class 0
+          Set of 254 grains.
+
+        """
+        if isinstance(index, list) or isinstance(index, tuple):
+            index = np.asarray(index)
         if isinstance(index, int):
             return self.polys[index]
         elif isinstance(index, str):
-            return Grains([g for g in self.polys if g.phase == index])
+            return Grains([g for g in self.polys if g.name == index])
         elif isinstance(index, np.ndarray):
             if index.dtype == 'bool':
                 index = np.flatnonzero(index)
@@ -731,15 +829,12 @@ class Grains(PolySet):
         else:
             return Grains(self.polys[index])
 
-    def phase_list(self, unique=True):
-        pl = list(self.phase)
-        if unique:
-            return sorted(list(set(pl)))
-        else:
-            return pl
+    @property
+    def phase_list(self):
+        """Returns list of unique Grain names.
 
-    def phase_dict(self):
-        return {key: g.phase for (key, g) in enumerate(self)}
+        """
+        return list(np.unique(self.name))
 
     @property
     def boundaries(self):
@@ -747,6 +842,14 @@ class Grains(PolySet):
 
     @classmethod
     def from_shp(self, filename=os.path.join(resource_filename(__name__, 'example'), 'sg2.shp'), phasefield='phase'):
+        """Create Grains from ESRI shapefile.
+
+        Args:
+          filename: filename of shapefile. Default sg2.shp from examples
+          phasefield: name of attribute in shapefile that
+            holds names of grains. Default "phase"
+
+        """
         sf = Reader(filename)
         if sf.shapeType == 5:
             fieldnames = [field[0].lower() for field in sf.fields[1:]]
@@ -758,7 +861,7 @@ class Grains(PolySet):
             shapes = []
             for pos, rec in enumerate(shapeRecs):
                 geom = shape(rec.shape.__geo_interface__)
-                # try  to "clean" self-touching or self-crossing polygons such as the classic "bowtie".
+                # try  to "clean" self-touching or self-crossing polygons
                 if not geom.is_valid:
                     geom = geom.buffer(0)
                 if geom.is_valid:
@@ -781,7 +884,7 @@ class Grains(PolySet):
 
     def _plot(self, ax, legend, alpha, ec='#222222'):
         groups = self.groups('shape')
-        for key in self.class_index:
+        for key in self.classes.index:
             group = groups.get_group(key)
             paths = []
             for g in group['shape']:
@@ -801,11 +904,9 @@ class Grains(PolySet):
 
 
 class Boundaries(PolySet):
+    """Class to store set of ``Boundaries`` objects
 
-    def __init__(self, shapes):
-        super(Boundaries, self).__init__(shapes)
-        self.classify('type', 'unique')
-
+    """
     def __repr__(self):
         return 'Set of %s boundaries.' % len(self.polys)
 
@@ -813,11 +914,32 @@ class Boundaries(PolySet):
         return Boundaries(self.polys + other.polys)
 
     def __getitem__(self, index):
+        """Fancy Boundaries indexing.
+
+        Boundaries could be indexed by several ways based on type of index.
+          int: returns Boundary defined by index position
+          string: returns Boundaries with index name (hyphen separated)
+          list, tuple or np.array of int: returns Boundaries by index positions
+          np.array of bool: return Grains where index is True
+
+        Examples:
+          >>> b[10]
+          Boundary 10 [qtz-qtz] L:0.0982331, AR:1.41954, LAO:109.179 (maxferet)
+          >>> b['qtz-pl']
+          Set of 238 boundaries.
+          >>> b[b.ar > 10]
+          Set of 577 boundaries.
+          >>> b[b.classes(0)]   #boundaries from class 0
+          Set of 374 boundaries.
+
+        """
+        if isinstance(index, list) or isinstance(index, tuple):
+            index = np.asarray(index)
         if isinstance(index, int):
             return self.polys[index]
         elif isinstance(index, str):
             okindex = '%s-%s' % tuple(sorted(index.split('-')))
-            return Boundaries([b for b in self.polys if b.type == okindex])
+            return Boundaries([b for b in self.polys if b.name == okindex])
         elif isinstance(index, np.ndarray):
             if index.dtype == 'bool':
                 index = np.flatnonzero(index)
@@ -825,18 +947,22 @@ class Boundaries(PolySet):
         else:
             return Boundaries(self.polys[index])
 
-    def type_list(self, unique=True):
-        pl = list(self.type)
-        if unique:
-            return sorted(list(set(pl)))
-        else:
-            return pl
+    @property
+    def type_list(self):
+        """Returns list of unique Boundary names.
 
-    def type_dict(self):
-        return {key: b.type for (key, b) in enumerate(self)}
+        """
+        return list(np.unique(self.name))
 
     @classmethod
     def from_grains(self, grains, T=None):
+        """Create Boundaries from Grains.
+
+        Example:
+          >>> g = Grains.from_shp()
+          >>> b = Boundaries.from_grains(g)
+
+        """
         from shapely.ops import linemerge
 
         shapes = []
@@ -851,14 +977,14 @@ class Boundaries(PolySet):
                 if not co in lookup:
                     lookup[co] = len(lookup)
                 path.append(lookup[co])
-            G.add_path(path, fid=fid, phase=g.phase)
+            G.add_path(path, fid=fid, phase=g.name)
             for holes in g.shape.interiors:
                 path = []
                 for co in holes.coords:
                     if not co in lookup:
                         lookup[co] = len(lookup)
                     path.append(lookup[co])
-                G.add_path(path, fid=fid, phase=g.phase)
+                G.add_path(path, fid=fid, phase=g.name)
         # Create topology graph
         H = G.to_undirected(reciprocal=True)
         for edge in H.edges_iter():
@@ -896,7 +1022,7 @@ class Boundaries(PolySet):
 
     def _plot(self, ax, legend, alpha):
         groups = self.groups('shape')
-        for key in self.class_index:
+        for key in self.classes.index:
             group = groups.get_group(key)
             x = []
             y = []
@@ -914,7 +1040,14 @@ class Boundaries(PolySet):
 
 
 class Sample(object):
+    """Class to store both ``Grains`` and ``Boundaries`` objects
 
+    Properties:
+      g: Grains object
+      b: Boundaries.objects
+      T. ``networkx.Graph`` storing grain topology
+
+    """
     def __init__(self):
         self.g = None
         self.b = None
@@ -936,6 +1069,19 @@ class Sample(object):
         return obj
 
     def plot(self, legend=None, pos='auto', alpha=0.8, cmap='jet', ncol=1):
+        """Plot overlay of ``Grains`` and ``Boundaries`` of ``Sample`` object.
+
+        Args:
+          legend: dictionary with classes as keys and RGB tuples as values
+                  Default Auto (created by _autocolortable method)
+          pos: legend position "top" or "right". Defalt Auto
+          alpha: transparency. Default 0.8
+          cmap: colormap. Default "jet"
+          ncol: number of columns for legend.
+
+        Returns matplotlib axes object.
+
+        """
         if legend is None:
             legend = dict(list(self.g._autocolortable().items()) + list(self.b._autocolortable().items()))
         fig = plt.figure()
@@ -944,3 +1090,11 @@ class Sample(object):
         self.b._plot(ax, legend, 1)
         plt.setp(plt.yticks()[1], rotation=90)
         self.g._makelegend(ax, pos, ncol)
+        return ax
+
+    def show(self):
+        """Show plot of ``Sample`` objects.
+
+        """
+        self.plot()
+        plt.show()
