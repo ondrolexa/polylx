@@ -24,7 +24,7 @@ test_requirements = [
 
 setup(
     name='polylx',
-    version='0.1.0',
+    version='0.2.0',
     description="A package to visualize and analyze microstructures.",
     long_description=readme + '\n\n' + history,
     author="Ondrej Lexa",
@@ -41,7 +41,7 @@ setup(
     zip_safe=False,
     keywords='polylx',
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: BSD License',
         'Natural Language :: English',
