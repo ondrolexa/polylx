@@ -135,8 +135,22 @@ class PolyShape(object):
 
 
 class Grain(PolyShape):
+    """Grain class to store polygonal grain geometry
 
+    A two-dimensional grain bounded by a linear ring with non-zero area.
+    It may have one or more negative-space “holes” which are also bounded
+    by linear rings.
+
+    Args:
+      shape: ``shapely.geometry.polygon.Polygon`` object
+      phase: string with phase name. Default "None"
+      fid: feature id. Default 0
+
+    """
     def __init__(self, shape, phase='None', fid=0):
+        """Create ``Grain`` object
+
+        """
         self.shape = shape
         self.phase = phase
         self.fid = fid
@@ -147,27 +161,71 @@ class Grain(PolyShape):
         return 'Grain %d [%s]: la:%g, sa:%g, lao:%g, sao:%g (%s)' % \
             (self.fid, self.phase, self.la, self.sa, self.lao, self.sao, self.shape_method)
 
+    @classmethod
+    def from_coords(self, x, y, phase='None', fid=0):
+        """Create ``Grain`` from coordinate arrays
+
+        Example:
+          >>> g=Grain.from_coords([0,0,2,2],[0,1,1,0])
+          >>> g.xy
+          array([[ 0.,  0.,  2.,  2.,  0.],
+                 [ 0.,  1.,  1.,  0.,  0.]])
+
+        """
+        geom = Polygon([(xx, yy) for xx, yy in zip(x, y)]) 
+        # try  to "clean" self-touching or self-crossing polygons such as the classic "bowtie".
+        if not geom.is_valid:
+            geom = geom.buffer(0)
+        if geom.is_valid and geom.geom_type == 'Polygon':
+            return self(geom, phase, fid)
+        else:
+            print('Invalid geometry (FID={}) skipped.'.format(pos))
+
     @property
     def xy(self):
+        """Returns array of vertex coordinate pair.
+        
+        Note that only vertexes from exterior boundary are returned.
+
+        """
         return np.array(self.shape.exterior.xy)
 
     @property
     def hull(self):
+        """Returns convex hull of grain geometry.
+        
+        Note that only vertexes from exterior boundary are used.
+
+        """
         return np.array(self.shape.convex_hull.exterior.xy)
 
     @property
     def area(self):
+        """Returns area of grain
+
+        """
         return self.shape.area
 
     @property
     def perimeter(self):
+        """Returns perimeter of grain
+
+        """
         return self.shape.length
 
     @property
     def ead(self):
+        """Returns equal area diameter of grain
+
+        """
         return 2*np.sqrt(self.shape.area/np.pi)
 
     def show(self):
+        """Preview grain geometry.
+
+        Note that plotted ellipse reflects actual shape method
+
+        """
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
         hull = self.hull
