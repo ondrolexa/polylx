@@ -26,6 +26,8 @@ Example:
     r.write_pdf()
 
 """
+from __future__ import print_function
+
 import tempfile
 import subprocess
 
