@@ -87,28 +87,7 @@ exclude_patterns = ['_build']
 #default_role = None
 
 # If true, '()' will be appended to :func: etc. cross-reference text.
-#add_function_parentheses = True# Mocks for Read the Docs
-import sys
-
-class Mock(object):
-    def __init__(self, *args, **kwargs):
-        pass
-
-    def __call__(self, *args, **kwargs):
-        return Mock()
-
-    @classmethod
-    def __getattr__(self, name):
-        if name in ('__file__', '__path__'):
-            return '/dev/null'
-        elif name[0] == name[0].upper():
-            return type(name, (), {})
-        else:
-            return Mock()
-
-MOCK_MODULES = ['shapely', 'shapely.wkt', 'shapely.wkb']
-for mod_name in MOCK_MODULES:
-    sys.modules[mod_name] = Mock()
+#add_function_parentheses = True
 
 # If true, the current module name will be prepended to all description
 # unit titles (such as .. function::).
@@ -321,3 +300,4 @@ class Mock(object):
 MOCK_MODULES = ['shapely', 'shapely.geometry', 'networkx', 'pandas', 'shapefile']
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = Mock()
+
