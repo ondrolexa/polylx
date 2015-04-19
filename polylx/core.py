@@ -993,50 +993,70 @@ class Boundaries(PolySet):
             # get phase and add to list and legend
             path = []
             for co in g.shape.exterior.coords:
-                if not co in lookup:
+                if co not in lookup:
                     lookup[co] = len(lookup)
                 path.append(lookup[co])
             G.add_path(path, fid=fid, phase=g.name)
             for holes in g.shape.interiors:
                 path = []
                 for co in holes.coords:
-                    if not co in lookup:
+                    if co not in lookup:
                         lookup[co] = len(lookup)
                     path.append(lookup[co])
                 G.add_path(path, fid=fid, phase=g.name)
         # Create topology graph
         H = G.to_undirected(reciprocal=True)
         for edge in H.edges_iter():
-            e1 = G.get_edge_data(edge[0],edge[1])
-            e2 = G.get_edge_data(edge[1],edge[0])
+            e1 = G.get_edge_data(edge[0], edge[1])
+            e2 = G.get_edge_data(edge[1], edge[0])
             bt = '%s-%s' % tuple(sorted([e1['phase'], e2['phase']]))
             T.add_node(e1['fid'])
             T.add_node(e2['fid'])
-            T.add_edge(e1['fid'], e2['fid'], type=bt)
+            T.add_edge(e1['fid'], e2['fid'], type=bt, bids=[])
         # Create boundaries
         for edge in T.edges_iter():
             shared = grains[edge[0]].intersection(grains[edge[1]])
-            typ = T[edge[0]][edge[1]]['type']
-            if shared.geom_type == 'LineString':
-                shapes.append(Boundary(shared, typ, len(shapes)))
-            elif shared.geom_type == 'MultiLineString':
+            edge_data = T.get_edge_data(edge[0], edge[1])
+            if shared.geom_type == 'LineString':  # LineString cannot be merged
+                shapes.append(Boundary(shared, edge_data['type'], len(shapes)))
+            elif shared.geom_type == 'MultiLineString':  # common case
                 shared = linemerge(shared)
-                if shared.geom_type == 'LineString':
-                    shapes.append(Boundary(shared, typ, len(shapes)))
-                else:
+                if shared.geom_type == 'LineString':  # single shared boundary
+                    bid = len(shapes)
+                    shapes.append(Boundary(shared,
+                                           edge_data['type'],
+                                           bid))
+                    edge_data['bids'].append(bid)
+                else:  # multiple shared boundary
                     for sub in list(shared):
-                        shapes.append(Boundary(sub, typ, len(shapes)))
-            elif shared.geom_type == 'GeometryCollection':
+                        bid = len(shapes)
+                        shapes.append(Boundary(sub,
+                                               edge_data['type'],
+                                               bid))
+                        edge_data['bids'].append(bid)
+            elif shared.geom_type == 'GeometryCollection':  # other cases
                 for sub in shared:
                     if sub.geom_type == 'LineString':
-                        shapes.append(Boundary(sub, typ, len(shapes)))
+                        bid = len(shapes)
+                        shapes.append(Boundary(sub,
+                                               edge_data['type'],
+                                               bid))
+                        edge_data['bids'].append(bid)
                     elif sub.geom_type == 'MultiLineString':
                         sub = linemerge(sub)
                         if sub.geom_type == 'LineString':
-                            shapes.append(Boundary(sub, typ, len(shapes)))
+                            bid = len(shapes)
+                            shapes.append(Boundary(sub,
+                                                   edge_data['type'],
+                                                   bid))
+                            edge_data['bids'].append(bid)
                         else:
                             for subsub in list(sub):
-                                shapes.append(Boundary(subsub, typ, len(shapes)))
+                                bid = len(shapes)
+                                shapes.append(Boundary(subsub,
+                                                       edge_data['type'],
+                                                       bid))
+                                edge_data['bids'].append(bid)
         return self(shapes)
 
     def _plot(self, ax, legend, alpha):
@@ -1087,6 +1107,17 @@ class Sample(object):
         obj.g = grains
         obj.b = Boundaries.from_grains(grains, obj.T)
         return obj
+
+    def neighbors(self, idx, name=None):
+        """Returns array of indexes of neighbouring grains.
+
+        If name attribute is provided only neighbours with name are returned
+
+        """
+        n = np.asarray(self.T.neighbors(idx))
+        if name:
+            n = n[self.g[n].name == name]
+        return n
 
     def plot(self, legend=None, pos='auto', alpha=0.8,
              cmap='jet', ncol=1, show_fid=False, show_index=False):
