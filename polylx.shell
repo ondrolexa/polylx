@@ -3,6 +3,7 @@
 from code import InteractiveConsole
 
 console = InteractiveConsole()
+console.runcode('import readline')
 console.runcode('from polylx import *')
 console.interact()
 
