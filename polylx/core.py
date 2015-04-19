@@ -695,7 +695,8 @@ class PolySet(object):
                        bbox_to_anchor=[1.04, 0.5])
             plt.tight_layout()
 
-    def plot(self, legend='auto', pos='auto', alpha=0.8, cmap='jet', ncol=1):
+    def plot(self, legend='auto', pos='auto', alpha=0.8,
+             cmap='jet', ncol=1, show_fid=False, show_index=False):
         """Plot set of ``Grains`` or ``Boundaries`` objects.
 
         Args:
@@ -714,6 +715,14 @@ class PolySet(object):
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
         self._plot(ax, legend, alpha)
+        if show_index:
+            for idx, p in enumerate(self):
+                ax.text(p.xc, p.yc, str(idx),
+                        bbox=dict(facecolor='yellow', alpha=0.5))
+        if show_fid:
+            for p in self:
+                ax.text(p.xc, p.yc, str(p.fid),
+                        bbox=dict(facecolor='yellow', alpha=0.5))
         plt.setp(plt.yticks()[1], rotation=90)
         self._makelegend(ax, pos, ncol)
         return ax
@@ -1079,7 +1088,8 @@ class Sample(object):
         obj.b = Boundaries.from_grains(grains, obj.T)
         return obj
 
-    def plot(self, legend=None, pos='auto', alpha=0.8, cmap='jet', ncol=1):
+    def plot(self, legend=None, pos='auto', alpha=0.8,
+             cmap='jet', ncol=1, show_fid=False, show_index=False):
         """Plot overlay of ``Grains`` and ``Boundaries`` of ``Sample`` object.
 
         Args:
@@ -1098,14 +1108,30 @@ class Sample(object):
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
         self.g._plot(ax, legend, alpha, ec='none')
+        if show_index:
+            for idx, p in enumerate(self.g):
+                ax.text(p.xc, p.yc, str(idx),
+                        bbox=dict(facecolor='yellow', alpha=0.5))
+        if show_fid:
+            for p in self.g:
+                ax.text(p.xc, p.yc, str(p.fid),
+                        bbox=dict(facecolor='yellow', alpha=0.5))
         self.b._plot(ax, legend, 1)
+        if show_index:
+            for idx, p in enumerate(self.b):
+                ax.text(p.xc, p.yc, str(idx),
+                        bbox=dict(facecolor='white', alpha=0.5))
+        if show_fid:
+            for p in self.b:
+                ax.text(p.xc, p.yc, str(p.fid),
+                        bbox=dict(facecolor='white', alpha=0.5))
         plt.setp(plt.yticks()[1], rotation=90)
         self.g._makelegend(ax, pos, ncol)
         return ax
 
-    def show(self):
+    def show(self, **kwargs):
         """Show plot of ``Sample`` objects.
 
         """
-        self.plot()
+        self.plot(**kwargs)
         plt.show()
