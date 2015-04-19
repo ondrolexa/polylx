@@ -1,0 +1,8 @@
+#!/usr/bin/env python
+
+from code import InteractiveConsole
+
+console = InteractiveConsole()
+console.runcode('from polylx import *')
+console.interact()
+

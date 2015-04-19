@@ -2,6 +2,8 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
+import networkx as nx
 from .core import Grain, Boundary, Grains, Boundaries, Sample
 
 __author__ = 'Ondrej Lexa'
