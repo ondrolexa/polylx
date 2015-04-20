@@ -8,6 +8,9 @@ Example:
 
 from polylx.utils import optimize_colormap
 g.plot(cmap=optimize_colormap('jet'))
+
+# use circular statistics for agg
+g.groups('lao').agg(circular.csd)
 """
 import numpy as np
 
@@ -21,6 +24,28 @@ def fixratio(x, y):
         return np.inf
     else:
         return x/y
+
+
+class circular(object):
+    @staticmethod
+    def rho(x):
+        return np.exp(2j*np.deg2rad(x)).mean()
+
+    @staticmethod
+    def R(x):
+        return abs(circular.rho(x))
+
+    @staticmethod
+    def mean(x):
+        return np.rad2deg(np.angle(circular.rho(x)))/2 % 180
+
+    @staticmethod
+    def var(x):
+        return 1 - circular.R(x)
+
+    @staticmethod
+    def csd(x):
+        return np.sqrt(-2*np.log(circular.R(x)))
 
 
 class deg(object):
