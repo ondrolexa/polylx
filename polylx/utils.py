@@ -12,6 +12,7 @@ g.plot(cmap=optimize_colormap('jet'))
 # use circular statistics for agg
 g.groups('lao').agg(circular.csd)
 """
+from __future__ import division
 import numpy as np
 
 
@@ -29,23 +30,97 @@ def fixratio(x, y):
 class circular(object):
     @staticmethod
     def rho(x):
+        """Mean resultant vector
+
+        """
         return np.exp(2j*np.deg2rad(x)).mean()
 
     @staticmethod
     def R(x):
+        """Length of mean resultant vector
+
+        """
         return abs(circular.rho(x))
 
     @staticmethod
     def mean(x):
-        return np.rad2deg(np.angle(circular.rho(x)))/2 % 180
+        """Mean direction
+
+        """
+        return np.angle(circular.rho(x), deg=True)/2 % 180
 
     @staticmethod
     def var(x):
+        """Circular variance
+
+        """
         return 1 - circular.R(x)
 
     @staticmethod
     def csd(x):
+        """Circular standard deviation
+
+        """
         return np.sqrt(-2*np.log(circular.R(x)))
+
+    @staticmethod
+    def angdev(x):
+        """Angular deviation
+
+        """
+        return np.sqrt(2*circular.var(x))
+
+    @staticmethod
+    def mean_conf(x, cl=0.95):
+        """Confidence limit on mean
+
+        cl confidence on mean between mu-conf..mu+conf
+
+        """
+        from scipy.stats import gamma
+        n = len(x)
+        R = circular.R(x)
+        r = R*n
+        c2 = gamma.ppf(cl, 0.5, scale=2)
+        if R < .9 and R > np.sqrt(c2/2/n):
+            t = np.sqrt((2*n*(2*r**2 - n*c2))/(4*n - c2))
+        elif R >= .9:
+            t = np.sqrt(n**2 - (n**2 - r**2)*np.exp(c2/n))
+        else:  # Resultant vector does not allow to specify confidence limits
+            t = np.nan
+        return deg.acos(t/r)
+
+    @staticmethod
+    def angskew(x):
+        """Angular skewness
+
+        """
+        return np.mean(deg.sin(2*circular.circdist(x, circular.mean(x))))
+
+    @staticmethod
+    def sas(x):
+        """Standardized angular skewness
+
+        """
+        rho_p, mu_p = circular.circmoment(x, 2)
+        s = deg.sin(circular.circdist(mu_p, 2*circular.mean(x)))
+        d = (1 - circular.var(x))**(2./3)
+        return rho_p*s/d
+
+    @staticmethod
+    def circdist(x, y):
+        """Pairwise difference around the circle
+
+        """
+        return np.angle(np.exp(1j*x)/np.exp(1j*y), deg=True)
+
+    @staticmethod
+    def circmoment(x, p=1):
+        """Complex centered p-th moment
+
+        """
+        mp = np.exp(2j*p*np.deg2rad(x)).mean()
+        return np.abs(mp), np.angle(mp, deg=True)
 
 
 class deg(object):

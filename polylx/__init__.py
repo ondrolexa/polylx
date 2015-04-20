@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import networkx as nx
 from .core import Grain, Boundary, Grains, Boundaries, Sample
+from .utils import deg, circular
 
 __author__ = 'Ondrej Lexa'
 __email__ = 'lexa.ondrej@gmail.com'
