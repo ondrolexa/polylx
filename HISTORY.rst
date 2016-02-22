@@ -15,7 +15,8 @@ History
 * Initial documentation added
 * `phase` and `type` properties renamed to `name`
 
-0.3.0 (not yet)
+0.3.0 (2016-02-22)
 ---------------
 * classification is persitant trough fancy indexing
 * empty classes allowed
+* bootstrap method added to PolySet
