@@ -19,8 +19,7 @@ requirements = [
     'matplotlib',
     'pandas',
     'networkx',
-    'shapely',
-    'pyshp'
+    'shapely'
 ]
 
 test_requirements = [
