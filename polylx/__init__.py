@@ -9,4 +9,4 @@ from .utils import deg, circular
 
 __author__ = 'Ondrej Lexa'
 __email__ = 'lexa.ondrej@gmail.com'
-__version__ = '0.3.0'
+__version__ = '0.3.1'
