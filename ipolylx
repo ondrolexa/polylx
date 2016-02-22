@@ -1,0 +1,11 @@
+#!/usr/bin/env python
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
+from IPython import embed
+import polylx
+from polylx import *
+
+plt.ion()
+embed(header='PolyLX %s and Pylab (%s, %s) imported into current namespace.' % \
+	         (polylx.__version__, matplotlib.__version__, np.__version__))

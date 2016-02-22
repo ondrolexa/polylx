@@ -1,7 +1,6 @@
-wheel
 numpy
 matplotlib
 pandas
 networkx
 shapely
-shapefile
+pyshp

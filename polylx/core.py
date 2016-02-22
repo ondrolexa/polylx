@@ -570,6 +570,12 @@ class PolySet(object):
             if p._shape_method != value:
                 p.shape_method = value
 
+    def bootstrap(self, num=100, size=None):
+        if size is None:
+            size = len(self)
+        for i in range(num):
+            yield self[np.random.choice(len(self), size)]
+
     @property
     def width(self):
         """Returns width of extent.
