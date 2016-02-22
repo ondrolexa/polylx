@@ -850,22 +850,24 @@ class Grains(PolySet):
 
     @classmethod
     def from_shp(self, filename=os.path.join(respath, 'sg2.shp'),
-                 phasefield='phase'):
+                 phasefield='phase', phase='None'):
         """Create Grains from ESRI shapefile.
 
         Args:
           filename: filename of shapefile. Default sg2.shp from examples
           phasefield: name of attribute in shapefile that
-            holds names of grains. Default "phase"
+            holds names of grains or None. Default "phase".
+          phase: value used for grain phase when phasefield is None
 
         """
         sf = Reader(filename)
         if sf.shapeType == 5:
             fieldnames = [field[0].lower() for field in sf.fields[1:]]
-            if phasefield in fieldnames:
-                phase_pos = fieldnames.index(phasefield)
-            else:
-                raise Exception("There is no field '%s'. Available fields are: %s" % (phasefield, fieldnames))
+            if phasefield is not None:
+                if phasefield in fieldnames:
+                    phase_pos = fieldnames.index(phasefield)
+                else:
+                    raise Exception("There is no field '%s'. Available fields are: %s" % (phasefield, fieldnames))
             shapeRecs = sf.shapeRecords()
             shapes = []
             for pos, rec in enumerate(shapeRecs):
@@ -875,12 +877,16 @@ class Grains(PolySet):
                     geom = geom.buffer(0)
                 if geom.is_valid:
                     if not geom.is_empty:
+                        if phasefield is None:
+                            ph = phase
+                        else:
+                            ph = rec.record[phase_pos]
                         if geom.geom_type == 'MultiPolygon':
                             for g in geom:
-                                shapes.append(Grain(g, rec.record[phase_pos], len(shapes)))
+                                shapes.append(Grain(g, ph, len(shapes)))
                             print('Multipolygon (FID={}) exploded.'.format(pos))
                         elif geom.geom_type == 'Polygon':
-                            shapes.append(Grain(geom, rec.record[phase_pos], len(shapes)))
+                            shapes.append(Grain(geom, ph, len(shapes)))
                         else:
                             raise Exception('Unexpected geometry type (FID={})!'.format(pos))
                     else:
