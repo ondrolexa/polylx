@@ -208,8 +208,8 @@ class Grain(PolyShape):
         """
         return 2*np.sqrt(self.shape.area/np.pi)
 
-    def show(self):
-        """View grain geometry on figure.
+    def plot(self):
+        """Plot ``Grain`` geometry on figure.
 
         Note that plotted ellipse reflects actual shape method
 
@@ -231,6 +231,13 @@ class Grain(PolyShape):
         ax.plot(xx[[90, 270]], yy[[90, 270]], color='green')
         ax.autoscale_view(None, True, True)
         plt.title('LAO:{g.lao:g} AR:{g.ar} ({g.shape_method})'.format(g=self))
+        return ax
+
+    def show(self):
+        """Show plot of ``Grain`` objects.
+
+        """
+        self.plot()
         plt.show()
 
     ##################################################################
@@ -471,8 +478,8 @@ class Boundary(PolyShape):
         else:
             return np.array(h.exterior.xy)
 
-    def show(self):
-        """View boundary geometry on figure.
+    def plot(self):
+        """View ``Boundary`` geometry on figure.
 
         """
         fig = plt.figure()
@@ -486,6 +493,13 @@ class Boundary(PolyShape):
         ax.plot(*hull.T[pa[ix]].T, ls=':', lw=2, c='r')
         ax.autoscale_view(None, True, True)
         plt.title('LAO:{b.lao:g} AR:{b.ar} ({b.shape_method})'.format(b=self))
+        return ax
+
+    def show(self):
+        """Show plot of ``Boundary`` objects.
+
+        """
+        self.plot()
         plt.show()
 
     ###################################################################
@@ -877,26 +891,30 @@ class Grains(PolySet):
             shapeRecs = sf.shapeRecords()
             shapes = []
             for pos, rec in enumerate(shapeRecs):
-                geom = shape(rec.shape.__geo_interface__)
-                # try  to "clean" self-touching or self-crossing polygons
-                if not geom.is_valid:
-                    geom = geom.buffer(0)
-                if geom.is_valid:
-                    if not geom.is_empty:
-                        if phasefield is None:
-                            ph = phase
+                # A valid polygon must have at least 4 coordinate tuples
+                if len(rec.shape.points) > 3:
+                    geom = shape(rec.shape.__geo_interface__)
+                    # try  to "clean" self-touching or self-crossing polygons
+                    if not geom.is_valid:
+                        geom = geom.buffer(0)
+                    if geom.is_valid:
+                        if not geom.is_empty:
+                            if phasefield is None:
+                                ph = phase
+                            else:
+                                ph = rec.record[phase_pos]
+                            if geom.geom_type == 'MultiPolygon':
+                                for g in geom:
+                                    shapes.append(Grain(g, ph, len(shapes)))
+                                print('Multipolygon (FID={}) exploded.'.format(pos))
+                            elif geom.geom_type == 'Polygon':
+                                shapes.append(Grain(geom, ph, len(shapes)))
+                            else:
+                                raise Exception('Unexpected geometry type (FID={})!'.format(pos))
                         else:
-                            ph = rec.record[phase_pos]
-                        if geom.geom_type == 'MultiPolygon':
-                            for g in geom:
-                                shapes.append(Grain(g, ph, len(shapes)))
-                            print('Multipolygon (FID={}) exploded.'.format(pos))
-                        elif geom.geom_type == 'Polygon':
-                            shapes.append(Grain(geom, ph, len(shapes)))
-                        else:
-                            raise Exception('Unexpected geometry type (FID={})!'.format(pos))
+                            print('Empty geometry (FID={}) skipped.'.format(pos))
                     else:
-                        print('Empty geometry (FID={}) skipped.'.format(pos))
+                        print('Invalid geometry (FID={}) skipped.'.format(pos))
                 else:
                     print('Invalid geometry (FID={}) skipped.'.format(pos))
             return self(shapes)
