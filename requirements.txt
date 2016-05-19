@@ -2,4 +2,4 @@ numpy
 matplotlib
 pandas
 networkx
-shapely
+shapely<1.3
