@@ -46,8 +46,8 @@ class PolyShape(object):
     """
     def __init__(self, shape, name, fid):
         self.shape = shape
-        self.name = name
-        self.fid = fid
+        self.name = str(name)
+        self.fid = int(fid)
 
     def __getattr__(self, attr):
         if hasattr(self.shape, attr):
@@ -968,7 +968,7 @@ class Grains(PolySet):
         for g in self:
             for p0, p1 in zip(g.xy.T[:-1], g.xy.T[1:]):
                 shapes.append(Boundary(LineString([p0, p1]), g.name, len(shapes)))
-        return self(shapes)
+        return Boundaries(shapes)
 
     @classmethod
     def from_shp(cls, filename=os.path.join(respath, 'sg2.shp'),
