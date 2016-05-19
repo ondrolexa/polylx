@@ -174,9 +174,9 @@ To summarize results for individual phases per class we can use
 ``pandas.pivot_table``::
 
     >>> pd.pivot_table(df,index=['ead_class'], columns=['name'], aggfunc=np.sum)
-                   area                    
+                   area
     name            ksp        pl       qtz
-    ead_class                              
+    ead_class
     0-0.05     0.062384  0.121512  0.066795
     0.05-0.1   0.363246  0.553436  0.172737
     0.1-0.15   0.647782  0.225262  0.200288
@@ -205,14 +205,14 @@ Work with boundaries
 The ``Boundaries`` object could be created from grains with correct
 topology (use OpenJUMP, QGIS or ArcGIS to validate grain shapefile topology)::
 
-    >>> b = Boundaries.from_grains(g)
+    >>> b = g.boundaries()
     >>> b.show()
 
 .. plot::
 
     from polylx import *
     g = Grains.from_shp()
-    b = Boundaries.from_grains(g)
+    b = b = g.boundaries()
     b.show()
 
 Most of methods and properties demonstrated for ``Grains`` are valid also

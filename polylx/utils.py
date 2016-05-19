@@ -17,14 +17,14 @@ import numpy as np
 
 
 def fixzero(x):
-    return x*(x > np.finfo(float).eps)
+    return x * (x > np.finfo(float).eps)
 
 
 def fixratio(x, y):
     if y == 0:
         return np.inf
     else:
-        return x/y
+        return x / y
 
 
 class circular(object):
@@ -33,7 +33,7 @@ class circular(object):
         """Mean resultant vector
 
         """
-        return np.exp(2j*np.deg2rad(x)).mean()
+        return np.exp(2j * np.deg2rad(x)).mean()
 
     @staticmethod
     def R(x):
@@ -47,7 +47,7 @@ class circular(object):
         """Mean direction
 
         """
-        return np.angle(circular.rho(x), deg=True)/2 % 180
+        return np.angle(circular.rho(x), deg=True) / 2 % 180
 
     @staticmethod
     def var(x):
@@ -61,14 +61,14 @@ class circular(object):
         """Circular standard deviation
 
         """
-        return np.sqrt(-2*np.log(circular.R(x)))
+        return np.sqrt(-2 * np.log(circular.R(x)))
 
     @staticmethod
     def angdev(x):
         """Angular deviation
 
         """
-        return np.sqrt(2*circular.var(x))
+        return np.sqrt(2 * circular.var(x))
 
     @staticmethod
     def mean_conf(x, cl=0.95):
@@ -80,22 +80,22 @@ class circular(object):
         from scipy.stats import gamma
         n = len(x)
         R = circular.R(x)
-        r = R*n
+        r = R * n
         c2 = gamma.ppf(cl, 0.5, scale=2)
-        if R < .9 and R > np.sqrt(c2/2/n):
-            t = np.sqrt((2*n*(2*r**2 - n*c2))/(4*n - c2))
+        if R < .9 and R > np.sqrt(c2 / 2 / n):
+            t = np.sqrt((2 * n * (2 * r**2 - n * c2)) / (4 * n - c2))
         elif R >= .9:
-            t = np.sqrt(n**2 - (n**2 - r**2)*np.exp(c2/n))
+            t = np.sqrt(n**2 - (n**2 - r**2) * np.exp(c2 / n))
         else:  # Resultant vector does not allow to specify confidence limits
             t = np.nan
-        return deg.acos(t/r)
+        return deg.acos(t / r)
 
     @staticmethod
     def angskew(x):
         """Angular skewness
 
         """
-        return np.mean(deg.sin(2*circular.circdist(x, circular.mean(x))))
+        return np.mean(deg.sin(2 * circular.circdist(x, circular.mean(x))))
 
     @staticmethod
     def sas(x):
@@ -103,23 +103,23 @@ class circular(object):
 
         """
         rho_p, mu_p = circular.circmoment(x, 2)
-        s = deg.sin(circular.circdist(mu_p, 2*circular.mean(x)))
-        d = (1 - circular.var(x))**(2./3)
-        return rho_p*s/d
+        s = deg.sin(circular.circdist(mu_p, 2 * circular.mean(x)))
+        d = (1 - circular.var(x))**(2 / 3)
+        return rho_p * s / d
 
     @staticmethod
     def circdist(x, y):
         """Pairwise difference around the circle
 
         """
-        return np.angle(np.exp(1j*x)/np.exp(1j*y), deg=True)
+        return np.angle(np.exp(1j * x) / np.exp(1j * y), deg=True)
 
     @staticmethod
     def circmoment(x, p=1):
         """Complex centered p-th moment
 
         """
-        mp = np.exp(2j*p*np.deg2rad(x)).mean()
+        mp = np.exp(2j * p * np.deg2rad(x)).mean()
         return np.abs(mp), np.angle(mp, deg=True)
 
 
@@ -163,21 +163,21 @@ class Classify(object):
             # if upper limit is maximum value, digitize it to last bin
             edge = len(bins) - 1
             index[np.flatnonzero(index == edge)] = edge - 1
-            self.index = ['%g-%g' % (bins[i], bins[i+1]) for i in range(len(counts))]
+            self.index = ['%g-%g' % (bins[i], bins[i + 1]) for i in range(len(counts))]
             self.names = np.array([self.index[i] for i in index])
         elif rule == 'natural':
             index, bins = natural_breaks(vals, k=k)
             counts = np.bincount(index)
-            self.index = ['%g-%g' % (bins[i], bins[i+1]) for i in range(len(counts))]
+            self.index = ['%g-%g' % (bins[i], bins[i + 1]) for i in range(len(counts))]
             self.names = np.array([self.index[i] for i in index])
         elif rule == 'jenks':
             bins = fisher_jenks(vals, k=k)
             index = np.digitize(vals, bins) - 1
             index[np.flatnonzero(index == k)] = k - 1
             counts = np.bincount(index)
-            self.index = ['%g-%g' % (bins[i], bins[i+1]) for i in range(len(counts))]
+            self.index = ['%g-%g' % (bins[i], bins[i + 1]) for i in range(len(counts))]
             self.names = np.array([self.index[i] for i in index])
-        else:  #unique
+        else:  # unique
             self.index = np.unique(vals)
             self.names = np.asarray(vals)
 
@@ -188,6 +188,7 @@ class Classify(object):
     def labels(self):
         index, inverse = np.unique(self.names, return_inverse=True)
         return ['%s (%d)' % p for p in zip(index, np.bincount(inverse))]
+
 
 def PolygonPath(polygon):
     """Constructs a compound matplotlib path from a Shapely object
@@ -265,7 +266,7 @@ def natural_breaks(values, k=5, itmax=100):
         # assign value to that centroid
         c1 = diffs.argmin(axis=0)
         c1 = np.array(c1)[0]
-        #compare new classids to previous
+        # compare new classids to previous
         d = abs(c1 - c0)
         if d.sum() == 0:
             solving = False
@@ -362,25 +363,25 @@ def fisher_jenks(values, k=5):
     values = np.sort(values)
     numVal = len(values)
 
-    varMat = (numVal+1)*[0]
-    for i in range(numVal+1):
-        varMat[i] = (numVal+1)*[0]
+    varMat = (numVal + 1) * [0]
+    for i in range(numVal + 1):
+        varMat[i] = (numVal + 1) * [0]
 
-    errorMat = (numVal+1)*[0]
-    for i in range(numVal+1):
-        errorMat[i] = (k+1)*[float('inf')]
+    errorMat = (numVal + 1) * [0]
+    for i in range(numVal + 1):
+        errorMat[i] = (k + 1) * [float('inf')]
 
-    pivotMat = (numVal+1)*[0]
-    for i in range(numVal+1):
-        pivotMat[i] = (k+1)*[0]
+    pivotMat = (numVal + 1) * [0]
+    for i in range(numVal + 1):
+        pivotMat[i] = (k + 1) * [0]
 
     # building up the initial variance matrix
-    for i in range(1, numVal+1):
+    for i in range(1, numVal + 1):
         sumVals = 0
         sqVals = 0
         numVals = 0
-        for j in range(i, numVal+1):
-            val = float(values[j-1])
+        for j in range(i, numVal + 1):
+            val = float(values[j - 1])
             sumVals += val
             sqVals += val * val
             numVals += 1.0
@@ -388,21 +389,21 @@ def fisher_jenks(values, k=5):
             if i == 1:
                 errorMat[j][1] = varMat[i][j]
 
-    for cIdx in range(2, k+1):
-        for vl in range(cIdx-1, numVal):
-            preError = errorMat[vl][cIdx-1]
-            for vIdx in range(vl+1, numVal+1):
-                curError = preError + varMat[vl+1][vIdx]
+    for cIdx in range(2, k + 1):
+        for vl in range(cIdx - 1, numVal):
+            preError = errorMat[vl][cIdx - 1]
+            for vIdx in range(vl + 1, numVal + 1):
+                curError = preError + varMat[vl + 1][vIdx]
                 if errorMat[vIdx][cIdx] > curError:
                     errorMat[vIdx][cIdx] = curError
                     pivotMat[vIdx][cIdx] = vl
 
-    pivots = (k+1)*[0]
-    pivots[k] = values[numVal-1]
+    pivots = (k + 1) * [0]
+    pivots[k] = values[numVal - 1]
     pivots[0] = values[0]
     lastPivot = pivotMat[numVal][k]
 
-    pNum = k-1
+    pNum = k - 1
     while pNum > 0:
         pivots[pNum] = values[lastPivot - 1]
         lastPivot = pivotMat[lastPivot][pNum]
@@ -419,7 +420,7 @@ def find_ellipse(x, y):
     y -= ymean
     x = x[:, np.newaxis]
     y = y[:, np.newaxis]
-    D = np.hstack((x*x, x*y, y*y, x, y, np.ones_like(x)))
+    D = np.hstack((x * x, x * y, y * y, x, y, np.ones_like(x)))
     S = np.dot(D.T, D)
     C = np.zeros([6, 6])
     C[0, 2] = C[2, 0] = 2
@@ -428,23 +429,24 @@ def find_ellipse(x, y):
     n = np.argmax(np.abs(E))
     q = V[:, n]
     # get parameters
-    b, c, d, f, g, a = q[1]/2, q[2], q[3]/2, q[4]/2, q[5], q[0]
-    num = b*b - a*c
-    xc = (c*d - b*f)/num + xmean
-    yc = (a*f - b*d)/num + ymean
-    phi = 0.5*np.arctan(2*b/(a - c))
-    up = 2*(a*f*f + c*d*d + g*b*b - 2*b*d*f - a*c*g)
-    down1 = (b*b - a*c)*((c - a)*np.sqrt(1 + 4*b*b/((a - c)*(a - c))) - (c + a))
-    down2 = (b*b - a*c)*((a - c)*np.sqrt(1 + 4*b*b/((a - c)*(a - c))) - (c + a))
-    a = np.sqrt(up/down1)
-    b = np.sqrt(up/down2)
+    b, c, d, f, g, a = q[1] / 2, q[2], q[3] / 2, q[4] / 2, q[5], q[0]
+    num = b * b - a * c
+    xc = (c * d - b * f) / num + xmean
+    yc = (a * f - b * d) / num + ymean
+    phi = 0.5 * np.arctan(2 * b / (a - c))
+    up = 2 * (a * f * f + c * d * d + g * b * b - 2 * b * d * f - a * c * g)
+    de = np.sqrt(1 + 4 * b * b / ((a - c) * (a - c))) - (c + a)
+    down1 = (b * b - a * c) * ((c - a) * de)
+    down2 = (b * b - a * c) * ((a - c) * de)
+    a = np.sqrt(up / down1)
+    b = np.sqrt(up / down2)
     return xc, yc, phi, a, b
 
 
 def densify(x, y, repeat=1):
     for i in range(repeat):
-        x = np.insert(x, np.s_[1:], x[:-1] + np.diff(x)/2)
-        y = np.insert(y, np.s_[1:], y[:-1] + np.diff(y)/2)
+        x = np.insert(x, np.s_[1:], x[:-1] + np.diff(x) / 2)
+        y = np.insert(y, np.s_[1:], y[:-1] + np.diff(y) / 2)
     return x, y
 
 
@@ -467,9 +469,9 @@ def _spline_ring(x, y, densify=5, pad=5):
     t = np.zeros(x.shape)
     t[1:] = np.sqrt((x[1:] - x[:-1])**2 + (y[1:] - y[:-1])**2)
     t = np.cumsum(t)
-    t -= t[pad-1]
+    t -= t[pad - 1]
     t /= t[-pad]
-    nt = np.linspace(0, 1, num*densify)
+    nt = np.linspace(0, 1, num * densify)
     x = spline(t, x, nt)
     y = spline(t, y, nt)
     x[-1] = x[0]
@@ -483,14 +485,14 @@ def _visvalingam_whyatt_ring(x, y, minarea=None):
     while do:
         xx = np.concatenate((x[-2:-1], x, x[1:2]))
         yy = np.concatenate((y[-2:-1], y, y[1:2]))
-        i0 = np.arange(len(xx)-2)
+        i0 = np.arange(len(xx) - 2)
         i1 = i0 + 1
         i2 = i0 + 2
-        a = (xx[i0]*(yy[i1] - yy[i2]) + xx[i1]*(yy[i2] - yy[i0]) + xx[i2]*(yy[i0] - yy[i1]))/2
+        a = (xx[i0] * (yy[i1] - yy[i2]) + xx[i1] * (yy[i2] - yy[i0]) + xx[i2] * (yy[i0] - yy[i1])) / 2
         ix = abs(a).argmin()
         mn = a[ix]
         if abs(tot + mn) < minarea and len(x) > 4:
-            if ix == 0 or ix == len(x)-1:
+            if ix == 0 or ix == len(x) - 1:
                 x = np.concatenate((x[1:-1], x[1:2]))
                 y = np.concatenate((y[1:-1], y[1:2]))
             else:

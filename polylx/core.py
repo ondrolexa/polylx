@@ -5,9 +5,9 @@ Python module to visualize and analyze digitized 2D microstructures.
 @author: Ondrej Lexa
 
 Examples:
-  >>> from core import *
+  >>> from polylx import *
   >>> g = Grains.from_shp('')
-  >>> b = Boundaries.from_grains(g)
+  >>> b = g.boundaries()
 
 """
 import os
@@ -30,8 +30,8 @@ from .utils import _chaikin_ring, _spline_ring, _visvalingam_whyatt_ring
 
 from pkg_resources import resource_filename
 
-__all__ = ['Grain', 'Boundary', 'Grains', 'Boundaries', 'Sample']
 respath = resource_filename(__name__, 'example')
+
 
 class PolyShape(object):
     """Base class to store polygon or polyline
@@ -87,7 +87,7 @@ class PolyShape(object):
         short axis. Both axes are calculated by actual ``shape method``.
 
         """
-        return np.sqrt(self.la*self.sa)
+        return np.sqrt(self.la * self.sa)
 
     @property
     def centroid(self):
@@ -121,7 +121,7 @@ class PolyShape(object):
         pa = np.array(list(itertools.combinations(range(len(xy)), 2)))
         d2 = np.sum((xy[pa[:, 0]] - xy[pa[:, 1]])**2, axis=1)
         ix = d2.argmax()
-        dxy = xy[pa[ix][1]]-xy[pa[ix][0]]
+        dxy = xy[pa[ix][1]] - xy[pa[ix][0]]
         self.la = np.sqrt(np.max(d2))
         self.lao = deg.atan2(*dxy) % 180
         self.sao = (self.lao + 90) % 180
@@ -174,7 +174,7 @@ class Grain(PolyShape):
         if geom.is_valid and geom.geom_type == 'Polygon':
             return self(geom, name, fid)
         else:
-            print('Invalid geometry.'.format(pos))
+            print('Invalid geometry.')
 
     @property
     def xy(self):
@@ -206,7 +206,7 @@ class Grain(PolyShape):
         """Returns equal area diameter of grain
 
         """
-        return 2*np.sqrt(self.shape.area/np.pi)
+        return 2 * np.sqrt(self.shape.area / np.pi)
 
     def plot(self):
         """Plot ``Grain`` geometry on figure.
@@ -224,8 +224,8 @@ class Grain(PolyShape):
         R = np.linspace(0, 360, 361)
         cr, sr = deg.cos(R), deg.sin(R)
         cl, sl = deg.cos(self.lao), deg.sin(self.lao)
-        xx = self.xc + self.la*cr*sl/2 + self.sa*sr*cl/2
-        yy = self.yc + self.la*cr*cl/2 - self.sa*sr*sl/2
+        xx = self.xc + self.la * cr * sl / 2 + self.sa * sr * cl / 2
+        yy = self.yc + self.la * cr * cl / 2 - self.sa * sr * sl / 2
         ax.plot(xx, yy, color='green')
         ax.plot(xx[[0, 180]], yy[[0, 180]], color='green')
         ax.plot(xx[[90, 270]], yy[[90, 270]], color='green')
@@ -253,7 +253,8 @@ class Grain(PolyShape):
         x, y = _spline_ring(*self.xy, densify=kwargs.get('densify', 5))
         holes = []
         for hole in self.interiors:
-            xh, yh = _spline_ring(*np.array(hole.xy), densify=kwargs.get('densify', 5))
+            xh, yh = _spline_ring(*np.array(hole.xy),
+                                  densify=kwargs.get('densify', 5))
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
@@ -273,7 +274,8 @@ class Grain(PolyShape):
         x, y = _chaikin_ring(*self.xy, repeat=kwargs.get('repeat', 4))
         holes = []
         for hole in self.interiors:
-            xh, yh = _chaikin_ring(*np.array(hole.xy), repeat=kwargs.get('repeat', 4))
+            xh, yh = _chaikin_ring(*np.array(hole.xy),
+                                   repeat=kwargs.get('repeat', 4))
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
@@ -339,7 +341,7 @@ class Grain(PolyShape):
 
         """
         xy = self.hull.T
-        dxy = xy[1:]-xy[:-1]
+        dxy = xy[1:] - xy[:-1]
         ang = (deg.atan2(*dxy.T) + 90) % 180
         pp = np.dot(xy, np.array([deg.sin(ang), deg.cos(ang)]))
         d = pp.max(axis=0) - pp.min(axis=0)
@@ -363,26 +365,26 @@ class Grain(PolyShape):
         y = y - y.mean()
         xl = np.roll(x, -1)
         yl = np.roll(y, -1)
-        v = xl*y - x*yl
-        A = round(1e14*np.sum(v)/2)/1e14
+        v = xl * y - x * yl
+        A = round(1e14 * np.sum(v) / 2) / 1e14
 
         if A != 0:
-            a10 = np.sum(v*(xl + x))/(6*A)
-            a01 = np.sum(v*(yl + y))/(6*A)
-            a20 = np.sum(v*(xl**2 + xl*x + x**2))/(12*A)
-            a11 = np.sum(v*(2*xl*yl + xl*y + x*yl + 2*x*y))/(24*A)
-            a02 = np.sum(v*(yl**2 + yl*y + y**2))/(12*A)
+            a10 = np.sum(v * (xl + x)) / (6 * A)
+            a01 = np.sum(v * (yl + y)) / (6 * A)
+            a20 = np.sum(v * (xl**2 + xl * x + x**2)) / (12 * A)
+            a11 = np.sum(v * (2 * xl * yl + xl * y + x * yl + 2 * x * y)) / (24 * A)
+            a02 = np.sum(v * (yl**2 + yl * y + y**2)) / (12 * A)
 
             m20 = a20 - a10**2
-            m11 = a11 - a10*a01
+            m11 = a11 - a10 * a01
             m02 = a02 - a01**2
 
-            CM = np.array([[m02, -m11], [-m11, m20]])/(4*(m20*m02 - m11**2))
+            CM = np.array([[m02, -m11], [-m11, m20]]) / (4 * (m20 * m02 - m11**2))
             evals, evecs = np.linalg.eig(CM)
             idx = evals.argsort()
             evals = evals[idx]
             evecs = evecs[:, idx]
-            self.la, self.sa = 2/np.sqrt(evals)
+            self.la, self.sa = 2 / np.sqrt(evals)
             self.lao, self.sao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
             self.xc, self.yc = self.shape.centroid.coords[0]
             self._shape_method = 'moment'
@@ -395,7 +397,7 @@ class Grain(PolyShape):
 
         Short, long axes and centre coordinates are calculated from direct
         least-square ellipse fitting. If direct fitting is not possible
-        silently fallback to moment. 
+        silently fallback to moment.
 
         """
         x, y = self.xy
@@ -414,7 +416,7 @@ class Grain(PolyShape):
         else:
             xc, yc, phi, a, b = res
             if a > b:
-                ori = np.pi/2 - phi
+                ori = np.pi / 2 - phi
             else:
                 ori = -phi
                 a, b = b, a
@@ -436,7 +438,7 @@ class Grain(PolyShape):
         idx = evals.argsort()
         evals = evals[idx]
         evecs = evecs[:, idx]
-        self.sa, self.la = np.sqrt(8)*np.sqrt(evals)
+        self.sa, self.la = np.sqrt(8) * np.sqrt(evals)
         self.sao, self.lao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
         self.xc, self.yc = self.shape.centroid.coords[0]
         self._shape_method = 'cov'
@@ -520,9 +522,9 @@ class Boundary(PolyShape):
         idx = evals.argsort()
         evals = evals[idx]
         evecs = evecs[:, idx]
-        self.sa, self.la = np.sqrt(2)*np.sqrt(evals)
+        self.sa, self.la = np.sqrt(2) * np.sqrt(evals)
         self.sa = fixzero(self.sa)
-        self.sao, self.lao = np.mod(deg.atan2(evecs[0,:],evecs[1,:]), 180)
+        self.sao, self.lao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
         self.xc, self.yc = self.shape.centroid.coords[0]
         self._shape_method = 'cov'
 
@@ -701,7 +703,7 @@ class PolySet(object):
             h, l = ax.get_legend_handles_labels()
             divider = make_axes_locatable(ax)
             cax = divider.append_axes('top',
-                                      size=0.25+0.25*np.ceil(len(h)/ncol))
+                                      size=0.25 + 0.25 * np.ceil(len(h) / ncol))
             cax.set_axis_off()
             cax.legend(h, l, loc=9, borderaxespad=0.,
                        ncol=ncol, bbox_to_anchor=[0.5, 1.1])
@@ -709,7 +711,7 @@ class PolySet(object):
         elif pos == 'right':
             h, l = ax.get_legend_handles_labels()
             divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size=0.2+1.6*ncol)
+            cax = divider.append_axes("right", size=0.2 + 1.6 * ncol)
             cax.set_axis_off()
             cax.legend(h, l, loc=7, borderaxespad=0.,
                        bbox_to_anchor=[1.04, 0.5])
@@ -793,19 +795,19 @@ class PolySet(object):
 
             radii /= len(ang)
         else:
-            width = 360/bins
+            width = 360 / bins
             num, bin_edges = np.histogram(np.concatenate((ang, ang + 180)),
                                           bins=bins + 1,
-                                          range=(-width/2, 360 + width/2),
+                                          range=(-width / 2, 360 + width / 2),
                                           weights=weights, density=density)
             num[0] += num[-1]
             num = num[:-1]
             theta = []
             radii = []
             for cc, val in zip(np.arange(0, 360, width), num):
-                theta.extend([cc - width/2, cc - rwidth*width/2, cc,
-                              cc + rwidth*width/2, cc + width/2, ])
-                radii.extend([0, val*arrow, val, val*arrow, 0])
+                theta.extend([cc - width / 2, cc - rwidth * width / 2, cc,
+                              cc + rwidth * width / 2, cc + width / 2, ])
+                radii.extend([0, val * arrow, val, val * arrow, 0])
             theta = np.deg2rad(theta)
         if scaled:
             radii = np.sqrt(radii)
@@ -864,12 +866,112 @@ class Grains(PolySet):
         """
         return list(np.unique(self.name))
 
-    @property
-    def boundaries(self):
-        return Boundaries.from_grains(self)
+    def boundaries(self, T=None):
+        """Create Boundaries from Grains.
+
+        Example:
+          >>> g = Grains.from_shp()
+          >>> b = g.boundaries()
+
+        """
+        from shapely.ops import linemerge
+
+        shapes = []
+        lookup = {}
+        if T is None:
+            T = nx.Graph()
+        G = nx.DiGraph()
+        for fid, g in enumerate(self):
+            # get phase and add to list and legend
+            path = []
+            for co in g.shape.exterior.coords:
+                if co not in lookup:
+                    lookup[co] = len(lookup)
+                path.append(lookup[co])
+            G.add_path(path, fid=fid, phase=g.name)
+            for holes in g.shape.interiors:
+                path = []
+                for co in holes.coords:
+                    if co not in lookup:
+                        lookup[co] = len(lookup)
+                    path.append(lookup[co])
+                G.add_path(path, fid=fid, phase=g.name)
+        # Create topology graph
+        H = G.to_undirected(reciprocal=True)
+        for edge in H.edges_iter():
+            e1 = G.get_edge_data(edge[0], edge[1])
+            e2 = G.get_edge_data(edge[1], edge[0])
+            bt = '%s-%s' % tuple(sorted([e1['phase'], e2['phase']]))
+            T.add_node(e1['fid'])
+            T.add_node(e2['fid'])
+            T.add_edge(e1['fid'], e2['fid'], type=bt, bids=[])
+        # Create boundaries
+        for edge in T.edges_iter():
+            shared = self[edge[0]].intersection(self[edge[1]])
+            edge_data = T.get_edge_data(edge[0], edge[1])
+            if shared.geom_type == 'LineString':  # LineString cannot be merged
+                shapes.append(Boundary(shared, edge_data['type'], len(shapes)))
+            elif shared.geom_type == 'MultiLineString':  # common case
+                shared = linemerge(shared)
+                if shared.geom_type == 'LineString':  # single shared boundary
+                    bid = len(shapes)
+                    shapes.append(Boundary(shared,
+                                           edge_data['type'],
+                                           bid))
+                    edge_data['bids'].append(bid)
+                else:  # multiple shared boundary
+                    for sub in list(shared):
+                        bid = len(shapes)
+                        shapes.append(Boundary(sub,
+                                               edge_data['type'],
+                                               bid))
+                        edge_data['bids'].append(bid)
+            elif shared.geom_type == 'GeometryCollection':  # other cases
+                for sub in shared:
+                    if sub.geom_type == 'LineString':
+                        bid = len(shapes)
+                        shapes.append(Boundary(sub,
+                                               edge_data['type'],
+                                               bid))
+                        edge_data['bids'].append(bid)
+                    elif sub.geom_type == 'MultiLineString':
+                        sub = linemerge(sub)
+                        if sub.geom_type == 'LineString':
+                            bid = len(shapes)
+                            shapes.append(Boundary(sub,
+                                                   edge_data['type'],
+                                                   bid))
+                            edge_data['bids'].append(bid)
+                        else:
+                            for subsub in list(sub):
+                                bid = len(shapes)
+                                shapes.append(Boundary(subsub,
+                                                       edge_data['type'],
+                                                       bid))
+                                edge_data['bids'].append(bid)
+        if not shapes:
+            print('No shared boundaries found.')
+        else:
+            return Boundaries(shapes)
+
+    def boundary_segments(self):
+        """Create Boundaries from Grains boundary segments.
+
+        Example:
+          >>> g = Grains.from_shp()
+          >>> b = g.boundary_segments()
+
+        """
+        from shapely.geometry import LineString
+
+        shapes = []
+        for g in self:
+            for p0, p1 in zip(g.xy.T[:-1], g.xy.T[1:]):
+                shapes.append(Boundary(LineString([p0, p1]), g.name, len(shapes)))
+        return self(shapes)
 
     @classmethod
-    def from_shp(self, filename=os.path.join(respath, 'sg2.shp'),
+    def from_shp(cls, filename=os.path.join(respath, 'sg2.shp'),
                  phasefield='phase', phase='None'):
         """Create Grains from ESRI shapefile.
 
@@ -917,7 +1019,7 @@ class Grains(PolySet):
                         print('Invalid geometry (FID={}) skipped.'.format(pos))
                 else:
                     print('Invalid geometry (FID={}) skipped.'.format(pos))
-            return self(shapes)
+            return cls(shapes)
         else:
             raise Exception('Shapefile must contains polygons!')
 
@@ -1003,92 +1105,6 @@ class Boundaries(PolySet):
         """
         return list(np.unique(self.name))
 
-    @classmethod
-    def from_grains(self, grains, T=None):
-        """Create Boundaries from Grains.
-
-        Example:
-          >>> g = Grains.from_shp()
-          >>> b = Boundaries.from_grains(g)
-
-        """
-        from shapely.ops import linemerge
-
-        shapes = []
-        lookup = {}
-        if T is None:
-            T = nx.Graph()
-        G = nx.DiGraph()
-        for fid, g in enumerate(grains.polys):
-            # get phase and add to list and legend
-            path = []
-            for co in g.shape.exterior.coords:
-                if co not in lookup:
-                    lookup[co] = len(lookup)
-                path.append(lookup[co])
-            G.add_path(path, fid=fid, phase=g.name)
-            for holes in g.shape.interiors:
-                path = []
-                for co in holes.coords:
-                    if co not in lookup:
-                        lookup[co] = len(lookup)
-                    path.append(lookup[co])
-                G.add_path(path, fid=fid, phase=g.name)
-        # Create topology graph
-        H = G.to_undirected(reciprocal=True)
-        for edge in H.edges_iter():
-            e1 = G.get_edge_data(edge[0], edge[1])
-            e2 = G.get_edge_data(edge[1], edge[0])
-            bt = '%s-%s' % tuple(sorted([e1['phase'], e2['phase']]))
-            T.add_node(e1['fid'])
-            T.add_node(e2['fid'])
-            T.add_edge(e1['fid'], e2['fid'], type=bt, bids=[])
-        # Create boundaries
-        for edge in T.edges_iter():
-            shared = grains[edge[0]].intersection(grains[edge[1]])
-            edge_data = T.get_edge_data(edge[0], edge[1])
-            if shared.geom_type == 'LineString':  # LineString cannot be merged
-                shapes.append(Boundary(shared, edge_data['type'], len(shapes)))
-            elif shared.geom_type == 'MultiLineString':  # common case
-                shared = linemerge(shared)
-                if shared.geom_type == 'LineString':  # single shared boundary
-                    bid = len(shapes)
-                    shapes.append(Boundary(shared,
-                                           edge_data['type'],
-                                           bid))
-                    edge_data['bids'].append(bid)
-                else:  # multiple shared boundary
-                    for sub in list(shared):
-                        bid = len(shapes)
-                        shapes.append(Boundary(sub,
-                                               edge_data['type'],
-                                               bid))
-                        edge_data['bids'].append(bid)
-            elif shared.geom_type == 'GeometryCollection':  # other cases
-                for sub in shared:
-                    if sub.geom_type == 'LineString':
-                        bid = len(shapes)
-                        shapes.append(Boundary(sub,
-                                               edge_data['type'],
-                                               bid))
-                        edge_data['bids'].append(bid)
-                    elif sub.geom_type == 'MultiLineString':
-                        sub = linemerge(sub)
-                        if sub.geom_type == 'LineString':
-                            bid = len(shapes)
-                            shapes.append(Boundary(sub,
-                                                   edge_data['type'],
-                                                   bid))
-                            edge_data['bids'].append(bid)
-                        else:
-                            for subsub in list(sub):
-                                bid = len(shapes)
-                                shapes.append(Boundary(subsub,
-                                                       edge_data['type'],
-                                                       bid))
-                                edge_data['bids'].append(bid)
-        return self(shapes)
-
     def _plot(self, ax, legend, alpha):
         groups = self.groups('shape')
         for key in self.classes.index:
@@ -1135,7 +1151,7 @@ class Sample(object):
         obj = cls()
         obj.T = nx.Graph()
         obj.g = grains
-        obj.b = Boundaries.from_grains(grains, obj.T)
+        obj.b = obj.g.boundaries(obj.T)
         return obj
 
     def neighbors(self, idx, name=None):

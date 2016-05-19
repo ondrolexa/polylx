@@ -8,8 +8,7 @@ Created on Wed Feb  5 21:42:54 2014
 @author: Ondrej Lexa
 
 Example:
-  import numpy as np
-  import matplotlib.pyplot as plt
+  from polylx import *
   from polylx.reports import Report
 
   g = Grains.from_shp()
@@ -21,7 +20,9 @@ Example:
   r = Report('Test report')
   r.add_chapter('Things will start here')
   r.savefig(fig, width='75%')
-  r.table([[1,2,120],[2,6,213],[3,4,118]], title='Table example', header=['No','Val','Age'])
+  r.table([[1,2,120],[2,6,213],[3,4,118]],
+          title='Table example',
+          header=['No','Val','Age'])
   r.grainmap(g, width='75%')
   r.write_pdf()
 
