@@ -20,3 +20,8 @@ History
 * classification is persitant trough fancy indexing
 * empty classes allowed
 * bootstrap method added to PolySet
+
+0.3.2 (dev)
+------------------
+* PolyShape name forced to be string
+* Creation of boundaries is Grains method
