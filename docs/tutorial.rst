@@ -212,7 +212,7 @@ topology (use OpenJUMP, QGIS or ArcGIS to validate grain shapefile topology)::
 
     from polylx import *
     g = Grains.from_shp()
-    b = b = g.boundaries()
+    b = g.boundaries()
     b.show()
 
 Most of methods and properties demonstrated for ``Grains`` are valid also
