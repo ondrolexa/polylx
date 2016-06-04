@@ -21,7 +21,7 @@ History
 * empty classes allowed
 * bootstrap method added to PolySet
 
-0.3.2 (dev)
+0.3.2 (2016-06-04)
 ------------------
 * PolyShape name forced to be string
 * Creation of boundaries is Grains method
