@@ -27,7 +27,7 @@ convinience, we will import polylx into actual namespace::
 
 To read example data, we can use ``Grains.from_shp`` method without
 arguments. Note that we create new ``Grains`` object, which store all
-imported features (polygons) from shapefile.
+imported features (polygons) from shapefile::
 
     >>> g = Grains.from_shp()
 
@@ -89,7 +89,7 @@ Note that most of properties are returned as ``numpy.array``::
             1.3177092 ,  2.33701528,  1.86371784,  1.26166336,  1.28322623])
 
 More conviniet way to work with Grains attributes is collect any properties
-to ``pandas.DataFrame`` using ``df`` method:::
+to ``pandas.DataFrame`` using ``df`` method::
 
     >>> g.df('la', 'sa', 'lao', 'sao', 'area', 'perimeter', 'ead', 'ar').head(10)
              la       ead        ar
