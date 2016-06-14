@@ -911,44 +911,20 @@ class Grains(PolySet):
             edge_data = T.get_edge_data(edge[0], edge[1])
             if shared.geom_type == 'LineString':  # LineString cannot be merged
                 shapes.append(Boundary(shared, edge_data['type'], len(shapes)))
-            elif shared.geom_type == 'MultiLineString':  # common case
-                shared = linemerge(shared)
-                if shared.geom_type == 'LineString':  # single shared boundary
-                    bid = len(shapes)
-                    shapes.append(Boundary(shared,
-                                           edge_data['type'],
-                                           bid))
-                    edge_data['bids'].append(bid)
-                else:  # multiple shared boundary
+            else:
+                # Skip points if polygon just touch
+                shared = linemerge([seg for seg in list(shared) if seg.geom_type is not 'Point'])
+                if shared.geom_type == 'LineString':
+                    shapes.append(Boundary(shared, edge_data['type'], len(shapes)))
+                elif shared.geom_type == 'MultiLineString':
                     for sub in list(shared):
                         bid = len(shapes)
                         shapes.append(Boundary(sub,
                                                edge_data['type'],
                                                bid))
                         edge_data['bids'].append(bid)
-            elif shared.geom_type == 'GeometryCollection':  # other cases
-                for sub in shared:
-                    if sub.geom_type == 'LineString':
-                        bid = len(shapes)
-                        shapes.append(Boundary(sub,
-                                               edge_data['type'],
-                                               bid))
-                        edge_data['bids'].append(bid)
-                    elif sub.geom_type == 'MultiLineString':
-                        sub = linemerge(sub)
-                        if sub.geom_type == 'LineString':
-                            bid = len(shapes)
-                            shapes.append(Boundary(sub,
-                                                   edge_data['type'],
-                                                   bid))
-                            edge_data['bids'].append(bid)
-                        else:
-                            for subsub in list(sub):
-                                bid = len(shapes)
-                                shapes.append(Boundary(subsub,
-                                                       edge_data['type'],
-                                                       bid))
-                                edge_data['bids'].append(bid)
+                else:
+                    print('Upsss. Strange topology between polygons ', edge)
         if not shapes:
             print('No shared boundaries found.')
         else:
