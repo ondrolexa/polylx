@@ -558,6 +558,50 @@ class PolySet(object):
         else:
             return self.__add__(other)
 
+    def __getitem__(self, index):
+        """Fancy indexing.
+
+        Grains and Boundaries could be indexed by several ways based on type of index.
+          int: returns objects defined by index position
+          string: returns objects with index name
+          list, tuple or np.array of int: returns objects by index positions
+          np.array of bool: return Grains where index is True
+
+       Examples:
+          >>> g[10]
+          Grain 10 [qtz] A:0.0186429, AR:1.45201, LAO:39.6622 (moment)
+          >>> g['qtz']
+          Set of 155 grains.
+          >>> g[g.ar > 3]
+          Set of 41 grains.
+          >>> g[g.classes(0)]   #grains from class 0
+          Set of 254 grains.
+          >>> b[10]
+          Boundary 10 [qtz-qtz] L:0.0982331, AR:1.41954, LAO:109.179 (maxferet)
+          >>> b['qtz-pl']
+          Set of 238 boundaries.
+          >>> b[b.ar > 10]
+          Set of 577 boundaries.
+          >>> b[b.classes(0)]   #boundaries from class 0
+          Set of 374 boundaries.
+
+        """
+        if isinstance(index, list) or isinstance(index, tuple):
+            index = np.asarray(index)
+        if isinstance(index, str):
+            index = np.flatnonzero(self.name == index)
+        if isinstance(index, slice):
+            index = np.arange(len(self))[index]
+        if isinstance(index, np.ndarray):
+            if index.dtype == 'bool':
+                index = np.flatnonzero(index)
+            return Boundaries([self.polys[fid] for fid in index],
+                              self.class_attr,
+                              self.classes.rule,
+                              self.classes.k)
+        else:
+            return self.polys[index]
+
     def __contains__(self, v):
         return v in self.polys
 
@@ -570,6 +614,36 @@ class PolySet(object):
             except ValueError:
                 res = [getattr(p, attr) for p in self]
         return res
+
+    def affine_transform(self, matrix):
+        from shapely.affinity import affine_transform
+        shapes = [type(e)(affine_transform(e.shape, matrix), name=e.name, fid=e.fid)
+                  for e in self]
+        return type(self)(shapes)
+
+    def rotate(self, angle, **kwargs):
+        from shapely.affinity import rotate
+        shapes = [type(e)(rotate(e.shape, angle, **kwargs), name=e.name, fid=e.fid)
+                  for e in self]
+        return type(self)(shapes)
+
+    def scale(self, **kwargs):
+        from shapely.affinity import scale
+        shapes = [type(e)(scale(e.shape, **kwargs), name=e.name, fid=e.fid)
+                  for e in self]
+        return type(self)(shapes)
+
+    def skew(self, **kwargs):
+        from shapely.affinity import skew
+        shapes = [type(e)(skew(e.shape, **kwargs), name=e.name, fid=e.fid)
+                  for e in self]
+        return type(self)(shapes)
+
+    def translate(self, **kwargs):
+        from shapely.affinity import translate
+        shapes = [type(e)(translate(e.shape, **kwargs), name=e.name, fid=e.fid)
+                  for e in self]
+        return type(self)(shapes)
 
     @property
     def shape_method(self):
@@ -679,6 +753,32 @@ class PolySet(object):
         """
         df = self.df(*attrs)
         return df.groupby(self.classes.names)
+
+    def nndist(self, show=False, exclude_hull=True):
+        from scipy.spatial import Delaunay
+        pts = self.centroid
+        tri = Delaunay(pts)
+        T = nx.Graph()
+        idx = np.arange(len(self))
+        if exclude_hull:
+            from scipy.spatial import ConvexHull
+            hull = ConvexHull(pts)
+            idx = np.setdiff1d(idx, hull.vertices)
+        for i in idx:
+            T.add_node(i)
+            for n in tri.vertex_neighbor_vertices[1][tri.vertex_neighbor_vertices[0][i]:tri.vertex_neighbor_vertices[0][i+1]]:
+                T.add_node(n)
+                T.add_edge(i, n)
+        if show:
+            x = []
+            y = []
+            for e in T.edges():
+                x += [pts[e[0]][0], pts[e[1]][0], np.nan]
+                y += [pts[e[0]][1], pts[e[1]][1], np.nan]
+            ax = self.plot()
+            ax.plot(x, y, 'k')
+            plt.show()
+        return [np.sqrt(np.sum((pts[e[0]]-pts[e[1]])**2)) for e in T.edges()]
 
     def _autocolortable(self, cmap='jet'):
         if isinstance(cmap, str):
@@ -824,40 +924,6 @@ class Grains(PolySet):
 
     def __add__(self, other):
         return Grains(self.polys + other.polys)
-
-    def __getitem__(self, index):
-        """Fancy Grains indexing.
-
-        Grains could be indexed by several ways based on type of index.
-          int: returns Grain defined by index position
-          string: returns Grains with index name
-          list, tuple or np.array of int: returns Grains by index positions
-          np.array of bool: return Grains where index is True
-
-        Examples:
-          >>> g[10]
-          Grain 10 [qtz] A:0.0186429, AR:1.45201, LAO:39.6622 (moment)
-          >>> g['qtz']
-          Set of 155 grains.
-          >>> g[g.ar > 3]
-          Set of 41 grains.
-          >>> g[g.classes(0)]   #grains from class 0
-          Set of 254 grains.
-
-        """
-        if isinstance(index, list) or isinstance(index, tuple):
-            index = np.asarray(index)
-        if isinstance(index, str):
-            index = np.flatnonzero(self.name == index)
-        if isinstance(index, np.ndarray):
-            if index.dtype == 'bool':
-                index = np.flatnonzero(index)
-            return Grains([self.polys[fid] for fid in index],
-                          self.class_attr,
-                          self.classes.rule,
-                          self.classes.k)
-        else:
-            return self.polys[index]
 
     @property
     def phase_list(self):
@@ -1040,40 +1106,6 @@ class Boundaries(PolySet):
     def __add__(self, other):
         return Boundaries(self.polys + other.polys)
 
-    def __getitem__(self, index):
-        """Fancy Boundaries indexing.
-
-        Boundaries could be indexed by several ways based on type of index.
-          int: returns Boundary defined by index position
-          string: returns Boundaries with index name (hyphen separated)
-          list, tuple or np.array of int: returns Boundaries by index positions
-          np.array of bool: return Grains where index is True
-
-        Examples:
-          >>> b[10]
-          Boundary 10 [qtz-qtz] L:0.0982331, AR:1.41954, LAO:109.179 (maxferet)
-          >>> b['qtz-pl']
-          Set of 238 boundaries.
-          >>> b[b.ar > 10]
-          Set of 577 boundaries.
-          >>> b[b.classes(0)]   #boundaries from class 0
-          Set of 374 boundaries.
-
-        """
-        if isinstance(index, list) or isinstance(index, tuple):
-            index = np.asarray(index)
-        if isinstance(index, str):
-            index = np.flatnonzero(self.name == index)
-        if isinstance(index, np.ndarray):
-            if index.dtype == 'bool':
-                index = np.flatnonzero(index)
-            return Boundaries([self.polys[fid] for fid in index],
-                              self.class_attr,
-                              self.classes.rule,
-                              self.classes.k)
-        else:
-            return self.polys[index]
-
     @property
     def type_list(self):
         """Returns list of unique Boundary names.
@@ -1093,7 +1125,8 @@ class Boundaries(PolySet):
                 x.append(np.nan)
                 y.extend(yb)
                 y.append(np.nan)
-            ax.plot(x, y, color=legend[key], alpha=alpha, label='{} ({})'.format(key, len(group)))
+            ax.plot(x, y, color=legend[key], alpha=alpha,
+                    label='{} ({})'.format(key, len(group)))
         ax.margins(0.025, 0.025)
         ax.get_yaxis().set_tick_params(which='both', direction='out')
         ax.get_xaxis().set_tick_params(which='both', direction='out')
@@ -1115,7 +1148,8 @@ class Sample(object):
         self.T = None
 
     def __repr__(self):
-        return 'Sample with %s grains and %s boundaries.' % (len(self.g.polys),len(self.b.polys))
+        return 'Sample with %s grains and %s boundaries.' % (len(self.g.polys),
+                                                             len(self.b.polys))
 
     @classmethod
     def from_shp(cls, filename=os.path.join(respath, 'sg2.shp'),
@@ -1140,6 +1174,29 @@ class Sample(object):
         if name:
             n = n[self.g[n].name == name]
         return n
+
+    def neighbors_dist(self, show=False, name=None):
+        idx = np.asarray(self.T.nodes())
+        pts = self.g.centroid
+        if name:
+            idx = idx[self.g[idx].name == name]
+        T = nx.Graph()
+        for i in idx:
+            T.add_node(i)
+            for n in self.neighbors(i, name=name):
+                T.add_node(n)
+                T.add_edge(i, n)
+        if show:
+            x = []
+            y = []
+            for e in T.edges():
+                x += [pts[e[0]][0], pts[e[1]][0], np.nan]
+                y += [pts[e[0]][1], pts[e[1]][1], np.nan]
+            ax = self.g.plot()
+            ax.plot(x, y, 'k')
+            plt.show()
+        return [np.sqrt(np.sum((pts[e[0]] - pts[e[1]]) ** 2))
+                for e in T.edges()]
 
     def plot(self, legend=None, pos='auto', alpha=0.8,
              cmap='jet', ncol=1, show_fid=False, show_index=False):

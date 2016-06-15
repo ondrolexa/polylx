@@ -39,9 +39,9 @@ class Report(object):
         self.rst = []
         self.images = []
         poc = len(title)
-        self.rst.append(poc*'=')
+        self.rst.append(poc * '=')
         self.rst.append(title)
-        self.rst.append(poc*'=')
+        self.rst.append(poc * '=')
         self.fin()
 
     def fin(self):
@@ -50,19 +50,19 @@ class Report(object):
     def add_chapter(self, title):
         poc = len(title)
         self.rst.append(title)
-        self.rst.append(poc*'=')
+        self.rst.append(poc * '=')
         self.fin()
 
     def add_section(self, title):
         poc = len(title)
         self.rst.append(title)
-        self.rst.append(poc*'-')
+        self.rst.append(poc * '-')
         self.fin()
 
     def add_subsection(self, title):
         poc = len(title)
         self.rst.append(title)
-        self.rst.append(poc*'~')
+        self.rst.append(poc * '~')
         self.fin()
 
     def transition(self):
@@ -105,7 +105,7 @@ class Report(object):
             self.rst.append('   :stub-columns: {}'.format(stub_columns))
         self.fin()
         if format is None:
-            format = len(rows[0])*['']
+            format = len(rows[0]) * ['']
         row_template = '   ' + ','.join(['{' + f + '}' for f in format])
         for row in rows:
             self.rst.append(row_template.format(*row))

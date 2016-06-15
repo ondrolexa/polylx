@@ -25,3 +25,11 @@ History
 ------------------
 * PolyShape name forced to be string
 * Creation of boundaries is Grains method
+
+0.4.0 (2016-X-X)
+------------------
+* Sample neighbors_dist method to calculate neighbors distances
+* Grains and Boundaries nndist to calculate nearest neighbors distances
+* Fancy indexing with slices fixed
+* Affine transformations affine_transform, rotate, scale, skew, translate
+  methods implemented for Grains and Boundaries

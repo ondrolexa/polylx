@@ -2,4 +2,5 @@ numpy
 matplotlib
 pandas
 networkx
+scipy
 shapely<1.5.10
