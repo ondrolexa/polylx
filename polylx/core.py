@@ -595,7 +595,7 @@ class PolySet(object):
         if isinstance(index, np.ndarray):
             if index.dtype == 'bool':
                 index = np.flatnonzero(index)
-            return Boundaries([self.polys[fid] for fid in index],
+            return type(self)([self.polys[fid] for fid in index],
                               self.class_attr,
                               self.classes.rule,
                               self.classes.k)
@@ -974,21 +974,24 @@ class Grains(PolySet):
         # Create boundaries
         for edge in T.edges_iter():
             shared = self[edge[0]].intersection(self[edge[1]])
-            edge_data = T.get_edge_data(edge[0], edge[1])
+            bt = T[edge[0]][edge[1]]['type']
+            bid = len(shapes)
             if shared.geom_type == 'LineString':  # LineString cannot be merged
-                shapes.append(Boundary(shared, edge_data['type'], len(shapes)))
+                shapes.append(Boundary(shared, bt, bid))
+                T[edge[0]][edge[1]]['bids'] = [bid]
             else:
                 # Skip points if polygon just touch
                 shared = linemerge([seg for seg in list(shared) if seg.geom_type is not 'Point'])
                 if shared.geom_type == 'LineString':
-                    shapes.append(Boundary(shared, edge_data['type'], len(shapes)))
+                    shapes.append(Boundary(shared, bt, bid))
+                    T[edge[0]][edge[1]]['bids'] = [bid]
                 elif shared.geom_type == 'MultiLineString':
+                    bids = []
                     for sub in list(shared):
                         bid = len(shapes)
-                        shapes.append(Boundary(sub,
-                                               edge_data['type'],
-                                               bid))
-                        edge_data['bids'].append(bid)
+                        shapes.append(Boundary(sub, bt, bid))
+                        bids.append(bid)
+                    T[edge[0]][edge[1]]['bids'] = bids
                 else:
                     print('Upsss. Strange topology between polygons ', edge)
         if not shapes:
@@ -1142,10 +1145,11 @@ class Sample(object):
       T. ``networkx.Graph`` storing grain topology
 
     """
-    def __init__(self):
+    def __init__(self, name=''):
         self.g = None
         self.b = None
         self.T = None
+        self.name = name
 
     def __repr__(self):
         return 'Sample with %s grains and %s boundaries.' % (len(self.g.polys),
@@ -1153,15 +1157,16 @@ class Sample(object):
 
     @classmethod
     def from_shp(cls, filename=os.path.join(respath, 'sg2.shp'),
-                 phasefield='phase'):
-        return cls.from_grains(Grains.from_shp(filename, phasefield))
+                 phasefield='phase', name=''):
+        return cls.from_grains(Grains.from_shp(filename, phasefield), name=name)
 
     @classmethod
-    def from_grains(cls, grains):
+    def from_grains(cls, grains, name=''):
         obj = cls()
         obj.T = nx.Graph()
         obj.g = grains
         obj.b = obj.g.boundaries(obj.T)
+        obj.name = name
         return obj
 
     def neighbors(self, idx, name=None):
@@ -1170,10 +1175,20 @@ class Sample(object):
         If name attribute is provided only neighbours with name are returned
 
         """
-        n = np.asarray(self.T.neighbors(idx))
-        if name:
-            n = n[self.g[n].name == name]
-        return n
+        if idx in self.T:
+            n = np.asarray(self.T.neighbors(idx))
+            if name:
+                n = n[self.g[n].name == name]
+        else:
+            n = []
+        return list(n)
+
+    def bids(self, idx, name=None):
+        nids = self.neighbors(idx, name=name)
+        bids = []
+        for nid in nids:
+            bids.extend(self.T[idx][nid]['bids'])
+        return bids
 
     def neighbors_dist(self, show=False, name=None):
         idx = np.asarray(self.T.nodes())
@@ -1237,6 +1252,7 @@ class Sample(object):
                         bbox=dict(facecolor='white', alpha=0.5))
         plt.setp(plt.yticks()[1], rotation=90)
         self.g._makelegend(ax, pos, ncol)
+        ax.set_ylabel(self.name)
         return ax
 
     def show(self, **kwargs):

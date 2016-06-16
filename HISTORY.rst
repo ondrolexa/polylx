@@ -33,3 +33,5 @@ History
 * Fancy indexing with slices fixed
 * Affine transformations affine_transform, rotate, scale, skew, translate
   methods implemented for Grains and Boundaries
+* Sample name atribute added
+* Sample bids method to get boundary id's related to grain added
