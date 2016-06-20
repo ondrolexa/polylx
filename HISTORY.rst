@@ -26,7 +26,7 @@ History
 * PolyShape name forced to be string
 * Creation of boundaries is Grains method
 
-0.4.0 (2016-X-X)
+0.4.0 (2016-06-20)
 ------------------
 * Sample neighbors_dist method to calculate neighbors distances
 * Grains and Boundaries nndist to calculate nearest neighbors distances

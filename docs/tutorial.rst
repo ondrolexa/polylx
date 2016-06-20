@@ -36,21 +36,13 @@ of Grains object::
 
     >>> g.show()
 
-.. plot::
-
-    from polylx import *
-    g = Grains.from_shp()
-    g.show()
+.. image:: _static/images/figure_1.png
 
 To show only 'qtz' phase, we can use fancy indexing::
 
     >>> g['qtz'].show()
 
-.. plot::
-
-    from polylx import *
-    g = Grains.from_shp()
-    g['qtz'].show()
+.. image:: _static/images/figure_2.png
 
 Grains support dot notation to access individual properties.
 Note that most of properties are returned as ``numpy.array``::
@@ -191,13 +183,7 @@ or we can directly plot it::
 
     >>> pd.pivot_table(df,index=['ead_class'], columns=['name'], aggfunc=np.sum).plot(kind='bar')
 
-.. plot::
-
-    from polylx import *
-    g = Grains.from_shp()
-    g.classify('ead', 'user', np.arange(0,0.7,0.05))
-    df = g.df('class', 'name', 'area')
-    pd.pivot_table(df,index=['ead_class'], columns=['name'], aggfunc=np.sum).plot(kind='bar')
+.. image:: _static/images/figure_3.png
 
 Work with boundaries
 --------------------
@@ -208,12 +194,7 @@ topology (use OpenJUMP, QGIS or ArcGIS to validate grain shapefile topology)::
     >>> b = g.boundaries()
     >>> b.show()
 
-.. plot::
-
-    from polylx import *
-    g = Grains.from_shp()
-    b = g.boundaries()
-    b.show()
+.. image:: _static/images/figure_4.png
 
 Most of methods and properties demonstrated for ``Grains`` are valid also
 for boundaries::
