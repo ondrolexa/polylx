@@ -35,3 +35,7 @@ History
   methods implemented for Grains and Boundaries
 * Sample name atribute added
 * Sample bids method to get boundary id's related to grain added
+
+0.4.1 (2016-06-20)
+------------------
+* Examples added to distribution
