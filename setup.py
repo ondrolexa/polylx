@@ -38,11 +38,12 @@ setup(
     packages=[
         'polylx',
     ],
-    package_dir={'polylx':
-                 'polylx'},
+    package_dir={'polylx':'polylx'},
     include_package_data=True,
     install_requires=requirements,
-    scripts=['ipolylx'],
+    entry_points = {
+        'console_scripts': ['ipolylx=polylx.core:cli'],
+    },
     license="BSD",
     zip_safe=False,
     keywords='polylx',

@@ -1261,3 +1261,15 @@ class Sample(object):
         """
         self.plot(**kwargs)
         plt.show()
+
+def cli():
+    from IPython import embed
+    import matplotlib
+    from . import __version__
+
+    plt.ion()
+    embed(header='PolyLX %s and Pylab (%s, %s) imported into current namespace.' % \
+                      (__version__, matplotlib.__version__, np.__version__))
+
+if __name__ == "__main__":
+    cli()
