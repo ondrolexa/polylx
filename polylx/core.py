@@ -1169,19 +1169,26 @@ class Sample(object):
         obj.name = name
         return obj
 
-    def neighbors(self, idx, name=None):
+    def neighbors(self, idx, name=None, inc=False):
         """Returns array of indexes of neighbouring grains.
 
-        If name attribute is provided only neighbours with name are returned
+        If name attribute is provided only neighbours with given name are returned
 
         """
-        if idx in self.T:
-            n = np.asarray(self.T.neighbors(idx))
-            if name:
-                n = n[self.g[n].name == name]
-        else:
-            n = []
-        return list(n)
+        try:
+            idx = iter(idx)
+        except TypeError:
+            idx = iter([idx])
+        res = set()
+        for ix in idx:
+            if ix in self.T:
+                n = np.asarray(self.T.neighbors(ix))
+                if name:
+                    n = n[self.g[n].name == name]
+                res.update(n)
+            if inc:
+                res.add(ix)
+        return list(res)
 
     def bids(self, idx, name=None):
         nids = self.neighbors(idx, name=name)
