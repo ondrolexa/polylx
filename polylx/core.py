@@ -1167,6 +1167,10 @@ class Sample(object):
         obj.g = grains
         obj.b = obj.g.boundaries(obj.T)
         obj.name = name
+        obj.pairs = {}
+        for id1, id2 in sm3.T.edges():
+            for bid in sm3.T[id1][id2]['bids']:
+                obj.pairs[bid] = (id1, id2)
         return obj
 
     def neighbors(self, idx, name=None, inc=False):
@@ -1189,6 +1193,25 @@ class Sample(object):
             if inc:
                 res.add(ix)
         return list(res)
+
+    def triplets(self):
+        lookup = {}
+        G = nx.Graph()
+        for bid, b in enumerate(self.b):
+            c0 = tuple(b.xy.T[0])
+            c1 = tuple(b.xy.T[-1])
+            if c0 not in lookup:
+                lookup[c0] = len(lookup)
+            if c1 not in lookup:
+                lookup[c1] = len(lookup)
+            G.add_edge(lookup[c0], lookup[c1], bid=bid)
+        res = []
+        for n0 in [n for n in G.degree() if G.degree()[n] == 3]:
+            tri = set()
+            for n1 in G.neighbors(n0):
+                tri.update(bb[G[n0][n1]['bid']])
+            res.append(tri)
+        return res
 
     def bids(self, idx, name=None):
         nids = self.neighbors(idx, name=name)
