@@ -754,13 +754,13 @@ class PolySet(object):
         df = self.df(*attrs)
         return df.groupby(self.classes.names)
 
-    def nndist(self, show=False, exclude_hull=True):
+    def nndist(self, **kwargs):
         from scipy.spatial import Delaunay
         pts = self.centroid
         tri = Delaunay(pts)
         T = nx.Graph()
         idx = np.arange(len(self))
-        if exclude_hull:
+        if kwargs.get('exclude_hull', True):
             from scipy.spatial import ConvexHull
             hull = ConvexHull(pts)
             idx = np.setdiff1d(idx, hull.vertices)
@@ -769,7 +769,7 @@ class PolySet(object):
             for n in tri.vertex_neighbor_vertices[1][tri.vertex_neighbor_vertices[0][i]:tri.vertex_neighbor_vertices[0][i+1]]:
                 T.add_node(n)
                 T.add_edge(i, n)
-        if show:
+        if kwargs.get('show', False):
             x = []
             y = []
             for e in T.edges():
@@ -817,8 +817,7 @@ class PolySet(object):
                        bbox_to_anchor=[1.04, 0.5])
             plt.tight_layout()
 
-    def plot(self, legend='auto', pos='auto', alpha=0.8,
-             cmap='jet', ncol=1, show_fid=False, show_index=False):
+    def plot(self, **kwargs):
         """Plot set of ``Grains`` or ``Boundaries`` objects.
 
         Args:
@@ -832,21 +831,21 @@ class PolySet(object):
         Returns matplotlib axes object.
 
         """
-        if legend == 'auto':
-            legend = self._autocolortable(cmap)
+        legend = kwargs.get('legend',
+                            self._autocolortable(kwargs.get('cmap', 'jet')))
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
-        self._plot(ax, legend, alpha)
-        if show_index:
+        self._plot(ax, legend, kwargs.get('alpha', 0.8))
+        if kwargs.get('show_index', False):
             for idx, p in enumerate(self):
                 ax.text(p.xc, p.yc, str(idx),
                         bbox=dict(facecolor='yellow', alpha=0.5))
-        if show_fid:
+        if kwargs.get('show_fid', False):
             for p in self:
                 ax.text(p.xc, p.yc, str(p.fid),
                         bbox=dict(facecolor='yellow', alpha=0.5))
         plt.setp(plt.yticks()[1], rotation=90)
-        self._makelegend(ax, pos, ncol)
+        self._makelegend(ax, kwargs.get('pos', 'auto'), kwargs.get('ncol', 1))
         return ax
 
     def show(self, **kwargs):
@@ -856,8 +855,7 @@ class PolySet(object):
         self.plot(**kwargs)
         plt.show()
 
-    def savefig(self, filename='figure.png', legend=None, pos='auto',
-                alpha=0.8, cmap='jet', dpi=150, ncol=1):
+    def savefig(self, **kwargs):
         """Save grains or boudaries plot to file.
 
         Args:
@@ -866,52 +864,53 @@ class PolySet(object):
           See `plot` for other kwargs
 
         """
-        if legend is None:
-            legend = self._autocolortable(cmap)
+        legend = kwargs.get('legend',
+                            self._autocolortable(kwargs.get('cmap', 'jet')))
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
-        self._plot(ax, legend, alpha)
+        self._plot(ax, legend, kwargs.get('alpha', 0.8))
         plt.setp(plt.yticks()[1], rotation=90)
-        self._makelegend(ax, pos, ncol)
-        plt.savefig(filename, dpi=dpi)
+        self._makelegend(ax, kwargs.get('pos', 'auto'), kwargs.get('ncol', 1))
+        plt.savefig(kwargs.get('filename', 'figure.png'),
+                    dpi=kwargs.get('dpi', 150))
         plt.close()
 
-    def rose(self, ang=None, bins=36, scaled=True, weights=None,
-             density=False, arrow=0.95, rwidth=1,
-             pdf=False, kappa=250, **kwargs):
-        if ang is None:
-            ang = self.lao
+    def rose(self, **kwargs):
+        ang = kwargs.get('angles', self.lao)
         fig = plt.figure()
         ax = fig.add_subplot(111, polar=True)
         ax.set_theta_zero_location('N')
         ax.set_theta_direction(-1)
-        if pdf:
+        if kwargs.get('pdf', False):
             from scipy.stats import vonmises
             theta = np.linspace(-np.pi, np.pi, 1801)
             radii = np.zeros_like(theta)
+            kappa = kwargs.get('kappa', 250)
             for a in ang:
                 radii += vonmises.pdf(theta, kappa, loc=np.radians(a))
                 radii += vonmises.pdf(theta, kappa, loc=np.radians(a + 180))
-
             radii /= len(ang)
         else:
+            bins = kwargs.get('bins', 36)
             width = 360 / bins
             num, bin_edges = np.histogram(np.concatenate((ang, ang + 180)),
                                           bins=bins + 1,
                                           range=(-width / 2, 360 + width / 2),
-                                          weights=weights, density=density)
+                                          weights=kwargs.get('weights', None),
+                                          density=kwargs.get('density', False))
             num[0] += num[-1]
             num = num[:-1]
-            theta = []
-            radii = []
+            theta, radii = [], []
+            arrow = kwargs.get('arrow', 0.95)
+            rwidth = kwargs.get('rwidth', 1)
             for cc, val in zip(np.arange(0, 360, width), num):
                 theta.extend([cc - width / 2, cc - rwidth * width / 2, cc,
                               cc + rwidth * width / 2, cc + width / 2, ])
                 radii.extend([0, val * arrow, val, val * arrow, 0])
             theta = np.deg2rad(theta)
-        if scaled:
+        if kwargs.get('scaled', True):
             radii = np.sqrt(radii)
-        ax.fill(theta, radii, **kwargs)
+        ax.fill(theta, radii, **kwargs.get('fill_kwg', {}))
         return ax
 
 
