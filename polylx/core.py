@@ -1167,8 +1167,8 @@ class Sample(object):
         obj.b = obj.g.boundaries(obj.T)
         obj.name = name
         obj.pairs = {}
-        for id1, id2 in sm3.T.edges():
-            for bid in sm3.T[id1][id2]['bids']:
+        for id1, id2 in obj.T.edges():
+            for bid in obj.T[id1][id2]['bids']:
                 obj.pairs[bid] = (id1, id2)
         return obj
 
