@@ -1,5 +1,6 @@
 numpy
 matplotlib
+ipython
 pandas
 networkx
 scipy
