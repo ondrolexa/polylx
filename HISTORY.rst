@@ -40,7 +40,7 @@ History
 ------------------
 * Examples added to distribution
 
-0.4.2 (2016-XX-XX)
+0.4.2 (2016-09-02)
 ------------------
 * Sample has pairs property(dictionary) to map boundary id to grains id
 * Sample triplets method returns list of grains id creating triple points
