@@ -44,3 +44,7 @@ History
 ------------------
 * Sample has pairs property(dictionary) to map boundary id to grains id
 * Sample triplets method returns list of grains id creating triple points
+
+0.4.3 (2016-09-02)
+------------------
+* IPython added to requirements

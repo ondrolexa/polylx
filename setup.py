@@ -30,7 +30,7 @@ test_requirements = [
 
 setup(
     name='polylx',
-    version='0.4.2',
+    version='0.4.3',
     description="A Python package to visualize and analyze microstructures.",
     long_description=readme + '\n\n' + history,
     author="Ondrej Lexa",
