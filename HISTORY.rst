@@ -48,3 +48,8 @@ History
 0.4.3 (2016-09-02)
 ------------------
 * IPython added to requirements
+
+0.4.4 (2016-XX-XX)
+------------------
+* Added MAEE (minimum area enclosing ellipse) to grain shape methods
+* Removed embedded IPython and IPython requirements

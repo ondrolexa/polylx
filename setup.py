@@ -17,7 +17,6 @@ with open('HISTORY.rst') as history_file:
 requirements = [
     'numpy',
     'matplotlib',
-    'ipython',
     'pandas',
     'networkx',
     'scipy',
@@ -42,9 +41,6 @@ setup(
     package_dir={'polylx':'polylx'},
     include_package_data=True,
     install_requires=requirements,
-    entry_points = {
-        'console_scripts': ['ipolylx=polylx.core:cli'],
-    },
     license="BSD",
     zip_safe=False,
     keywords='polylx',

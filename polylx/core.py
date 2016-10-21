@@ -443,6 +443,43 @@ class Grain(PolyShape):
         self.xc, self.yc = self.shape.centroid.coords[0]
         self._shape_method = 'cov'
 
+    def maee(self):
+        """`shape_method`: maee
+
+        Short and long axes are calculated from minimum volume enclosing
+        ellipse. The solver is based on Khachiyan Algorithm, and the final
+        solution is different from the optimal value by the pre-specified
+        amount of tolerance of EAD/100.
+        """
+        P = self.hull[:, :-1]
+        d, N = P.shape
+        Q = np.vstack((P, np.ones(N)))
+        count = 1
+        err = 1
+        u = np.ones(N)/N
+        tol = self.ead/100
+        # Khachiyan Algorithm
+        while err > tol:
+            X = Q @ np.diag(u) @ Q.T
+            M = np.diag(Q.T @ np.linalg.inv(X) @ Q)
+            maximum, j = M.max(), M.argmax()
+            step_size = (maximum - d -1)/((d+1)*(maximum-1))
+            new_u = (1 - step_size)*u
+            new_u[j] = new_u[j] + step_size
+            count += 1
+            err = np.linalg.norm(new_u - u)
+            u = new_u
+        U = np.diag(u)
+        A = np.linalg.inv(P @ U @ P.T - np.outer(P@u, P@u) )/d
+        evals, evecs = np.linalg.eig(A)
+        idx = evals.argsort()
+        evals = evals[idx]
+        evecs = evecs[:, idx]
+        self.la, self.sa = 2 / np.sqrt(evals)
+        self.lao, self.sao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
+        self.xc, self.yc = P @ u
+        self._shape_method = 'maee'
+
 
 class Boundary(PolyShape):
     """Boundary class to store polyline boundary geometry
@@ -1291,12 +1328,3 @@ class Sample(object):
         self.plot(**kwargs)
         plt.show()
 
-def cli():
-    from IPython import embed
-    from . import __version__
-
-    plt.ion()
-    embed(header='PolyLX %s imported into current namespace.' % (__version__))
-
-if __name__ == "__main__":
-    cli()
