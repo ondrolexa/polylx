@@ -817,6 +817,22 @@ class PolySet(object):
             plt.show()
         return [np.sqrt(np.sum((pts[e[0]]-pts[e[1]])**2)) for e in T.edges()]
 
+    def boundary_segments(self):
+        """Create Boundaries from object boundary segments.
+
+        Example:
+          >>> g = Grains.from_shp()
+          >>> b = g.boundary_segments()
+
+        """
+        from shapely.geometry import LineString
+
+        shapes = []
+        for g in self:
+            for p0, p1 in zip(g.xy.T[:-1], g.xy.T[1:]):
+                shapes.append(Boundary(LineString([p0, p1]), g.name, len(shapes)))
+        return Boundaries(shapes)
+
     def _autocolortable(self, cmap='jet'):
         if isinstance(cmap, str):
             cmap = cm.get_cmap(cmap)
@@ -914,8 +930,11 @@ class PolySet(object):
 
     def rose(self, **kwargs):
         ang = kwargs.get('angles', self.lao)
-        fig = plt.figure()
-        ax = fig.add_subplot(111, polar=True)
+        if 'ax' in kwargs:
+            ax = kwargs.get('ax')
+        else:
+            fig = plt.figure()
+            ax = fig.add_subplot(111, polar=True)
         ax.set_theta_zero_location('N')
         ax.set_theta_direction(-1)
         if kwargs.get('pdf', False):
@@ -930,11 +949,17 @@ class PolySet(object):
         else:
             bins = kwargs.get('bins', 36)
             width = 360 / bins
-            num, bin_edges = np.histogram(np.concatenate((ang, ang + 180)),
-                                          bins=bins + 1,
-                                          range=(-width / 2, 360 + width / 2),
-                                          weights=kwargs.get('weights', None),
-                                          density=kwargs.get('density', False))
+            if 'weights' in kwargs:
+                num, bin_edges = np.histogram(np.concatenate((ang, ang + 180)),
+                                              bins=bins + 1,
+                                              range=(-width / 2, 360 + width / 2),
+                                              weights=np.concatenate((kwargs.get('weights'), kwargs.get('weights'))),
+                                              density=kwargs.get('density', False))
+            else:
+                num, bin_edges = np.histogram(np.concatenate((ang, ang + 180)),
+                                              bins=bins + 1,
+                                              range=(-width / 2, 360 + width / 2),
+                                              density=kwargs.get('density', False))
             num[0] += num[-1]
             num = num[:-1]
             theta, radii = [], []
@@ -1034,22 +1059,6 @@ class Grains(PolySet):
             print('No shared boundaries found.')
         else:
             return Boundaries(shapes)
-
-    def boundary_segments(self):
-        """Create Boundaries from Grains boundary segments.
-
-        Example:
-          >>> g = Grains.from_shp()
-          >>> b = g.boundary_segments()
-
-        """
-        from shapely.geometry import LineString
-
-        shapes = []
-        for g in self:
-            for p0, p1 in zip(g.xy.T[:-1], g.xy.T[1:]):
-                shapes.append(Boundary(LineString([p0, p1]), g.name, len(shapes)))
-        return Boundaries(shapes)
 
     @classmethod
     def from_shp(cls, filename=os.path.join(respath, 'sg2.shp'),
