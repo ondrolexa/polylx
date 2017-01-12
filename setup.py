@@ -24,13 +24,14 @@ test_requirements = [
 
 setup(
     name='polylx',
-    version='0.4.5',
+    version='0.4.6',
     description="A Python package to visualize and analyze microstructures.",
     long_description=readme + '\n\n' + history,
     author="Ondrej Lexa",
     author_email='lexa.ondrej@gmail.com',
     url='https://github.com/ondrolexa/polylx',
     packages=find_packages(),
+    package_data={'polylx.example': ['*']},
     install_requires=requirements,
     entry_points={
     'console_scripts': [
