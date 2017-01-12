@@ -34,7 +34,7 @@ setup(
     install_requires=requirements,
     entry_points={
     'console_scripts': [
-        'iapsg=apsg.shell:main'
+        'ipolylx=polylx.shell:main'
         ]
     },
     license="BSD",
