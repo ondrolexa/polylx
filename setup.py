@@ -1,12 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-
-try:
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
-
+from setuptools import setup, find_packages
 
 with open('README.rst') as readme_file:
     readme = readme_file.read()
@@ -29,18 +24,19 @@ test_requirements = [
 
 setup(
     name='polylx',
-    version='0.4.3',
+    version='0.4.4',
     description="A Python package to visualize and analyze microstructures.",
     long_description=readme + '\n\n' + history,
     author="Ondrej Lexa",
     author_email='lexa.ondrej@gmail.com',
     url='https://github.com/ondrolexa/polylx',
-    packages=[
-        'polylx',
-    ],
-    package_dir={'polylx':'polylx'},
-    include_package_data=True,
+    packages=find_packages(),
     install_requires=requirements,
+    entry_points={
+    'console_scripts': [
+        'iapsg=apsg.shell:main'
+        ]
+    },
     license="BSD",
     zip_safe=False,
     keywords='polylx',

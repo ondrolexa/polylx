@@ -9,7 +9,6 @@ from .utils import deg, circular
 
 __author__ = 'Ondrej Lexa'
 __email__ = 'lexa.ondrej@gmail.com'
-__version__ = '0.4.3'
 
 __all__ = ['Grain', 'Boundary', 'Grains', 'Boundaries', 'Sample',
            'np', 'plt', 'pd', 'nx', 'deg', 'circular']

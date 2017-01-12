@@ -49,7 +49,8 @@ History
 ------------------
 * IPython added to requirements
 
-0.4.4 (2016-XX-XX)
+0.4.4 (2017-01-12)
 ------------------
 * Added MAEE (minimum area enclosing ellipse) to grain shape methods
 * Removed embedded IPython and IPython requirements
+* shell script ipolylx opens interactive console
