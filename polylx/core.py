@@ -313,10 +313,10 @@ class Grain(PolyShape):
 
         Keywords:
           minarea: Allowed total area change after simplification.
-          Default value is calculated as 10% of grain area.
+          Default value is calculated as 1% of grain area.
 
         """
-        x, y = _visvalingam_whyatt_ring(*self.xy, minarea=kwargs.get('minarea', 0.01*self.area))
+        x, y = _visvalingam_whyatt_ring(*self.xy, minarea=kwargs.get('minarea', 0.01*Polygon(self.exterior).area))
         holes = []
         for hole in self.interiors:
             xh, yh = _visvalingam_whyatt_ring(*np.array(hole.xy), minarea=kwargs.get('minarea', 0.01*Polygon(hole).area))
