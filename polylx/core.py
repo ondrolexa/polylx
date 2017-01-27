@@ -642,14 +642,23 @@ class PolySet(object):
     def __contains__(self, v):
         return v in self.polys
 
-    def __getattr__(self, attr):
-        if attr == 'shape':
-            res = np.array([getattr(p, attr) for p in self], dtype=object)
+    def __getattr__(self, attr, *args, **kwargs):
+        res = []
+        ismine = False
+        for p in self:
+            r = getattr(p, attr)
+            if callable(r):
+                r = r(*args, **kwargs)
+            if isinstance(r, PolyShape):
+                ismine = True
+            res.append(r)
+        if ismine:
+            res = type(self)(res)
         else:
             try:
                 res = np.array([getattr(p, attr) for p in self])
-            except ValueError:
-                res = [getattr(p, attr) for p in self]
+            except:
+                pass
         return res
 
     def affine_transform(self, matrix):
