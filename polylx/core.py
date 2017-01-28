@@ -49,11 +49,11 @@ class PolyShape(object):
         self.name = str(name)
         self.fid = int(fid)
 
-    def __getattr__(self, attr):
-        if hasattr(self.shape, attr):
-            return getattr(self.shape, attr)
-        else:
-            raise AttributeError
+    # def __getattr__(self, attr):
+    #     if hasattr(self.shape, attr):
+    #         return getattr(self.shape, attr)
+    #     else:
+    #         raise AttributeError
 
     @property
     def shape_method(self):
@@ -68,6 +68,27 @@ class PolyShape(object):
 
         """
         getattr(self, value)()   # to evaluate and check validity
+
+    @property
+    def bounds(self):
+        """Returns minimum bounding region (minx, miny, maxx, maxy)
+
+        """
+        return self.shape.bounds
+
+    @property
+    def area(self):
+        """Area of the shape. For boundary returns 0.
+
+        """
+        return self.shape.area
+
+    @property
+    def length(self):
+        """Unitless length of the geometry (float)
+
+        """
+        return self.shape.length
 
     @property
     def ar(self):
@@ -95,6 +116,13 @@ class PolyShape(object):
 
         """
         return self.shape.centroid.coords[0]
+
+    @property
+    def representative_point(self):
+        """Returns a cheaply computed point that is guaranteed to be within the object.
+
+        """
+        return self.shape.representative_point().coords[0]
 
     def feret(self, angle=0):
         """Returns the ferret diameter for given angle
@@ -128,6 +156,100 @@ class PolyShape(object):
         self.sa = fixzero(self.feret(self.sao))
         self.xc, self.yc = self.shape.centroid.coords[0]
         self._shape_method = 'maxferet'
+
+    ##################################################################
+    # Shapely/GEOS algorithms                                        #
+    ##################################################################
+
+    def contains(self, other):
+        """Returns True if the geometry contains the other, else False
+
+        """
+        return self.shape.contains(other.shape)
+
+    def crosses(self, other):
+        """Returns True if the geometries cross, else False
+
+        """
+        return self.shape.crosses(other.shape)
+
+    def difference(self, other):
+        """Returns the difference of the geometries
+
+        """
+        return self.shape.difference(other.shape)
+
+    def disjoint(self, other):
+        """Returns True if geometries are disjoint, else False
+
+        """
+        return self.shape.disjoint(other.shape)
+
+    def distance(self, other):
+        """Unitless distance to other geometry (float)
+
+        """
+        return self.shape.distance(other.shape)
+
+    def equals(self, other):
+        """Returns True if geometries are equal, else False
+
+        """
+        return self.shape.equals(other.shape)
+
+    def equals_exact(self, other, tolerance):
+        """Returns True if geometries are equal to within a specified tolerance
+
+        """
+        return self.shape.equals_exact(other.shape, tolerance)
+
+    def intersection(self, other):
+        """Returns the intersection of the geometries
+
+        """
+        return self.shape.intersection(other.shape)
+
+    def intersects(self, other):
+        """Returns True if geometries intersect, else False
+
+        """
+        return self.shape.intersects(other.shape)
+
+    def overlaps(self, other):
+        """Returns True if geometries overlap, else False
+
+        """
+        return self.shape.overlaps(other.shape)
+
+    def relate(self, other):
+        """Returns the DE-9IM intersection matrix for the two geometries (string)
+
+        """
+        return self.shape.relate(other.shape)
+
+    def symmetric_difference(self, other):
+        """Returns the symmetric difference of the geometries (Shapely geometry)
+
+        """
+        return self.shape.symmetric_difference(other.shape)
+
+    def touches(self, other):
+        """Returns True if geometries touch, else False
+
+        """
+        return self.shape.relate(other.shape)
+
+    def union(self, other):
+        """Returns the union of the geometries (Shapely geometry)
+
+        """
+        return self.shape.union(other.shape)
+
+    def within(self, other):
+        """Returns True if geometry is within the other, else False
+
+        """
+        return self.shape.within(other.shape)
 
 
 class Grain(PolyShape):
@@ -193,13 +315,6 @@ class Grain(PolyShape):
 
         """
         return np.array(self.shape.convex_hull.exterior.xy)
-
-    @property
-    def perimeter(self):
-        """Returns perimeter of grain
-
-        """
-        return self.shape.length
 
     @property
     def ead(self):
@@ -298,7 +413,10 @@ class Grain(PolyShape):
             i1 = np.arange(len(x) - 2)
             i2 = i1 + 2
             i0 = i1 + 1
-            d = abs((y[i2] - y[i1])*x[i0] - (x[i2] - x[i1])*y[i0] + x[i2]*y[i1] - y[i2]*x[i1])/np.sqrt((y[i2]-y[i1])**2 + (x[i2]-x[i1])**2)
+            d = (abs((y[i2] - y[i1]) * x[i0] -
+                     (x[i2] - x[i1]) * y[i0] +
+                     x[i2] * y[i1] - y[i2] * x[i1]) /
+                 np.sqrt((y[i2] - y[i1]) ** 2 + (x[i2] - x[i1]) ** 2))
             tolerance = d.mean()
         shape = self.shape.simplify(tolerance=kwargs.get('tolerance', tolerance),
                                     preserve_topology=kwargs.get('preserve_topology', False))
@@ -316,10 +434,10 @@ class Grain(PolyShape):
           Default value is calculated as 1% of grain area.
 
         """
-        x, y = _visvalingam_whyatt_ring(*self.xy, minarea=kwargs.get('minarea', 0.01*Polygon(self.exterior).area))
+        x, y = _visvalingam_whyatt_ring(*self.xy, minarea=kwargs.get('minarea', 0.01 * Polygon(self.exterior).area))
         holes = []
         for hole in self.interiors:
-            xh, yh = _visvalingam_whyatt_ring(*np.array(hole.xy), minarea=kwargs.get('minarea', 0.01*Polygon(hole).area))
+            xh, yh = _visvalingam_whyatt_ring(*np.array(hole.xy), minarea=kwargs.get('minarea', 0.01 * Polygon(hole).area))
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
@@ -456,21 +574,21 @@ class Grain(PolyShape):
         Q = np.vstack((P, np.ones(N)))
         count = 1
         err = 1
-        u = np.ones(N)/N
-        tol = self.ead/100
+        u = np.ones(N) / N
+        tol = self.ead / 100
         # Khachiyan Algorithm
         while err > tol:
             X = Q @ np.diag(u) @ Q.T
             M = np.diag(Q.T @ np.linalg.inv(X) @ Q)
             maximum, j = M.max(), M.argmax()
-            step_size = (maximum - d -1)/((d+1)*(maximum-1))
-            new_u = (1 - step_size)*u
+            step_size = (maximum - d - 1) / ((d + 1) * (maximum - 1))
+            new_u = (1 - step_size) * u
             new_u[j] = new_u[j] + step_size
             count += 1
             err = np.linalg.norm(new_u - u)
             u = new_u
         U = np.diag(u)
-        A = np.linalg.inv(P @ U @ P.T - np.outer(P@u, P@u) )/d
+        A = np.linalg.inv(P @ U @ P.T - np.outer(P @ u, P @ u) ) / d
         evals, evecs = np.linalg.eig(A)
         idx = evals.argsort()
         evals = evals[idx]
@@ -577,8 +695,6 @@ class PolySet(object):
     def __init__(self, shapes, attr='name', rule='unique', k=5):
         if len(shapes) > 0:
             self.polys = shapes
-            gb = self.bounds
-            self.extent = gb[:, 0].min(), gb[:, 1].min(), gb[:, 2].max(), gb[:, 3].max()
             self.classify(attr, rule=rule, k=k)
         else:
             raise ValueError("No objects passed.")
@@ -642,50 +758,89 @@ class PolySet(object):
     def __contains__(self, v):
         return v in self.polys
 
-    def __getattr__(self, attr, *args, **kwargs):
-        res = []
-        ismine = False
-        for p in self:
-            r = getattr(p, attr)
-            if callable(r):
-                r = r(*args, **kwargs)
-            if isinstance(r, PolyShape):
-                ismine = True
-            res.append(r)
-        if ismine:
-            res = type(self)(res)
-        else:
-            try:
-                res = np.array([getattr(p, attr) for p in self])
-            except:
-                pass
-        return res
+    # def __getattr__(self, attr, *args, **kwargs):
+    #     res = []
+    #     ismine = False
+    #     for p in self:
+    #         r = getattr(p, attr)
+    #         if callable(r):
+    #             r = r(*args, **kwargs)
+    #         if isinstance(r, PolyShape):
+    #             ismine = True
+    #         res.append(r)
+    #     if ismine:
+    #         res = type(self)(res)
+    #     else:
+    #         try:
+    #             res = np.array([getattr(p, attr) for p in self])
+    #         except:
+    #             pass
+    #     return res
+
+    ###################################################################
+    # Shapely affinity methods                                        #
+    ###################################################################
 
     def affine_transform(self, matrix):
+        """Returns a transformed geometry using an affine transformation matrix.
+        The matrix is provided as a list or tuple with 6 items:
+        [a, b, d, e, xoff, yoff]
+        which defines the equations for the transformed coordinates:
+        x’ = a * x + b * y + xoff y’ = d * x + e * y + yoff
+
+        """
         from shapely.affinity import affine_transform
         shapes = [type(e)(affine_transform(e.shape, matrix), name=e.name, fid=e.fid)
                   for e in self]
         return type(self)(shapes)
 
     def rotate(self, angle, **kwargs):
+        """Returns a rotated geometry on a 2D plane.
+        The angle of rotation can be specified in either degrees (default)
+        or radians by setting use_radians=True. Positive angles are
+        counter-clockwise and negative are clockwise rotations.
+        The point of origin can be a keyword ‘center’ for the object bounding
+        box center (default), ‘centroid’ for the geometry’s centroid,
+        or coordinate tuple (x0, y0) for fixed point.
+
+        """
         from shapely.affinity import rotate
         shapes = [type(e)(rotate(e.shape, angle, **kwargs), name=e.name, fid=e.fid)
                   for e in self]
         return type(self)(shapes)
 
     def scale(self, **kwargs):
+        """Returns a scaled geometry, scaled by factors along each dimension.
+        The point of origin can be a keyword ‘center’ for the object bounding
+        box center (default), ‘centroid’ for the geometry’s centroid,
+        or coordinate tuple (x0, y0) for fixed point.
+        Negative scale factors will mirror or reflect coordinates.
+
+        """
         from shapely.affinity import scale
         shapes = [type(e)(scale(e.shape, **kwargs), name=e.name, fid=e.fid)
                   for e in self]
         return type(self)(shapes)
 
     def skew(self, **kwargs):
+        """Returns a skewed geometry, sheared by angles ‘xs’ along x and
+        ‘ys’ along y direction. The shear angle can be specified in either
+        degrees (default) or radians by setting use_radians=True.
+        The point of origin can be a keyword ‘center’ for the object bounding
+        box center (default), ‘centroid’ for the geometry’s centroid,
+        or a coordinate tuple (x0, y0) for fixed point.
+
+        """
         from shapely.affinity import skew
         shapes = [type(e)(skew(e.shape, **kwargs), name=e.name, fid=e.fid)
                   for e in self]
         return type(self)(shapes)
 
     def translate(self, **kwargs):
+        """Returns a translated geometry shifted by offsets ‘xoff’ along x
+        and ‘yoff’ along y direction.
+
+        """
         from shapely.affinity import translate
         shapes = [type(e)(translate(e.shape, **kwargs), name=e.name, fid=e.fid)
                   for e in self]
@@ -707,6 +862,15 @@ class PolySet(object):
                 p.shape_method = value
 
     def bootstrap(self, num=100, size=None):
+        """Bootstrap random sample generator.
+
+        Args:
+          num: number of boostraped samples. Default 100
+          size: size of bootstraped samples. Default number of objects.
+
+        Examples:
+          >>> bsmean = np.mean([gs.ead.mean() for gs in g.bootstrap()])
+        """
         if size is None:
             size = len(self)
         for i in range(num):
@@ -726,8 +890,96 @@ class PolySet(object):
         """
         return self.extent[3] - self.extent[1]
 
+    @property
+    def extent(self):
+        """Returns minimum bounding region (minx, miny, maxx, maxy) of
+        all objects
+
+        """
+        gb = np.array([p.bounds for p in self])
+        return gb[:, 0].min(), gb[:, 1].min(), gb[:, 2].max(), gb[:, 3].max()
+
+    @property
+    def name(self):
+        """Return list of names of the objects.
+
+        """
+        return [p.name for p in self]
+
+    @property
+    def shape(self):
+        """Return list of shapely objects.
+
+        """
+        return [p.shape for p in self]
+
+    @property
+    def fid(self):
+        """Return list of fids of objects.
+
+        """
+        return np.array([p.fid for p in self])
+
+    def _fid(self, fid, first=True):
+        """Return the indices of the objects with given fid.
+
+        """
+        ix = np.flatnonzero(self.fid == fid)
+        if ix and first:
+            return self[ix[0]]
+        else:
+            return self[ix]
+
+    @property
+    def area(self):
+        """Return array of areas of the objects. For boundary returns 0.
+
+        """
+        return np.array([p.area for p in self])
+
+    @property
+    def length(self):
+        """Return array of lengths of the objects.
+
+        """
+        return np.array([p.length for p in self])
+
+    @property
+    def ar(self):
+        """Returns array of axial ratios
+
+        Note that axial ratio is calculated from long and short axes
+        calculated by actual ``shape method``.
+
+        """
+        return np.array([p.ar for p in self])
+
+    @property
+    def ma(self):
+        """Returns mean axis
+
+        Return array of mean axes calculated by actual ``shape method``.
+
+        """
+        return np.array([p.ma for p in self])
+
+    @property
+    def centroid(self):
+        """Returns the 2D array of geometric centers of the objects
+
+        """
+        return np.array([p.centroid for p in self])
+
+    @property
+    def representative_point(self):
+        """Returns a 2D array of cheaply computed points that are
+        guaranteed to be within the objects.
+
+        """
+        return np.array([p.representative_point() for p in self])
+
     def feret(self, angle=0):
-        """Returns array of feret diameters.
+        """Returns array of feret diameters for given angle.
 
         Args:
             angle: Caliper angle. Default 0
@@ -1002,6 +1254,13 @@ class Grains(PolySet):
         """
         return list(np.unique(self.name))
 
+    @property
+    def ead(self):
+        """Returns array of equal area diameters of grains
+
+        """
+        return np.array([p.ead for p in self])
+
     def boundaries(self, T=None):
         """Create Boundaries from Grains.
 
@@ -1230,7 +1489,8 @@ class Sample(object):
     def neighbors(self, idx, name=None, inc=False):
         """Returns array of indexes of neighbouring grains.
 
-        If name attribute is provided only neighbours with given name are returned
+        If name attribute is provided only neighbours with given name
+        are returned.
 
         """
         try:
@@ -1345,4 +1605,3 @@ class Sample(object):
         """
         self.plot(**kwargs)
         plt.show()
-
