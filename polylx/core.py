@@ -739,10 +739,10 @@ class PolySet(object):
           Set of 374 boundaries.
 
         """
+        if isinstance(index, str):
+            index = [i for i, n in enumerate(self.name) if n == index]
         if isinstance(index, list) or isinstance(index, tuple):
             index = np.asarray(index)
-        if isinstance(index, str):
-            index = np.flatnonzero(self.name == index)
         if isinstance(index, slice):
             index = np.arange(len(self))[index]
         if isinstance(index, np.ndarray):
@@ -1252,7 +1252,7 @@ class Grains(PolySet):
         """Returns list of unique Grain names.
 
         """
-        return list(np.unique(self.name))
+        return sorted(list(set(self.name)))
 
     @property
     def ead(self):
@@ -1427,7 +1427,7 @@ class Boundaries(PolySet):
         """Returns list of unique Boundary names.
 
         """
-        return list(np.unique(self.name))
+        return sorted(list(set(self.name)))
 
     def _plot(self, ax, legend, alpha):
         groups = self.groups('shape')
@@ -1489,7 +1489,7 @@ class Sample(object):
     def neighbors(self, idx, name=None, inc=False):
         """Returns array of indexes of neighbouring grains.
 
-        If name attribute is provided only neighbours with given name
+        If name keyword is provided only neighbours with given name
         are returned.
 
         """
@@ -1500,9 +1500,9 @@ class Sample(object):
         res = set()
         for ix in idx:
             if ix in self.T:
-                n = np.asarray(self.T.neighbors(ix))
+                n = self.T.neighbors(ix)
                 if name:
-                    n = n[self.g[n].name == name]
+                    n = [i for i in n if self.g[i].name == name]
                 res.update(n)
             if inc:
                 res.add(ix)
@@ -1535,10 +1535,16 @@ class Sample(object):
         return bids
 
     def neighbors_dist(self, show=False, name=None):
-        idx = np.asarray(self.T.nodes())
+        """Return array of nearest neighbors distances.
+
+        If name keyword is provided only neighbours with given name
+        are returned. When keyword show is True, plot is produced.
+
+        """
+        idx = self.T.nodes()
         pts = self.g.centroid
         if name:
-            idx = idx[self.g[idx].name == name]
+            idx = [i for i in idx if self.g[i].name == name]
         T = nx.Graph()
         for i in idx:
             T.add_node(i)
