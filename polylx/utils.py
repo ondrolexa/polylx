@@ -30,7 +30,7 @@ def fixratio(x, y):
 class circular(object):
     @staticmethod
     def rho(x):
-        """Mean resultant vector
+        """Mean resultant vector as complex number
 
         """
         return np.exp(2j * np.deg2rad(x)).mean()
@@ -183,6 +183,10 @@ class Classify(object):
 
     def __call__(self, num):
         return np.flatnonzero(self.names == self.index[num])
+
+    def __repr__(self):
+        return 'Classification: %s with %g classes.' % (self.rule,
+                                                        len(self.index))
 
     @property
     def labels(self):
