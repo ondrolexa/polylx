@@ -125,14 +125,41 @@ class PolyShape(object):
         return self.shape.representative_point().coords[0]
 
     def feret(self, angle=0):
-        """Returns the ferret diameter for given angle
+        """Returns the ferret diameter for given angle.
 
         Args:
           angle: angle of caliper rotation
 
         """
-        pp = np.dot(self.hull.T, np.array([deg.sin(angle), deg.cos(angle)]))
+        pp = np.dot(self.xy.T, np.array([deg.sin(angle), deg.cos(angle)]))
         return pp.max(axis=0) - pp.min(axis=0)
+
+    def proj(self, angle=0):
+        """Returns the cumulative projection of object for given angle.
+
+        Args:
+          angle: angle of projection line
+
+        """
+        pp = np.dot(self.xy.T, np.array([deg.sin(angle), deg.cos(angle)]))
+        return abs(np.diff(pp)).sum()
+
+    def surfor(self, angles=range(180), normalized=True):
+        """Returns surfor function values. When normalized maximum value
+        is 1 and correspond to max feret.
+
+        Args:
+          angles: iterable angle values. Defaut range(180)
+          normalized: whether to normalize values. Defaut True
+
+        """
+        res = np.array([self.feret(a) for a in angles])
+        if normalized:
+            xy = self.hull.T
+            pa = np.array(list(itertools.combinations(range(len(xy)), 2)))
+            d2 = np.sum((xy[pa[:, 0]] - xy[pa[:, 1]])**2, axis=1)
+            res = res / np.sqrt(np.max(d2))
+        return res
 
     #################################################################
     # Common shape methods (should modify sa, la, sao, lao, xc, yc) #
@@ -907,6 +934,13 @@ class PolySet(object):
         return [p.name for p in self]
 
     @property
+    def names(self):
+        """Returns list of unique object names.
+
+        """
+        return sorted(list(set(self.name)))
+
+    @property
     def shape(self):
         """Return list of shapely objects.
 
@@ -1014,6 +1048,25 @@ class PolySet(object):
 
         """
         return np.array([p.feret(angle) for p in self])
+
+    def proj(self, angle=0):
+        """Returns array of cumulative projection of object for given angle.
+        Args:
+          angle: angle of projection line
+
+        """
+        return np.array([p.proj(angle) for p in self])
+
+    def surfor(self, angles=range(180), normalized=True):
+        """Returns surfor function values. When normalized maximum value
+        is 1 and correspond to max feret.
+
+        Args:
+          angles: iterable angle values. Defaut range(180)
+          normalized: whether to normalize values. Defaut True
+
+        """
+        return np.array([p.surfor(angles, normalized) for p in self])
 
     def classify(self, attr, rule='natural', k=5):
         """Define classification of objects.
@@ -1287,13 +1340,6 @@ class Grains(PolySet):
         return Grains(self.polys + other.polys)
 
     @property
-    def phase_list(self):
-        """Returns list of unique Grain names.
-
-        """
-        return sorted(list(set(self.name)))
-
-    @property
     def ead(self):
         """Returns array of equal area diameters of grains
 
@@ -1460,13 +1506,6 @@ class Boundaries(PolySet):
 
     def __add__(self, other):
         return Boundaries(self.polys + other.polys)
-
-    @property
-    def type_list(self):
-        """Returns list of unique Boundary names.
-
-        """
-        return sorted(list(set(self.name)))
 
     def _plot(self, ax, legend, alpha):
         groups = self.groups('shape')
