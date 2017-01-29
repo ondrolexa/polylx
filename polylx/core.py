@@ -914,8 +914,36 @@ class PolySet(object):
         return [p.shape for p in self]
 
     @property
+    def la(self):
+        """Return array of long axes of objects according to shape_method.
+
+        """
+        return np.array([p.la for p in self])
+
+    @property
+    def sa(self):
+        """Return array of long axes of objects according to shape_method
+
+        """
+        return np.array([p.sa for p in self])
+
+    @property
+    def lao(self):
+        """Return array of long axes of objects according to shape_method
+
+        """
+        return np.array([p.lao for p in self])
+
+    @property
+    def sao(self):
+        """Return array of long axes of objects according to shape_method
+
+        """
+        return np.array([p.sao for p in self])
+
+    @property
     def fid(self):
-        """Return list of fids of objects.
+        """Return array of fids of objects.
 
         """
         return np.array([p.fid for p in self])
@@ -1026,10 +1054,22 @@ class PolySet(object):
         return d
 
     def agg(self, *pairs):
+        """Returns concatenated result of multiple aggregations (different
+        aggregation function for different attributes) based on actual
+        classification. For single aggregation function use directly
+        pandas groups, e.g. g.groups('lao', 'sao').agg(circular.mean)
+
+        Example:
+          >>> g.agg('area', np.sum, 'ead', np.mean, 'lao', circular.mean)
+               sum_area  mean_ead  circular.mean_lao
+          ksp  2.443733  0.089710          76.875574
+          pl   1.083516  0.060629          94.331525
+          qtz  1.166097  0.068071          74.318887
+
+        """
         pieces = []
-        for aggfunc, attr in zip(pairs[0::2], pairs[1::2]):
-            df = getattr(self.groups(attr), aggfunc)()
-            df.columns = ['{}_{}'.format(aggfunc, attr)]
+        for attr, aggfunc in zip(pairs[0::2], pairs[1::2]):
+            df = self.groups(attr).agg(aggfunc)
             pieces.append(df)
         return pd.concat(pieces, axis=1).reindex(self.classes.index)
 
@@ -1041,13 +1081,12 @@ class PolySet(object):
         Example:
           >>> g.classify('ar', 'natural')
           >>> g.groups('ead').mean()
-                                    ead
-              1.01765-1.31807  0.067772
-              1.31807-1.54201  0.076206
-              1.54201-1.82242  0.065400
-              1.82242-2.36773  0.073690
-              2.36773-12.1571  0.084016
-
+                                ead
+          1.01765-1.31807  0.067772
+          1.31807-1.54201  0.076206
+          1.54201-1.82242  0.065400
+          1.82242-2.36773  0.073690
+          2.36773-12.1571  0.084016
         """
         df = self.df(*attrs)
         return df.groupby(self.classes.names)
