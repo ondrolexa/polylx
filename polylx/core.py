@@ -132,7 +132,7 @@ class PolyShape(object):
           angle: angle of caliper rotation
 
         """
-        pp = np.dot(self.xy.T, np.array([deg.sin(angle), deg.cos(angle)]))
+        pp = np.dot(self.hull.T, np.array([deg.sin(angle), deg.cos(angle)]))
         return pp.max(axis=0) - pp.min(axis=0)
 
     def proj(self, angle=0):
@@ -185,7 +185,7 @@ class PolyShape(object):
 
         Long axis is defined as the maximum caliper of the polygon/polyline.
         Short axis correspond to caliper orthogonal to long axis.
-        Center coordinates are set to centroid.
+        Center coordinates are set to centroid of exterior.
 
         """
         xy = self.hull.T
@@ -197,7 +197,7 @@ class PolyShape(object):
         self.lao = deg.atan2(*dxy) % 180
         self.sao = (self.lao + 90) % 180
         self.sa = fixzero(self.feret(self.sao))
-        self.xc, self.yc = self.shape.centroid.coords[0]
+        self.xc, self.yc = self.shape.exterior.centroid.coords[0]
         self._shape_method = 'maxferet'
 
     ##################################################################
@@ -388,11 +388,12 @@ class Grain(PolyShape):
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
         hull = self.hull
-        ax.plot(*hull, ls='--', c='g')
+        ax.plot(*hull, ls='--', c='green')
         ax.add_patch(PathPatch(PolygonPath(self.shape),
                      fc='blue', ec='#000000', alpha=0.5, zorder=2))
         ax.plot(*self.representative_point, color='coral', marker='o')
         ax.plot(*self.centroid, color='red', marker='o')
+        ax.plot(self.xc, self.yc, color='green', marker='o')
         R = np.linspace(0, 360, 361)
         cr, sr = deg.cos(R), deg.sin(R)
         cl, sl = deg.cos(self.lao), deg.sin(self.lao)
@@ -514,20 +515,52 @@ class Grain(PolyShape):
 
         Short axis is defined as the minimum caliper of the polygon.
         Long axis correspond to caliper orthogonal to short axis.
-        Center coordinates are set to centroid.
+        Center coordinates are set to centroid of exterior.
 
         """
         xy = self.hull.T
         dxy = xy[1:] - xy[:-1]
         ang = (deg.atan2(*dxy.T) + 90) % 180
-        pp = np.dot(xy, np.array([deg.sin(ang), deg.cos(ang)]))
-        d = pp.max(axis=0) - pp.min(axis=0)
+        d = self.feret(ang)
         self.sa = np.min(d)
         self.sao = ang[d.argmin()]
         self.lao = (self.sao + 90) % 180
         self.la = self.feret(self.lao)
-        self.xc, self.yc = self.shape.centroid.coords[0]
+        self.xc, self.yc = self.shape.exterior.centroid.coords[0]
         self._shape_method = 'minferet'
+
+    def minbox(self):
+        """`shape_method`: minbox
+
+        Short and long axes are claculated as widht and height of smallest
+        area enclosing box.
+        Center coordinates are set to centre of box.
+
+        """
+        xy = self.hull.T
+        dxy = xy[1:] - xy[:-1]
+        ang = (deg.atan2(*dxy.T)) % 180
+        d1 = self.feret(ang)
+        d2 = self.feret(ang + 90)
+        ix = (d1 * d2).argmin()
+        v1 = np.array([deg.sin(ang[ix]), deg.cos(ang[ix])])
+        pp = np.dot(xy, v1)
+        k1 = (pp.max() + pp.min()) / 2
+        v2 = np.array([deg.sin(ang[ix] + 90), deg.cos(ang[ix] + 90)])
+        pp = np.dot(xy, v2)
+        k2 = (pp.max() + pp.min()) / 2
+        self.xc, self.yc = k1 * v1 + k2 * v2
+        if d1[ix] < d2[ix]:
+            self.sa = d1[ix]
+            self.sao = ang[ix]
+            self.lao = (self.sao + 90) % 180
+            self.la = d2[ix]
+        else:
+            self.sa = d2[ix]
+            self.lao = ang[ix]
+            self.sao = (self.lao + 90) % 180
+            self.la = d1[ix]
+        self._shape_method = 'minbox'
 
     def moment(self):
         """`shape_method`: moment
@@ -535,6 +568,7 @@ class Grain(PolyShape):
         Short and long axes are calculated from area moments of inertia.
         Center coordinates are set to centroid. If moment fitting failed
         silently fallback to maxferet.
+        Center coordinates are set to centroid.
 
         """
         if not np.isclose(self.shape.area, 0):
@@ -562,6 +596,7 @@ class Grain(PolyShape):
         Short, long axes and centre coordinates are calculated from direct
         least-square ellipse fitting. If direct fitting is not possible
         silently fallback to moment.
+        Center coordinates are set to centre of fitted ellipse.
 
         """
         x, y = self.xy
@@ -592,19 +627,18 @@ class Grain(PolyShape):
 
         Short and long axes are calculated from eigenvalue analysis
         of coordinate covariance matrix.
+        Center coordinates are set to centroid of exterior.
 
         """
         x, y = self.xy[:, :-1]
-        x = x - x.mean()
-        y = y - y.mean()
-        s = np.cov(x, y)
+        self.xc, self.yc = self.shape.exterior.centroid.coords[0]
+        s = np.cov(x - self.xc, y - self.yc)
         evals, evecs = np.linalg.eig(s)
         idx = evals.argsort()
         evals = evals[idx]
         evecs = evecs[:, idx]
         self.sa, self.la = np.sqrt(8) * np.sqrt(evals)
         self.sao, self.lao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
-        self.xc, self.yc = self.shape.centroid.coords[0]
         self._shape_method = 'cov'
 
     def maee(self):
@@ -614,6 +648,7 @@ class Grain(PolyShape):
         ellipse. The solver is based on Khachiyan Algorithm, and the final
         solution is different from the optimal value by the pre-specified
         amount of tolerance of EAD/100.
+        Center coordinates are set to centre of fitted ellipse.
         """
         P = self.hull[:, :-1]
         d, N = P.shape

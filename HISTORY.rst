@@ -65,3 +65,4 @@ History
 * moments calculation including holes
 * surfor and parror functions added
 * orientation of polygons is unified and checked
+* minbox shape method added
