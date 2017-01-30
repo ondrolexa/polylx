@@ -20,12 +20,13 @@ from matplotlib.patches import PathPatch
 from matplotlib.path import Path
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from shapely.geometry import shape, Polygon, LinearRing
+from shapely.geometry.polygon import orient
 import networkx as nx
 import pandas as pd
 
 from .shapefile import Reader
 from .utils import fixratio, fixzero, deg, Classify, PolygonPath
-from .utils import find_ellipse, densify
+from .utils import find_ellipse, densify, inertia_moments
 from .utils import _chaikin_ring, _spline_ring, _visvalingam_whyatt_ring
 
 from pkg_resources import resource_filename
@@ -142,7 +143,7 @@ class PolyShape(object):
 
         """
         pp = np.dot(self.xy.T, np.array([deg.sin(angle), deg.cos(angle)]))
-        return abs(np.diff(pp)).sum()
+        return abs(np.diff(pp, axis=0)).sum(axis=0)
 
     def surfor(self, angles=range(180), normalized=True):
         """Returns surfor function values. When normalized maximum value
@@ -153,12 +154,27 @@ class PolyShape(object):
           normalized: whether to normalize values. Defaut True
 
         """
-        res = np.array([self.feret(a) for a in angles])
+        res = self.feret(angles)
         if normalized:
-            xy = self.hull.T
-            pa = np.array(list(itertools.combinations(range(len(xy)), 2)))
-            d2 = np.sum((xy[pa[:, 0]] - xy[pa[:, 1]])**2, axis=1)
-            res = res / np.sqrt(np.max(d2))
+            #xy = self.hull.T
+            #pa = np.array(list(itertools.combinations(range(len(xy)), 2)))
+            #d2 = np.sum((xy[pa[:, 0]] - xy[pa[:, 1]])**2, axis=1)
+            #res = res / np.sqrt(np.max(d2))
+            res = res / res.max()
+        return res
+
+    def paror(self, angles=range(180), normalized=True):
+        """Returns paror function values. When normalized maximum value
+        is 1 and correspond to max feret.
+
+        Args:
+          angles: iterable angle values. Defaut range(180)
+          normalized: whether to normalize values. Defaut True
+
+        """
+        res = self.proj(angles)
+        if normalized:
+            res = res / res.max()
         return res
 
     #################################################################
@@ -321,7 +337,7 @@ class Grain(PolyShape):
         if not geom.is_valid:
             geom = geom.buffer(0)
         if geom.is_valid and geom.geom_type == 'Polygon':
-            return self(geom, name, fid)
+            return self(orient(geom), name, fid)
         else:
             print('Invalid geometry.')
 
@@ -330,15 +346,21 @@ class Grain(PolyShape):
         """Returns array of vertex coordinate pair.
 
         Note that only vertexes from exterior boundary are returned.
+        For interiors use interiors property.
 
         """
         return np.array(self.shape.exterior.xy)
 
     @property
+    def interiors(self):
+        """Returns list of arrays of vertex coordinate pair of interiors.
+
+        """
+        return [np.array(hole.xy) for hole in self.shape.interiors]
+
+    @property
     def hull(self):
         """Returns array of vertices on convex hull of grain geometry.
-
-        Note that only vertexes from exterior boundary are used.
 
         """
         return np.array(self.shape.convex_hull.exterior.xy)
@@ -348,7 +370,14 @@ class Grain(PolyShape):
         """Returns equal area diameter of grain
 
         """
-        return 2 * np.sqrt(self.shape.area / np.pi)
+        return 2 * np.sqrt(self.area / np.pi)
+
+    @property
+    def nholes(self):
+        """Returns number of holes (shape interiors)
+
+        """
+        return len(self.shape.interiors)
 
     def plot(self):
         """Plot ``Grain`` geometry on figure.
@@ -362,6 +391,7 @@ class Grain(PolyShape):
         ax.plot(*hull, ls='--', c='g')
         ax.add_patch(PathPatch(PolygonPath(self.shape),
                      fc='blue', ec='#000000', alpha=0.5, zorder=2))
+        ax.plot(*self.representative_point, color='coral', marker='o')
         ax.plot(*self.centroid, color='red', marker='o')
         R = np.linspace(0, 360, 361)
         cr, sr = deg.cos(R), deg.sin(R)
@@ -395,7 +425,7 @@ class Grain(PolyShape):
         x, y = _spline_ring(*self.xy, densify=kwargs.get('densify', 5))
         holes = []
         for hole in self.interiors:
-            xh, yh = _spline_ring(*np.array(hole.xy),
+            xh, yh = _spline_ring(*hole,
                                   densify=kwargs.get('densify', 5))
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
@@ -416,7 +446,7 @@ class Grain(PolyShape):
         x, y = _chaikin_ring(*self.xy, repeat=kwargs.get('repeat', 4))
         holes = []
         for hole in self.interiors:
-            xh, yh = _chaikin_ring(*np.array(hole.xy),
+            xh, yh = _chaikin_ring(*hole,
                                    repeat=kwargs.get('repeat', 4))
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
@@ -461,10 +491,12 @@ class Grain(PolyShape):
           Default value is calculated as 1% of grain area.
 
         """
-        x, y = _visvalingam_whyatt_ring(*self.xy, minarea=kwargs.get('minarea', 0.01 * Polygon(self.exterior).area))
+        x, y = _visvalingam_whyatt_ring(*self.xy,
+                                        minarea=kwargs.get('minarea', 0.01 * Polygon(self.exterior).area))
         holes = []
         for hole in self.interiors:
-            xh, yh = _visvalingam_whyatt_ring(*np.array(hole.xy), minarea=kwargs.get('minarea', 0.01 * Polygon(hole).area))
+            xh, yh = _visvalingam_whyatt_ring(*hole,
+                                              minarea=kwargs.get('minarea', 0.01 * Polygon(hole).area))
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
@@ -505,26 +537,13 @@ class Grain(PolyShape):
         silently fallback to maxferet.
 
         """
-        x, y = self.xy[:, :-1]
-        x = x - x.mean()
-        y = y - y.mean()
-        xl = np.roll(x, -1)
-        yl = np.roll(y, -1)
-        v = xl * y - x * yl
-        A = round(1e14 * np.sum(v) / 2) / 1e14
-
-        if A != 0:
-            a10 = np.sum(v * (xl + x)) / (6 * A)
-            a01 = np.sum(v * (yl + y)) / (6 * A)
-            a20 = np.sum(v * (xl**2 + xl * x + x**2)) / (12 * A)
-            a11 = np.sum(v * (2 * xl * yl + xl * y + x * yl + 2 * x * y)) / (24 * A)
-            a02 = np.sum(v * (yl**2 + yl * y + y**2)) / (12 * A)
-
-            m20 = a20 - a10**2
-            m11 = a11 - a10 * a01
-            m02 = a02 - a01**2
-
-            CM = np.array([[m02, -m11], [-m11, m20]]) / (4 * (m20 * m02 - m11**2))
+        if not np.isclose(self.shape.area, 0):
+            x, y = self.xy
+            self.xc, self.yc = self.shape.centroid.coords[0]
+            M = inertia_moments(x, y, self.xc, self.yc)
+            for x, y in self.interiors:
+                M -= inertia_moments(x, y, self.xc, self.yc)
+            CM = np.array([[M[1], -M[2]], [-M[2], M[0]]]) / (4 * (M[0] * M[1] - M[2]**2))
             evals, evecs = np.linalg.eig(CM)
             idx = evals.argsort()
             evals = evals[idx]
@@ -534,7 +553,7 @@ class Grain(PolyShape):
             self.xc, self.yc = self.shape.centroid.coords[0]
             self._shape_method = 'moment'
         else:
-            print('Moment fit failed for grain fid={}. Fallback to maxferet.'.format(self.fid))
+            print('Moment fit failed for grain fid={} due to too small area. Fallback to maxferet.'.format(self.fid))
             self.maxferet()
 
     def direct(self):
@@ -1068,6 +1087,17 @@ class PolySet(object):
         """
         return np.array([p.surfor(angles, normalized) for p in self])
 
+    def paror(self, angles=range(180), normalized=True):
+        """Returns paror function values. When normalized maximum value
+        is 1 and correspond to max feret.
+
+        Args:
+          angles: iterable angle values. Defaut range(180)
+          normalized: whether to normalize values. Defaut True
+
+        """
+        return np.array([p.paror(angles, normalized) for p in self])
+
     def classify(self, attr, rule='natural', k=5):
         """Define classification of objects.
 
@@ -1346,6 +1376,13 @@ class Grains(PolySet):
         """
         return np.array([p.ead for p in self])
 
+    @property
+    def nholes(self):
+        """Returns array of number of holes (shape interiors)
+
+        """
+        return np.array([p.nholes for p in self])
+
     def boundaries(self, T=None):
         """Create Boundaries from Grains.
 
@@ -1450,10 +1487,10 @@ class Grains(PolySet):
                                 ph = rec.record[phase_pos]
                             if geom.geom_type == 'MultiPolygon':
                                 for g in geom:
-                                    shapes.append(Grain(g, ph, len(shapes)))
+                                    shapes.append(Grain(orint(g), ph, len(shapes)))
                                 print('Multipolygon (FID={}) exploded.'.format(pos))
                             elif geom.geom_type == 'Polygon':
-                                shapes.append(Grain(geom, ph, len(shapes)))
+                                shapes.append(Grain(orient(geom), ph, len(shapes)))
                             else:
                                 raise Exception('Unexpected geometry type (FID={})!'.format(pos))
                         else:

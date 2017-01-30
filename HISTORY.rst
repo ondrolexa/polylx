@@ -57,3 +57,11 @@ History
 0.4.5 (2017-01-12)
 ------------------
 * shell script ipolylx opens interactive console
+
+0.4.6 (2017-XX-XX)
+------------------
+* added plots module (initial)
+* representative_point for Grains implemented
+* moments calculation including holes
+* surfor and parror functions added
+* orientation of polygons is unified and checked

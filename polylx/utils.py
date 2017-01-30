@@ -283,75 +283,6 @@ def natural_breaks(values, k=5, itmax=100):
     cuts = [min(values)] + [max(values[c1 == c]) for c in rk]
     return c1, cuts
 
-
-def _fisher_jenks_means(values, classes=5, sort=True):
-    """
-    Jenks Optimal (Natural Breaks) algorithm implemented in Python.
-    The original Python code comes from here:
-    http://danieljlewis.org/2010/06/07/jenks-natural-breaks-algorithm-in-python/
-    and is based on a JAVA and Fortran code available here:
-    https://stat.ethz.ch/pipermail/r-sig-geo/2006-March/000811.html
-
-    Returns class breaks such that classes are internally homogeneous while
-    assuring heterogeneity among classes.
-    Sergio J. Rey Copyright (c) 2009-10 Sergio J. Rey
-
-    """
-    if sort:
-        values.sort()
-    mat1 = []
-    for i in range(0, len(values) + 1):
-        temp = []
-        for j in range(0, classes + 1):
-            temp.append(0)
-        mat1.append(temp)
-    mat2 = []
-    for i in range(0, len(values) + 1):
-        temp = []
-        for j in range(0, classes + 1):
-            temp.append(0)
-        mat2.append(temp)
-    for i in range(1, classes + 1):
-        mat1[1][i] = 1
-        mat2[1][i] = 0
-        for j in range(2, len(values) + 1):
-            mat2[j][i] = float('inf')
-    v = 0.0
-    for l in range(2, len(values) + 1):
-        s1 = 0.0
-        s2 = 0.0
-        w = 0.0
-        for m in range(1, l + 1):
-            i3 = l - m + 1
-            val = float(values[i3 - 1])
-            s2 += val * val
-            s1 += val
-            w += 1
-            v = s2 - (s1 * s1) / w
-            i4 = i3 - 1
-            if i4 != 0:
-                for j in range(2, classes + 1):
-                    if mat2[l][j] >= (v + mat2[i4][j - 1]):
-                        mat1[l][j] = i3
-                        mat2[l][j] = v + mat2[i4][j - 1]
-        mat1[l][1] = 1
-        mat2[l][1] = v
-    k = len(values)
-    kclass = []
-    for i in range(0, classes + 1):
-        kclass.append(0)
-    kclass[classes] = float(values[len(values) - 1])
-    kclass[0] = float(values[0])
-    countNum = classes
-    while countNum >= 2:
-        pivot = mat1[k][countNum]
-        id = int(pivot - 2)
-        kclass[countNum - 1] = values[id]
-        k = int(pivot - 1)
-        countNum -= 1
-    return kclass
-
-
 def fisher_jenks(values, k=5):
     """
     Our own version of Jenks Optimal (Natural Breaks) algorithm
@@ -446,6 +377,20 @@ def find_ellipse(x, y):
     b = np.sqrt(up / down2)
     return xc, yc, phi, a, b
 
+def inertia_moments(x, y, xc, yc):
+    x = x - xc
+    y = y - yc
+    d = x[1:] * y[:-1] - x[:-1] * y[1:]
+    A = np.sum(d) / 2
+    ax = np.sum(d * (x[1:] + x[:-1])) / (6 * A)
+    ay = np.sum(d * (y[1:] + y[:-1])) / (6 * A)
+    axx = np.sum(d * (x[1:]**2 + x[1:] * x[:-1] + x[:-1]**2)) / (12 * A)
+    ayy = np.sum(d * (y[1:]**2 + y[1:] * y[:-1] + y[:-1]**2)) / (12 * A)
+    axy = np.sum(d * (2 * x[1:] * y[1:] + x[1:] * y[:-1] + x[:-1] * y[1:] + 2 * x[:-1] * y[:-1])) / (24 * A)
+    mxx = axx - ax**2
+    myy = ayy - ay**2
+    mxy = axy - ax * ay
+    return np.array([mxx, myy, mxy])
 
 def densify(x, y, repeat=1):
     for i in range(repeat):
