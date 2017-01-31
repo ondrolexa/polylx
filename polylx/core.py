@@ -321,6 +321,9 @@ class Grain(PolyShape):
                 'A:{g.area:g}, AR:{g.ar:g}, '
                 'LAO:{g.lao:g} ({g.shape_method:s})').format(g=self)
 
+    def copy(self):
+        return Grain(self.shape, self.name, self.fid)
+
     @classmethod
     def from_coords(self, x, y, name='None', fid=0):
         """Create ``Grain`` from coordinate arrays
@@ -698,6 +701,9 @@ class Boundary(PolyShape):
                 'L:{b.length:g}, AR:{b.ar:g}, '
                 'LAO:{b.lao:g} ({b.shape_method:s})').format(b=self)
 
+    def copy(self):
+        return Boundary(self.shape, self.name, self.fid)
+
     @property
     def xy(self):
         """Returns array of vertex coordinate pair.
@@ -776,6 +782,11 @@ class PolySet(object):
     def __init__(self, shapes, attr='name', rule='unique', k=5):
         if len(shapes) > 0:
             self.polys = shapes
+            fids = self.fid
+            if len(fids) != len(np.unique(fids)):
+                for ix, s in enumerate(self.polys):
+                    s.fid = ix
+                print('FIDs are not unique and have been automatically changed.')
             self.classify(attr, rule=rule, k=k)
         else:
             raise ValueError("No objects passed.")
@@ -1162,14 +1173,25 @@ class PolySet(object):
         attrs = list(attrs)
         if 'classes' in attrs:
             attrs[attrs.index('classes')] = 'class'
+        idx = pd.Index(self.fid, name='fid')
         if 'class' in attrs:
             attrs.remove('class')
-            d = pd.DataFrame({self.class_attr + '_class': self.classes.names})
+            d = pd.DataFrame({self.class_attr + '_class': self.classes.names}, index=idx)
         else:
-            d = pd.DataFrame()
+            d = pd.DataFrame(index=idx)
         for attr in attrs:
             d[attr] = getattr(self, attr)
         return d
+
+    def get(self, attr):
+        """Returns ``pandas.Series`` of object attribute.
+
+        Example:
+          >>> g.get('ead')
+
+        """
+        idx = pd.Index(self.fid, name='fid')
+        return pd.Series(getattr(self, attr), index=idx, name=attr)
 
     def agg(self, *pairs):
         """Returns concatenated result of multiple aggregations (different
