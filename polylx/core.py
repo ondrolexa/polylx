@@ -21,6 +21,7 @@ from matplotlib.path import Path
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from shapely.geometry import shape, Polygon, LinearRing
 from shapely.geometry.polygon import orient
+from shapely import affinity
 import networkx as nx
 import pandas as pd
 
@@ -270,6 +271,65 @@ class PolyShape(object):
 
         """
         return self.shape.within(other.shape)
+
+    ###################################################################
+    # Shapely affinity methods                                        #
+    ###################################################################
+
+    def affine_transform(self, matrix):
+        """Returns a transformed geometry using an affine transformation matrix.
+        The matrix is provided as a list or tuple with 6 items:
+        [a, b, d, e, xoff, yoff]
+        which defines the equations for the transformed coordinates:
+        x’ = a * x + b * y + xoff y’ = d * x + e * y + yoff
+
+        """
+        return type(self)(affinity.affine_transform(self.shape, matrix),
+                          name=self.name, fid=self.fid)
+
+    def rotate(self, angle, **kwargs):
+        """Returns a rotated geometry on a 2D plane.
+        The angle of rotation can be specified in either degrees (default)
+        or radians by setting use_radians=True. Positive angles are
+        counter-clockwise and negative are clockwise rotations.
+        The point of origin can be a keyword ‘center’ for the object bounding
+        box center (default), ‘centroid’ for the geometry’s centroid,
+        or coordinate tuple (x0, y0) for fixed point.
+
+        """
+        return type(self)(affinity.rotate(self.shape, angle, **kwargs),
+                          name=self.name, fid=self.fid)
+
+    def scale(self, **kwargs):
+        """Returns a scaled geometry, scaled by factors along each dimension.
+        The point of origin can be a keyword ‘center’ for the object bounding
+        box center (default), ‘centroid’ for the geometry’s centroid,
+        or coordinate tuple (x0, y0) for fixed point.
+        Negative scale factors will mirror or reflect coordinates.
+
+        """
+        return type(self)(affinity.scale(self.shape, **kwargs),
+                          name=self.name, fid=self.fid)
+
+    def skew(self, **kwargs):
+        """Returns a skewed geometry, sheared by angles ‘xs’ along x and
+        ‘ys’ along y direction. The shear angle can be specified in either
+        degrees (default) or radians by setting use_radians=True.
+        The point of origin can be a keyword ‘center’ for the object bounding
+        box center (default), ‘centroid’ for the geometry’s centroid,
+        or a coordinate tuple (x0, y0) for fixed point.
+
+        """
+        return type(self)(affinity.skew(self.shape, **kwargs),
+                          name=self.name, fid=self.fid)
+
+    def translate(self, **kwargs):
+        """Returns a translated geometry shifted by offsets ‘xoff’ along x
+        and ‘yoff’ along y direction.
+
+        """
+        return type(self)(affinity.translate(self.shape, **kwargs),
+                          name=self.name, fid=self.fid)
 
 
 class Grain(PolyShape):
@@ -906,10 +966,7 @@ class PolySet(object):
         x’ = a * x + b * y + xoff y’ = d * x + e * y + yoff
 
         """
-        from shapely.affinity import affine_transform
-        shapes = [type(e)(affine_transform(e.shape, matrix), name=e.name, fid=e.fid)
-                  for e in self]
-        return type(self)(shapes)
+        return type(self)([e.affine_transform(matrix) for e in self])
 
     def rotate(self, angle, **kwargs):
         """Returns a rotated geometry on a 2D plane.
@@ -921,10 +978,7 @@ class PolySet(object):
         or coordinate tuple (x0, y0) for fixed point.
 
         """
-        from shapely.affinity import rotate
-        shapes = [type(e)(rotate(e.shape, angle, **kwargs), name=e.name, fid=e.fid)
-                  for e in self]
-        return type(self)(shapes)
+        return type(self)([e.rotate(angle, **kwargs) for e in self])
 
     def scale(self, **kwargs):
         """Returns a scaled geometry, scaled by factors along each dimension.
@@ -934,10 +988,7 @@ class PolySet(object):
         Negative scale factors will mirror or reflect coordinates.
 
         """
-        from shapely.affinity import scale
-        shapes = [type(e)(scale(e.shape, **kwargs), name=e.name, fid=e.fid)
-                  for e in self]
-        return type(self)(shapes)
+        return type(self)([e.scale(**kwargs) for e in self])
 
     def skew(self, **kwargs):
         """Returns a skewed geometry, sheared by angles ‘xs’ along x and
@@ -948,20 +999,33 @@ class PolySet(object):
         or a coordinate tuple (x0, y0) for fixed point.
 
         """
-        from shapely.affinity import skew
-        shapes = [type(e)(skew(e.shape, **kwargs), name=e.name, fid=e.fid)
-                  for e in self]
-        return type(self)(shapes)
+        return type(self)([e.skew(**kwargs) for e in self])
 
     def translate(self, **kwargs):
         """Returns a translated geometry shifted by offsets ‘xoff’ along x
         and ‘yoff’ along y direction.
 
         """
-        from shapely.affinity import translate
-        shapes = [type(e)(translate(e.shape, **kwargs), name=e.name, fid=e.fid)
-                  for e in self]
-        return type(self)(shapes)
+        return type(self)([e.translate(**kwargs) for e in self])
+
+    ###################################################################
+    # Shapely set-theoretic methods                                   #
+    ###################################################################
+
+    def clip(self, other):
+        assert isinstance(other, Grain), 'Clipping is possible only by Grain.'
+        res = []
+        for e in self:
+            if other.shape.intersects(e.shape):
+                x = other.shape.intersection(e.shape)
+                if x.geom_type == e.shape.geom_type:
+                    res.append(type(e)(x, e.name, e.fid))
+                elif x.geom_type == 'Multi' + e.shape.geom_type:
+                    for xx in x:
+                        res.append(type(e)(xx, e.name, e.fid))
+                else:
+                    pass
+        return type(self)(res)
 
     @property
     def shape_method(self):
@@ -992,6 +1056,47 @@ class PolySet(object):
             size = len(self)
         for i in range(num):
             yield self[np.random.choice(len(self), size)]
+
+    def gridsplit(self, m=1, n=1):
+        """Rectangular split generator.
+
+        Args:
+          m, n: number of rows and columns to split.
+
+        Examples:
+          >>> smean = np.mean([gs.ead.mean() for gs in g.gridsplit(6, 8)])
+        """
+        xmin, ymin, xmax, ymax = self.extent
+        yoff = (ymax - ymin) / m
+        xoff = (xmax - xmin) / n
+        o = Grain.from_coords([xmin, xmin + xoff, xmin + xoff, xmin, xmin],
+                              [ymin, ymin, ymin + yoff, ymin + yoff, ymin])
+
+        for iy in range(m):
+            for ix in range(n):
+                c = o.translate(xoff=ix * xoff, yoff=iy * yoff)
+                yield self.clip(c)
+
+    def clipstrap(self, num=100, f=0.3):
+        """Bootstrap random rectangular clip generator.
+
+        Args:
+          num: number of boostraped samples. Default 100
+          f: area fraction clipped from original shape. Default 0.3
+
+        Examples:
+          >>> csmean = np.mean([gs.ead.mean() for gs in g.clipstrap()])
+        """
+        xmin, ymin, xmax, ymax = self.extent
+        f = np.clip(f, 0, 1)
+        w = f * (xmax - xmin)
+        h = f * (ymax - ymin)
+        for i in range(num):
+            x = xmin + (1 - f) * (xmax - xmin) * np.random.random()
+            y = ymin + (1 - f) * (ymax - ymin) * np.random.random()
+            c = Grain.from_coords([x, x + w, x + w, x, x],
+                                  [y, y, y + h, y + h, y])
+            yield self.clip(c)
 
     @property
     def width(self):
