@@ -177,29 +177,6 @@ class PolyShape(object):
             res = res / res.max()
         return res
 
-    #################################################################
-    # Common shape methods (should modify sa, la, sao, lao, xc, yc) #
-    #################################################################
-    def maxferet(self):
-        """`shape_method`: maxferet
-
-        Long axis is defined as the maximum caliper of the polygon/polyline.
-        Short axis correspond to caliper orthogonal to long axis.
-        Center coordinates are set to centroid of exterior.
-
-        """
-        xy = self.hull.T
-        pa = np.array(list(itertools.combinations(range(len(xy)), 2)))
-        d2 = np.sum((xy[pa[:, 0]] - xy[pa[:, 1]])**2, axis=1)
-        ix = d2.argmax()
-        dxy = xy[pa[ix][1]] - xy[pa[ix][0]]
-        self.la = np.sqrt(np.max(d2))
-        self.lao = deg.atan2(*dxy) % 180
-        self.sao = (self.lao + 90) % 180
-        self.sa = fixzero(self.feret(self.sao))
-        self.xc, self.yc = self.shape.exterior.centroid.coords[0]
-        self._shape_method = 'maxferet'
-
     ##################################################################
     # Shapely/GEOS algorithms                                        #
     ##################################################################
@@ -382,14 +359,18 @@ class Grain(PolyShape):
         """
         return len(self.shape.interiors)
 
-    def plot(self):
+    def plot(self, **kwargs):
         """Plot ``Grain`` geometry on figure.
 
         Note that plotted ellipse reflects actual shape method
 
         """
-        fig = plt.figure()
-        ax = fig.add_subplot(111, aspect='equal')
+        if 'ax' in kwargs:
+            ax = kwargs['ax']
+            ax.set_aspect('equal')
+        else:
+            fig = plt.figure()
+            ax = fig.add_subplot(111, aspect='equal')
         hull = self.hull
         ax.plot(*hull, ls='--', c='green')
         ax.add_patch(PathPatch(PolygonPath(self.shape),
@@ -409,11 +390,11 @@ class Grain(PolyShape):
         plt.title('LAO:{g.lao:g} AR:{g.ar} ({g.shape_method})'.format(g=self))
         return ax
 
-    def show(self):
+    def show(self, **kwargs):
         """Show plot of ``Grain`` objects.
 
         """
-        self.plot()
+        self.plot(**kwargs)
         plt.show()
 
     ##################################################################
@@ -513,6 +494,26 @@ class Grain(PolyShape):
     ################################################################
     # Grain shape methods (should modify sa, la, sao, lao, xc, yc) #
     ################################################################
+    def maxferet(self):
+        """`shape_method`: maxferet
+
+        Long axis is defined as the maximum caliper of the polygon.
+        Short axis correspond to caliper orthogonal to long axis.
+        Center coordinates are set to centroid of exterior.
+
+        """
+        xy = self.hull.T
+        pa = np.array(list(itertools.combinations(range(len(xy)), 2)))
+        d2 = np.sum((xy[pa[:, 0]] - xy[pa[:, 1]])**2, axis=1)
+        ix = d2.argmax()
+        dxy = xy[pa[ix][1]] - xy[pa[ix][0]]
+        self.la = np.sqrt(np.max(d2))
+        self.lao = deg.atan2(*dxy) % 180
+        self.sao = (self.lao + 90) % 180
+        self.sa = fixzero(self.feret(self.sao))
+        self.xc, self.yc = self.shape.exterior.centroid.coords[0]
+        self._shape_method = 'maxferet'
+
     def minferet(self):
         """`shape_method`: minferet
 
@@ -722,14 +723,18 @@ class Boundary(PolyShape):
         else:
             return np.array(h.exterior.xy)
 
-    def plot(self):
+    def plot(self, **kwargs):
         """View ``Boundary`` geometry on figure.
 
         """
-        fig = plt.figure()
-        ax = fig.add_subplot(111, aspect='equal')
+        if 'ax' in kwargs:
+            ax = kwargs['ax']
+            ax.set_aspect('equal')
+        else:
+            fig = plt.figure()
+            ax = fig.add_subplot(111, aspect='equal')
         hull = self.hull
-        ax.plot(*hull, ls='--', c='g')
+        ax.plot(*hull, ls='--', c='green')
         ax.plot(*self.xy, c='blue')
         pa = np.array(list(itertools.combinations(range(len(hull.T)), 2)))
         d2 = np.sum((hull.T[pa[:, 0]] - hull.T[pa[:, 1]])**2, axis=1)
@@ -739,16 +744,36 @@ class Boundary(PolyShape):
         plt.title('LAO:{b.lao:g} AR:{b.ar} ({b.shape_method})'.format(b=self))
         return ax
 
-    def show(self):
+    def show(self, **kwargs):
         """Show plot of ``Boundary`` objects.
 
         """
-        self.plot()
+        self.plot(**kwargs)
         plt.show()
 
     ###################################################################
     # Boundary shape methods (should modify sa, la, sao, lao, xc, yc) #
     ###################################################################
+    def maxferet(self):
+        """`shape_method`: maxferet
+
+        Long axis is defined as the maximum caliper of the polyline.
+        Short axis correspond to caliper orthogonal to long axis.
+        Center coordinates are set to centroid of polyline.
+
+        """
+        xy = self.hull.T
+        pa = np.array(list(itertools.combinations(range(len(xy)), 2)))
+        d2 = np.sum((xy[pa[:, 0]] - xy[pa[:, 1]])**2, axis=1)
+        ix = d2.argmax()
+        dxy = xy[pa[ix][1]] - xy[pa[ix][0]]
+        self.la = np.sqrt(np.max(d2))
+        self.lao = deg.atan2(*dxy) % 180
+        self.sao = (self.lao + 90) % 180
+        self.sa = fixzero(self.feret(self.sao))
+        self.xc, self.yc = self.shape.centroid.coords[0]
+        self._shape_method = 'maxferet'
+
     def cov(self):
         """`shape_method`: cov
 
@@ -1320,14 +1345,20 @@ class PolySet(object):
           alpha: transparency. Default 0.8
           cmap: colormap. Default "jet"
           ncol: number of columns for legend.
+          show_fid: Show FID of objects. Default False
+          show_index: Show index of objects. Default False
 
         Returns matplotlib axes object.
 
         """
+        if 'ax' in kwargs:
+            ax = kwargs['ax']
+            ax.set_aspect('equal')
+        else:
+            fig = plt.figure()
+            ax = fig.add_subplot(111, aspect='equal')
         legend = kwargs.get('legend',
                             self._autocolortable(kwargs.get('cmap', 'jet')))
-        fig = plt.figure()
-        ax = fig.add_subplot(111, aspect='equal')
         self._plot(ax, legend, kwargs.get('alpha', 0.8))
         if kwargs.get('show_index', False):
             for idx, p in enumerate(self):
@@ -1544,7 +1575,7 @@ class Grains(PolySet):
                                 ph = rec.record[phase_pos]
                             if geom.geom_type == 'MultiPolygon':
                                 for g in geom:
-                                    shapes.append(Grain(orint(g), ph, len(shapes)))
+                                    shapes.append(Grain(orient(g), ph, len(shapes)))
                                 print('Multipolygon (FID={}) exploded.'.format(pos))
                             elif geom.geom_type == 'Polygon':
                                 shapes.append(Grain(orient(geom), ph, len(shapes)))
@@ -1735,25 +1766,35 @@ class Sample(object):
         return [np.sqrt(np.sum((pts[e[0]] - pts[e[1]]) ** 2))
                 for e in T.edges()]
 
-    def plot(self, legend=None, pos='auto', alpha=0.8,
-             cmap='jet', ncol=1, show_fid=False, show_index=False):
+    def plot(self, **kwargs):
         """Plot overlay of ``Grains`` and ``Boundaries`` of ``Sample`` object.
 
         Args:
           legend: dictionary with classes as keys and RGB tuples as values
                   Default Auto (created by _autocolortable method)
           pos: legend position "top" or "right". Defalt Auto
-          alpha: transparency. Default 0.8
-          cmap: colormap. Default "jet"
+          alpha: Grains transparency. Default 0.8
+          gcmap: Grains colormap. Default "jet"
+          bcmap: Boundary colormap. Default "jet"
           ncol: number of columns for legend.
+          show_fid: Show FID of objects. Default False
+          show_index: Show index of objects. Default False
 
         Returns matplotlib axes object.
 
         """
-        if legend is None:
-            legend = dict(list(self.g._autocolortable().items()) + list(self.b._autocolortable().items()))
-        fig = plt.figure()
-        ax = fig.add_subplot(111, aspect='equal')
+        if 'ax' in kwargs:
+            ax = kwargs['ax']
+            ax.set_aspect('equal')
+        else:
+            fig = plt.figure()
+            ax = fig.add_subplot(111, aspect='equal')
+        legend = kwargs.get('legend',
+                            dict(list(self.g._autocolortable(kwargs.get('gcmap', 'jet')).items()) +
+                                 list(self.b._autocolortable(kwargs.get('bcmap', 'jet')).items())))
+        alpha = kwargs.get('alpha', 0.8)
+        show_fid = kwargs.get('show_fid', False)
+        show_index = kwargs.get('show_index', False)
         self.g._plot(ax, legend, alpha, ec='none')
         if show_index:
             for idx, p in enumerate(self.g):
@@ -1773,7 +1814,7 @@ class Sample(object):
                 ax.text(p.xc, p.yc, str(p.fid),
                         bbox=dict(facecolor='white', alpha=0.5))
         plt.setp(plt.yticks()[1], rotation=90)
-        self.g._makelegend(ax, pos, ncol)
+        self.g._makelegend(ax, kwargs.get('pos', 'auto'), kwargs.get('ncol', 1))
         ax.set_ylabel(self.name)
         return ax
 
