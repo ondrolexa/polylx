@@ -935,6 +935,11 @@ class PolySet(object):
     def __contains__(self, v):
         return v in self.polys
 
+    def _ipython_key_completions_(self):
+        """ IPython integration of Tab key completions
+        """
+        return self.names
+
     # def __getattr__(self, attr, *args, **kwargs):
     #     res = []
     #     ismine = False
@@ -1557,7 +1562,15 @@ class Grains(PolySet):
 
     """
     def __repr__(self):
-        return 'Set of %s grains.' % len(self.polys)
+        #return 'Set of %s grains.' % len(self.polys)
+        if len(self.names) == 1:
+            res = 'Set of {:d} {:s} grains'.format(len(self), self.names[0])
+        else:    
+            res = 'Set of {:d} grains with {:d} names'.format(len(self), len(self.names))
+            if len(self.names) < 6:
+                for p in self.names:
+                    res += ' {:s}({:g})'.format(p, len(self[p]))
+        return res
 
     def __add__(self, other):
         return Grains(self.polys + other.polys)
@@ -1732,7 +1745,15 @@ class Boundaries(PolySet):
 
     """
     def __repr__(self):
-        return 'Set of %s boundaries.' % len(self.polys)
+        #return 'Set of %s boundaries.' % len(self.polys)
+        if len(self.names) == 1:
+            res = 'Set of {:d} {:s} boundaries'.format(len(self), self.names[0])
+        else:    
+            res = 'Set of {:d} boundaries with {:d} names'.format(len(self), len(self.names))
+            if len(self.names) < 6:
+                for p in self.names:
+                    res += ' {:s}({:g})'.format(p, len(self[p]))
+        return res
 
     def __add__(self, other):
         return Boundaries(self.polys + other.polys)
