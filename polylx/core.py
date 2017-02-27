@@ -871,7 +871,7 @@ class PolySet(object):
             if len(fids) != len(np.unique(fids)):
                 for ix, s in enumerate(self.polys):
                     s.fid = ix
-                print('FIDs are not unique and have been automatically changed.')
+                #print('FIDs are not unique and have been automatically changed.')
             self.classify(attr, rule=rule, k=k)
         else:
             raise ValueError("No objects passed.")
