@@ -111,7 +111,12 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'default'
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
+
+if on_rtd:
+    html_theme = 'default'
+else:
+    html_theme = 'alabaster'
 
 # Theme options are theme-specific and customize the look and feel of a
 # theme further.  For a list of options available for each theme, see the
@@ -276,16 +281,3 @@ texinfo_documents = [
 
 # Sort members by type
 autodoc_member_order = 'groupwise'
-
-# Mocks for Read the Docs
-import sys
-from unittest.mock import MagicMock
-
-class Mock(MagicMock):
-    @classmethod
-    def __getattr__(cls, name):
-            return Mock()
-
-MOCK_MODULES = ['numpy','matplotlib','pandas','networkx','scipy','shapely']
-sys.modules.update((mod_name, Mock()) for mod_name in MOCK_MODULES)
-
