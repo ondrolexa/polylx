@@ -18,6 +18,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.patches import PathPatch
 from matplotlib.path import Path
+import matplotlib.cbook as mcb
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from shapely.geometry import shape, Polygon, LinearRing
 from shapely.geometry.polygon import orient

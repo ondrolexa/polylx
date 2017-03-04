@@ -66,3 +66,7 @@ History
 * surfor and parror functions added
 * orientation of polygons is unified and checked
 * minbox shape method added
+
+0.4.7 (2017-03-04)
+------------------
+* bugfix
