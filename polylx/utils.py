@@ -283,6 +283,7 @@ def natural_breaks(values, k=5, itmax=100):
     cuts = [min(values)] + [max(values[c1 == c]) for c in rk]
     return c1, cuts
 
+
 def fisher_jenks(values, k=5):
     """
     Our own version of Jenks Optimal (Natural Breaks) algorithm
@@ -377,6 +378,7 @@ def find_ellipse(x, y):
     b = np.sqrt(up / down2)
     return xc, yc, phi, a, b
 
+
 def inertia_moments(x, y, xc, yc):
     x = x - xc
     y = y - yc
@@ -391,6 +393,7 @@ def inertia_moments(x, y, xc, yc):
     myy = ayy - ay**2
     mxy = axy - ax * ay
     return np.array([mxx, myy, mxy])
+
 
 def densify(x, y, repeat=1):
     for i in range(repeat):

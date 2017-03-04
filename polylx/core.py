@@ -160,10 +160,10 @@ class PolyShape(object):
         """
         res = self.feret(angles)
         if normalized:
-            #xy = self.hull.T
-            #pa = np.array(list(itertools.combinations(range(len(xy)), 2)))
-            #d2 = np.sum((xy[pa[:, 0]] - xy[pa[:, 1]])**2, axis=1)
-            #res = res / np.sqrt(np.max(d2))
+            # xy = self.hull.T
+            # pa = np.array(list(itertools.combinations(range(len(xy)), 2)))
+            # d2 = np.sum((xy[pa[:, 0]] - xy[pa[:, 1]])**2, axis=1)
+            # res = res / np.sqrt(np.max(d2))
             res = res / res.max()
         return res
 
@@ -686,7 +686,7 @@ class Grain(PolyShape):
             else:
                 ori = -phi
                 a, b = b, a
-            self.xc, self.yc, self.la, self.sa, self.lao, self.sao = xc, yc, 2*a, 2*b, np.rad2deg(ori) % 180, (np.rad2deg(ori) + 90) % 180
+            self.xc, self.yc, self.la, self.sa, self.lao, self.sao = xc, yc, 2 * a, 2 * b, np.rad2deg(ori) % 180, (np.rad2deg(ori) + 90) % 180
             self._shape_method = 'direct'
 
     def cov(self):
@@ -874,7 +874,7 @@ class PolySet(object):
             if len(fids) != len(np.unique(fids)):
                 for ix, s in enumerate(self.polys):
                     s.fid = ix
-                #print('FIDs are not unique and have been automatically changed.')
+                # print('FIDs are not unique and have been automatically changed.')
             self.classify(attr, rule=rule, k=k)
         else:
             raise ValueError("No objects passed.")

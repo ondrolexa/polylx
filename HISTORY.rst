@@ -58,7 +58,7 @@ History
 ------------------
 * shell script ipolylx opens interactive console
 
-0.4.6 (2017-XX-XX)
+0.4.6 (2017-03-04)
 ------------------
 * added plots module (initial)
 * representative_point for Grains implemented

@@ -33,11 +33,10 @@ setup(
     packages=find_packages(),
     package_data={'polylx.example': ['*.*']},
     install_requires=requirements,
-    entry_points={
-    'console_scripts': [
-        'ipolylx=polylx.shell:main'
-        ]
-    },
+    entry_points="""
+    [console_scripts]
+    ipolylx=polylx.shell:main
+    """,
     license="BSD",
     zip_safe=False,
     keywords='polylx',
