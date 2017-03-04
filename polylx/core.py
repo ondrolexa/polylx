@@ -24,6 +24,7 @@ from shapely.geometry.polygon import orient
 from shapely import affinity
 import networkx as nx
 import pandas as pd
+import warnings
 
 from .shapefile import Reader
 from .utils import fixratio, fixzero, deg, Classify, PolygonPath
@@ -33,6 +34,8 @@ from .utils import _chaikin_ring, _spline_ring, _visvalingam_whyatt_ring
 from pkg_resources import resource_filename
 
 respath = resource_filename(__name__, 'example')
+# ignore matplotlib deprecation warnings
+warnings.filterwarnings('ignore', category=mcb.mplDeprecation)
 
 
 class PolyShape(object):
@@ -1565,7 +1568,7 @@ class Grains(PolySet):
         #return 'Set of %s grains.' % len(self.polys)
         if len(self.names) == 1:
             res = 'Set of {:d} {:s} grains'.format(len(self), self.names[0])
-        else:    
+        else:
             res = 'Set of {:d} grains with {:d} names'.format(len(self), len(self.names))
             if len(self.names) < 6:
                 for p in self.names:
@@ -1748,7 +1751,7 @@ class Boundaries(PolySet):
         #return 'Set of %s boundaries.' % len(self.polys)
         if len(self.names) == 1:
             res = 'Set of {:d} {:s} boundaries'.format(len(self), self.names[0])
-        else:    
+        else:
             res = 'Set of {:d} boundaries with {:d} names'.format(len(self), len(self.names))
             if len(self.names) < 6:
                 for p in self.names:
