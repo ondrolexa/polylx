@@ -68,6 +68,11 @@ Changes
 * orientation of polygons is unified and checked
 * minbox shape method added
 
-0.4.7 (2017-03-04)
+0.4.8 (2017-03-04)
 ~~~~~~~~~~~~~~~~~~
 * bugfix
+
+0.4.9 (2017-03-04)
+~~~~~~~~~~~~~~~~~~
+ *
+
