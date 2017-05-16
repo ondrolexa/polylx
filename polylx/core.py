@@ -1196,6 +1196,12 @@ class PolySet(object):
         else:
             return self[ix]
 
+    def getindex(self, name):
+        """Return the indices of the objects with given name.
+
+        """
+        return [i for i, n in enumerate(self.name) if n == name]
+
     @property
     def area(self):
         """Return array of areas of the objects. For boundary returns 0.
