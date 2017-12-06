@@ -602,7 +602,7 @@ class Grain(PolyShape):
         """
         N = kwargs.get('N', 128)
         rc = np.asarray([self.shape.exterior.interpolate(d, normalized=True).xy
-                         for d in np.linspace(0, 1, N)])[:,:,0]
+                         for d in np.linspace(0, 1, N)])[:, :, 0]
         return Grain(Polygon(rc), self.name, self.fid)
 
     ################################################################
@@ -787,7 +787,7 @@ class Grain(PolyShape):
             err = np.linalg.norm(new_u - u)
             u = new_u
         U = np.diag(u)
-        A = np.linalg.inv(P @ U @ P.T - np.outer(P @ u, P @ u) ) / d
+        A = np.linalg.inv(P @ U @ P.T - np.outer(P @ u, P @ u)) / d
         evals, evecs = np.linalg.eig(A)
         idx = evals.argsort()
         evals = evals[idx]
@@ -918,7 +918,7 @@ class PolySet(object):
       extent: tuple of (xmin, ymin, xmax, ymax)
 
     """
-    def __init__(self, shapes, attr='name', rule='unique', k=5):
+    def __init__(self, shapes, classification=None):
         if len(shapes) > 0:
             self.polys = shapes
             fids = self.fid
@@ -926,7 +926,10 @@ class PolySet(object):
                 for ix, s in enumerate(self.polys):
                     s.fid = ix
                 # print('FIDs are not unique and have been automatically changed.')
-            self.classify(attr, rule=rule, k=k)
+            if classification is None:
+                self.classify('name', rule='unique')
+            else:
+                self.classes = classification
         else:
             raise ValueError("No objects passed.")
 
@@ -979,10 +982,8 @@ class PolySet(object):
         if isinstance(index, np.ndarray):
             if index.dtype == 'bool':
                 index = np.flatnonzero(index)
-            return type(self)([self.polys[fid] for fid in index],
-                              self.class_attr,
-                              self.classes.rule,
-                              self.classes.k)
+            return type(self)([self.polys[ix] for ix in index],
+                              self.classes[index])
         else:
             return self.polys[index]
 
@@ -1339,24 +1340,30 @@ class PolySet(object):
         """
         return np.array([p.paror(angles, normalized) for p in self])
 
-    def classify(self, attr, rule='natural', k=5):
+    def classify(self, vals, rule='natural', k=5, label='User values'):
         """Define classification of objects.
 
         Args:
-          attr: name of attribute used for classification
+          vals: name of attribute (str) used for classification
+                or array of values
+          label: used as classification label when vals is array
+          k: number of classes for continuous values
           rule: type of classification
             'unique': unique value mapping (for discrete values)
             'equal': k equaly spaced bins (for continuos values)
             'user': bins edges defined by array k (for continuos values)
-            'natural': natural breaks. Default rule
+            'natural': natural breaks. Default rule.
+                       (beware not always unique solution)
             'jenks': fischer jenks scheme
 
         Examples:
           >>> g.classify('name', 'unique')
 
         """
-        self.class_attr = attr
-        self.classes = Classify(getattr(self, attr), rule, k)
+        if isinstance(vals, str):
+            self.classes = Classify(getattr(self, vals), rule=rule, k=k, label=vals)
+        else:
+            self.classes = Classify(vals, rule=rule, k=k, label=label)
 
     def df(self, *attrs):
         """Returns ``pandas.DataFrame`` of object attributes.
@@ -1371,7 +1378,7 @@ class PolySet(object):
         idx = pd.Index(self.fid, name='fid')
         if 'class' in attrs:
             attrs.remove('class')
-            d = pd.DataFrame({self.class_attr + '_class': self.classes.names}, index=idx)
+            d = pd.DataFrame({self.classes.label + '_class': self.classes.names}, index=idx)
         else:
             d = pd.DataFrame(index=idx)
         for attr in attrs:
@@ -1396,10 +1403,11 @@ class PolySet(object):
 
         Example:
           >>> g.agg('area', np.sum, 'ead', np.mean, 'lao', circular.mean)
-               sum_area  mean_ead  circular.mean_lao
-          ksp  2.443733  0.089710          76.875574
-          pl   1.083516  0.060629          94.331525
-          qtz  1.166097  0.068071          74.318887
+                          area       ead        lao
+          name_class
+          ksp         2.443733  0.089710  76.875488
+          pl          1.083516  0.060629  94.197847
+          qtz         1.166097  0.068071  74.320337
 
         """
         pieces = []
@@ -1417,14 +1425,16 @@ class PolySet(object):
           >>> g.classify('ar', 'natural')
           >>> g.groups('ead').mean()
                                 ead
+          ar_class
           1.01765-1.31807  0.067772
-          1.31807-1.54201  0.076206
-          1.54201-1.82242  0.065400
-          1.82242-2.36773  0.073690
+          1.31807-1.5445   0.076042
+          1.5445-1.83304   0.065900
+          1.83304-2.36773  0.073338
           2.36773-12.1571  0.084016
+
         """
-        df = self.df(*attrs)
-        return df.groupby(self.classes.names)
+        df = self.df('class', *attrs)
+        return df.groupby(df.columns[0])
 
     def nndist(self, **kwargs):
         from scipy.spatial import Delaunay
@@ -1438,7 +1448,7 @@ class PolySet(object):
             idx = np.setdiff1d(idx, hull.vertices)
         for i in idx:
             T.add_node(i)
-            for n in tri.vertex_neighbor_vertices[1][tri.vertex_neighbor_vertices[0][i]:tri.vertex_neighbor_vertices[0][i+1]]:
+            for n in tri.vertex_neighbor_vertices[1][tri.vertex_neighbor_vertices[0][i]:tri.vertex_neighbor_vertices[0][i + 1]]:
                 T.add_node(n)
                 T.add_edge(i, n)
         if kwargs.get('show', False):
@@ -1450,7 +1460,7 @@ class PolySet(object):
             ax = self.plot()
             ax.plot(x, y, 'k')
             plt.show()
-        return [np.sqrt(np.sum((pts[e[0]]-pts[e[1]])**2)) for e in T.edges()]
+        return [np.sqrt(np.sum((pts[e[0]] - pts[e[1]])**2)) for e in T.edges()]
 
     def boundary_segments(self):
         """Create Boundaries from object boundary segments.
@@ -1488,20 +1498,20 @@ class PolySet(object):
                 ncol = 1
 
         if pos == 'top':
-            h, l = ax.get_legend_handles_labels()
+            h, lbls = ax.get_legend_handles_labels()
             divider = make_axes_locatable(ax)
             cax = divider.append_axes('top',
                                       size=0.25 + 0.25 * np.ceil(len(h) / ncol))
             cax.set_axis_off()
-            cax.legend(h, l, loc=9, borderaxespad=0.,
+            cax.legend(h, lbls, loc=9, borderaxespad=0.,
                        ncol=ncol, bbox_to_anchor=[0.5, 1.1])
             plt.tight_layout()
         elif pos == 'right':
-            h, l = ax.get_legend_handles_labels()
+            h, lbls = ax.get_legend_handles_labels()
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size=0.2 + 1.6 * ncol)
             cax.set_axis_off()
-            cax.legend(h, l, loc=7, borderaxespad=0.,
+            cax.legend(h, lbls, loc=7, borderaxespad=0.,
                        bbox_to_anchor=[1.04, 0.5])
             plt.tight_layout()
 
@@ -1622,7 +1632,7 @@ class Grains(PolySet):
 
     """
     def __repr__(self):
-        #return 'Set of %s grains.' % len(self.polys)
+        # return 'Set of %s grains.' % len(self.polys)
         if len(self.names) == 1:
             res = 'Set of {:d} {:s} grains'.format(len(self), self.names[0])
         else:
@@ -1641,6 +1651,16 @@ class Grains(PolySet):
 
         """
         return np.array([p.ead for p in self])
+
+    def shape_vector(self, **kwargs):
+        """Returns array of shape (feature) vectors.
+
+        Keywords:
+          N: number of points to regularize shape. Default 128
+             Routine return N/2 of FDs
+
+        """
+        return np.array([p.shape_vector(**kwargs) for p in self])
 
     @property
     def nholes(self):
@@ -1805,7 +1825,7 @@ class Boundaries(PolySet):
 
     """
     def __repr__(self):
-        #return 'Set of %s boundaries.' % len(self.polys)
+        # return 'Set of %s boundaries.' % len(self.polys)
         if len(self.names) == 1:
             res = 'Set of {:d} {:s} boundaries'.format(len(self), self.names[0])
         else:

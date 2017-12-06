@@ -79,3 +79,4 @@ Changes
 * Grain cdir property return centroid-vertex direction function
 * Grain shape_vector property returns normalized Fourier descriptors
 * Grain regularize method returns Grain with regularly distributed vertices
+* Classification could be based on properties or any other values

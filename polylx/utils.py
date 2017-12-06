@@ -13,6 +13,7 @@ g.plot(cmap=optimize_colormap('jet'))
 g.groups('lao').agg(circular.csd)
 """
 from __future__ import division
+from copy import deepcopy
 import numpy as np
 
 
@@ -154,9 +155,10 @@ class deg(object):
 
 
 class Classify(object):
-    def __init__(self, vals, rule='natural', k=5):
+    def __init__(self, vals, rule='natural', k=5, label='Default'):
         self.rule = rule
-        self.k = k
+        self.vals = vals
+        self.label = label
         if rule == 'equal' or rule == 'user':
             counts, bins = np.histogram(vals, k)
             index = np.digitize(vals, bins) - 1
@@ -178,15 +180,22 @@ class Classify(object):
             self.index = ['%g-%g' % (bins[i], bins[i + 1]) for i in range(len(counts))]
             self.names = np.array([self.index[i] for i in index])
         else:  # unique
-            self.index = np.unique(vals)
+            self.index = list(np.unique(vals))
             self.names = np.asarray(vals)
 
     def __call__(self, num):
         return np.flatnonzero(self.names == self.index[num])
 
+    def __getitem__(self, index):
+        cl = deepcopy(self)
+        cl.vals = [self.vals[ix] for ix in index]
+        cl.names = self.names[index]
+        cl.index = list(np.unique(cl.names))
+        return cl
+
     def __repr__(self):
-        return 'Classification: %s with %g classes.' % (self.rule,
-                                                        len(self.index))
+        tmpl = 'Classification %s of %s with %g classes.'
+        return tmpl % (self.rule, self.label, len(self.index))
 
     @property
     def labels(self):
@@ -239,7 +248,7 @@ def optimize_colormap(name):
     return cmap
 
 
-def natural_breaks(values, k=5, itmax=100):
+def natural_breaks(values, k=5, itmax=1000):
     """
     natural breaks helper function
     Sergio J. Rey Copyright (c) 2009-10 Sergio J. Rey
