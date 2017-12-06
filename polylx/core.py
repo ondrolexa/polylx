@@ -417,6 +417,41 @@ class Grain(PolyShape):
         return 2 * np.sqrt(self.area / np.pi)
 
     @property
+    def cdist(self):
+        """Returns centroid-vertex distances of grain
+
+        """
+        return np.sqrt(np.sum((self.xy.T - self.centroid)**2, axis=1))
+
+    @property
+    def cdir(self):
+        """Returns centroid-vertex directions of grain
+
+        """
+        return np.arctan2(*(self.xy.T - self.centroid).T)
+
+    def shape_vector(self, **kwargs):
+        """Returns shape (feature) vector.
+
+        Shape (feature) vector is calculated from Fourier descriptors (FD)
+        to index the shape. To achieve rotation invariance, phase information
+        of the FDs are ignored and only the magnitudes |FDn| are used. Scale
+        invariance is achieved by dividing the magnitudes by the DC component,
+        i.e., |FD0|. Since centroid distance is a real value function, only half
+        of the FDs are needed to index the shape.
+
+        Keywords:
+          N: number of points to regularize shape. Default 128
+             Routine return N/2 of FDs
+
+        """
+        N = kwargs.get('N', 128)
+        r = self.regularize(N=N).cdist
+        fft = np.fft.fft(r)
+        f = abs(fft[1:]) / abs(fft[0])
+        return f[:N // 2]
+
+    @property
     def nholes(self):
         """Returns number of holes (shape interiors)
 
@@ -541,11 +576,11 @@ class Grain(PolyShape):
 
         """
         x, y = _visvalingam_whyatt_ring(*self.xy,
-                                        minarea=kwargs.get('minarea', 0.01 * Polygon(self.exterior).area))
+                                        minarea=kwargs.get('minarea', 0.01 * Polygon(self.xy.T).area))
         holes = []
         for hole in self.interiors:
             xh, yh = _visvalingam_whyatt_ring(*hole,
-                                              minarea=kwargs.get('minarea', 0.01 * Polygon(hole).area))
+                                              minarea=kwargs.get('minarea', 0.01 * Polygon(hole.T).area))
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
@@ -554,6 +589,21 @@ class Grain(PolyShape):
             res = self
             print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
         return res
+
+    def regularize(self, **kwargs):
+        """Polygon xterior vertex regularization.
+
+        Returns ``Grain`` object defined by vertices regularly distributed
+        along perimeter of original ``Grain``. Holes are excluded.
+
+        Keywords:
+          N: Number of vertices. Default 128.
+
+        """
+        N = kwargs.get('N', 128)
+        rc = np.asarray([self.shape.exterior.interpolate(d, normalized=True).xy
+                         for d in np.linspace(0, 1, N)])[:,:,0]
+        return Grain(Polygon(rc), self.name, self.fid)
 
     ################################################################
     # Grain shape methods (should modify sa, la, sao, lao, xc, yc) #
