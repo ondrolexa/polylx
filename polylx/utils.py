@@ -411,12 +411,16 @@ def densify(x, y, repeat=1):
     return x, y
 
 
-def _chaikin_ring(x, y, repeat=4):
+def _chaikin(x, y, repeat=2, is_ring=False):
     # Chaikin's corner cutting algorithm
     for i in range(repeat):
         x, y = densify(x, y, 2)
-        x = np.append(x[1::2], x[1])
-        y = np.append(y[1::2], y[1])
+        if is_ring:
+            x = np.append(x[1::2], x[1])
+            y = np.append(y[1::2], y[1])
+        else:
+            x = np.concatenate((x[:1], x[3:-3:2], x[-1:]))
+            y = np.concatenate((y[:1], y[3:-3:2], y[-1:]))
     return x, y
 
 
@@ -440,26 +444,49 @@ def _spline_ring(x, y, densify=5, pad=5):
     return x, y
 
 
-def _visvalingam_whyatt_ring(x, y, minarea=None):
-    do = True
-    tot = 0
-    while do:
-        xx = np.concatenate((x[-2:-1], x, x[1:2]))
-        yy = np.concatenate((y[-2:-1], y, y[1:2]))
-        i0 = np.arange(len(xx) - 2)
-        i1 = i0 + 1
-        i2 = i0 + 2
-        a = (xx[i0] * (yy[i1] - yy[i2]) + xx[i1] * (yy[i2] - yy[i0]) + xx[i2] * (yy[i0] - yy[i1])) / 2
-        ix = abs(a).argmin()
-        mn = a[ix]
-        if abs(tot + mn) < minarea and len(x) > 4:
+def _visvalingam_whyatt(x, y, threshold=1, is_ring=False):
+    ds = np.c_[x[1:] - x[:-1], y[1:] - y[:-1]]
+    l0 = np.sum(np.linalg.norm(ds, axis=1))
+    if is_ring:
+        do = len(x) > 4
+        while do:
+            xx = np.concatenate((x[-2:-1], x, x[1:2]))
+            yy = np.concatenate((y[-2:-1], y, y[1:2]))
+            i0 = np.arange(len(xx) - 2)
+            i1 = i0 + 1
+            i2 = i0 + 2
+            a = (xx[i0] * (yy[i1] - yy[i2]) + xx[i1] * (yy[i2] - yy[i0]) + xx[i2] * (yy[i0] - yy[i1])) / 2
+            ix = abs(a).argmin()
             if ix == 0 or ix == len(x) - 1:
-                x = np.concatenate((x[1:-1], x[1:2]))
-                y = np.concatenate((y[1:-1], y[1:2]))
+                xx = np.concatenate((x[1:-1], x[1:2]))
+                yy = np.concatenate((y[1:-1], y[1:2]))
             else:
-                x = np.delete(x, ix)
-                y = np.delete(y, ix)
-            tot += mn
-        else:
-            do = False
+                xx = np.delete(x, ix)
+                yy = np.delete(y, ix)
+            ds = np.c_[xx[1:] - xx[:-1], yy[1:] - yy[:-1]]
+            l1 = np.sum(np.linalg.norm(ds, axis=1))
+            dif = 100 * abs(l1 - l0) / l0
+            if dif < threshold and len(xx) > 4:
+                x = xx
+                y = yy
+            else:
+                do = False
+    else:
+        do = len(x) > 2
+        while do:
+            i0 = np.arange(len(x) - 2)
+            i1 = i0 + 1
+            i2 = i0 + 2
+            a = (x[i0] * (y[i1] - y[i2]) + x[i1] * (y[i2] - y[i0]) + x[i2] * (y[i0] - y[i1])) / 2
+            ix = abs(a).argmin()
+            xx = np.delete(x, ix + 1)
+            yy = np.delete(y, ix + 1)
+            ds = np.c_[xx[1:] - xx[:-1], yy[1:] - yy[:-1]]
+            l1 = np.sum(np.linalg.norm(ds, axis=1))
+            dif = 100 * abs(l1 - l0) / l0
+            if dif < threshold and len(xx) > 2:
+                x = xx
+                y = yy
+            else:
+                do = False
     return x, y

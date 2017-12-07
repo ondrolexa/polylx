@@ -20,7 +20,7 @@ from matplotlib.patches import PathPatch
 from matplotlib.path import Path
 import matplotlib.cbook as mcb
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from shapely.geometry import shape, Polygon, LinearRing
+from shapely.geometry import shape, Polygon, LinearRing, LineString
 from shapely.geometry.polygon import orient
 from shapely import affinity
 import networkx as nx
@@ -30,7 +30,8 @@ import warnings
 from .shapefile import Reader
 from .utils import fixratio, fixzero, deg, Classify, PolygonPath
 from .utils import find_ellipse, densify, inertia_moments
-from .utils import _chaikin_ring, _spline_ring, _visvalingam_whyatt_ring
+from .utils import _chaikin, _visvalingam_whyatt
+from .utils import _spline_ring
 
 from pkg_resources import resource_filename
 
@@ -181,6 +182,25 @@ class PolyShape(object):
         if normalized:
             res = res / res.max()
         return res
+
+    def boundary_segments(self):
+        """Create Boundaries from object boundary segments.
+
+        Example:
+          >>> g = Grains.from_shp()
+          >>> b = g.boundaries()
+          >>> bs1 = g[10].boundary_segments()
+          >>> bs2 = b[10].boundary_segments()
+
+        """
+        shapes = []
+        for p0, p1 in zip(self.xy.T[:-1], self.xy.T[1:]):
+            shapes.append(Boundary(LineString([p0, p1]), self.name, len(shapes)))
+        if isinstance(self, Grain):
+            for hole in self.interiors:
+                for p0, p1 in zip(hole.T[:-1], hole.T[1:]):
+                    shapes.append(Boundary(LineString([p0, p1]), self.name, len(shapes)))
+        return Boundaries(shapes)
 
     ##################################################################
     # Shapely/GEOS algorithms                                        #
@@ -335,6 +355,39 @@ class PolyShape(object):
         return type(self)(affinity.translate(self.shape, **kwargs),
                           name=self.name, fid=self.fid)
 
+    ###################################################################
+    # Shapely affinity methods                                        #
+    ###################################################################
+
+    def dp(self, **kwargs):
+        """Douglas–Peucker simplification.
+
+        Keywords:
+          tolerance: All points in the simplified object will be within the
+          tolerance distance of the original geometry. Default Auto
+
+        """
+        x, y = self.xy
+        if len(x) > 2:
+            if 'tolerance' not in kwargs:
+                i1 = np.arange(len(x) - 2)
+                i2 = i1 + 2
+                i0 = i1 + 1
+                d = (abs((y[i2] - y[i1]) * x[i0] -
+                         (x[i2] - x[i1]) * y[i0] +
+                         x[i2] * y[i1] - y[i2] * x[i1]) /
+                     np.sqrt((y[i2] - y[i1]) ** 2 + (x[i2] - x[i1]) ** 2))
+                tolerance = d.mean()
+            shape = self.shape.simplify(kwargs.get('tolerance', tolerance), False)
+            if shape.is_empty:
+                shape = self.shape.simplify(kwargs.get('tolerance', tolerance), True)
+            if shape.is_empty:
+                shape = self.shape
+                print('Invalid shape produced during smoothing for FID={}'.format(self.fid))
+        else:
+            shape = self.shape
+        return type(self)(shape, self.name, self.fid)
+
 
 class Grain(PolyShape):
     """Grain class to store polygonal grain geometry
@@ -418,14 +471,14 @@ class Grain(PolyShape):
 
     @property
     def cdist(self):
-        """Returns centroid-vertex distances of grain
+        """Returns centroid-vertex distances of grain exterior
 
         """
         return np.sqrt(np.sum((self.xy.T - self.centroid)**2, axis=1))
 
     @property
     def cdir(self):
-        """Returns centroid-vertex directions of grain
+        """Returns centroid-vertex directions of grain exterior
 
         """
         return np.arctan2(*(self.xy.T - self.centroid).T)
@@ -464,6 +517,7 @@ class Grain(PolyShape):
         Note that plotted ellipse reflects actual shape method
 
         """
+        vertices = kwargs.get('vertices', False)
         if 'ax' in kwargs:
             ax = kwargs['ax']
             ax.set_aspect('equal')
@@ -474,6 +528,10 @@ class Grain(PolyShape):
         ax.plot(*hull, ls='--', c='green')
         ax.add_patch(PathPatch(PolygonPath(self.shape),
                      fc='blue', ec='#000000', alpha=0.5, zorder=2))
+        if vertices:
+            ax.plot(*self.xy, marker='.', c='blue')
+            for hole in self.interiors:
+                ax.plot(*hole, marker='.', c='blue')
         ax.plot(*self.representative_point, color='coral', marker='o')
         ax.plot(*self.centroid, color='red', marker='o')
         ax.plot(self.xc, self.yc, color='green', marker='o')
@@ -524,14 +582,14 @@ class Grain(PolyShape):
         """Chaikin corner-cutting smoothing algorithm.
 
         Keywords:
-          repeat: Number of repetitions. Default 4
+          repeat: Number of repetitions. Default 2
 
         """
-        x, y = _chaikin_ring(*self.xy, repeat=kwargs.get('repeat', 4))
+        repeat = kwargs.get('repeat', 2)
+        x, y = _chaikin(*self.xy, repeat=repeat, is_ring=True)
         holes = []
         for hole in self.interiors:
-            xh, yh = _chaikin_ring(*hole,
-                                   repeat=kwargs.get('repeat', 4))
+            xh, yh = _chaikin(*hole, repeat=repeat, is_ring=True)
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
@@ -540,28 +598,6 @@ class Grain(PolyShape):
             res = self
             print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
         return res
-
-    def dp(self, **kwargs):
-        """Douglas–Peucker simplification.
-
-        Keywords:
-          tolerance: All points in the simplified object will be within the
-          tolerance distance of the original geometry. Default Auto
-
-        """
-        if 'tolerance' not in kwargs:
-            x, y = self.xy
-            i1 = np.arange(len(x) - 2)
-            i2 = i1 + 2
-            i0 = i1 + 1
-            d = (abs((y[i2] - y[i1]) * x[i0] -
-                     (x[i2] - x[i1]) * y[i0] +
-                     x[i2] * y[i1] - y[i2] * x[i1]) /
-                 np.sqrt((y[i2] - y[i1]) ** 2 + (x[i2] - x[i1]) ** 2))
-            tolerance = d.mean()
-        shape = self.shape.simplify(tolerance=kwargs.get('tolerance', tolerance),
-                                    preserve_topology=kwargs.get('preserve_topology', False))
-        return Grain(shape, self.name, self.fid)
 
     def vw(self, **kwargs):
         """Visvalingam-Whyatt simplification.
@@ -571,18 +607,16 @@ class Grain(PolyShape):
         in total area of the polygon by adding or removing that point.
 
         Keywords:
-          minarea: Allowed total area change after simplification.
-          Default value is calculated as 1% of grain area.
+          threshold: Allowed total boundary length change in percents. Default 1
 
         """
-        x, y = _visvalingam_whyatt_ring(*self.xy,
-                                        minarea=kwargs.get('minarea', 0.01 * Polygon(self.xy.T).area))
+        threshold = kwargs.get('threshold', 1)
+        x, y = _visvalingam_whyatt(*self.xy, threshold=threshold, is_ring=True)
         holes = []
         for hole in self.interiors:
-            xh, yh = _visvalingam_whyatt_ring(*hole,
-                                              minarea=kwargs.get('minarea', 0.01 * Polygon(hole.T).area))
+            xh, yh = _visvalingam_whyatt(*hole, threshold=threshold, is_ring=True)
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
-        shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
+        shape = Polygon(LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
             res = Grain(shape, self.name, self.fid)
         else:
@@ -591,19 +625,31 @@ class Grain(PolyShape):
         return res
 
     def regularize(self, **kwargs):
-        """Polygon xterior vertex regularization.
+        """Grain vertices regularization.
 
         Returns ``Grain`` object defined by vertices regularly distributed
-        along perimeter of original ``Grain``. Holes are excluded.
+        along boundaries of original ``Grain``.
 
         Keywords:
           N: Number of vertices. Default 128.
+          length: approx. length of segments. Default None
 
         """
         N = kwargs.get('N', 128)
+        if 'length' in kwargs:
+            N = self.shape.exterior.length // kwargs['length'] + 1
+            N = max(N, 4)
         rc = np.asarray([self.shape.exterior.interpolate(d, normalized=True).xy
                          for d in np.linspace(0, 1, N)])[:, :, 0]
-        return Grain(Polygon(rc), self.name, self.fid)
+        holes = []
+        for hole in self.shape.interiors:
+            if 'length' in kwargs:
+                N = hole.length // kwargs['length'] + 1
+                N = max(N, 4)
+            rh = np.asarray([hole.interpolate(d, normalized=True).xy
+                             for d in np.linspace(0, 1, N)])[:, :, 0]
+            holes.append(LinearRing(rh))
+        return Grain(Polygon(rc, holes=holes), self.name, self.fid)
 
     ################################################################
     # Grain shape methods (should modify sa, la, sao, lao, xc, yc) #
@@ -841,15 +887,18 @@ class Boundary(PolyShape):
         """View ``Boundary`` geometry on figure.
 
         """
+        vertices = kwargs.get('vertices', False)
         if 'ax' in kwargs:
-            ax = kwargs['ax']
+            ax = kwargs.pop('ax')
             ax.set_aspect('equal')
         else:
             fig = plt.figure()
             ax = fig.add_subplot(111, aspect='equal')
+        ax.plot(*self.xy, c='blue')
+        if vertices:
+            ax.plot(*self.xy, marker='.', c='blue')
         hull = self.hull
         ax.plot(*hull, ls='--', c='green')
-        ax.plot(*self.xy, c='blue')
         pa = np.array(list(itertools.combinations(range(len(hull.T)), 2)))
         d2 = np.sum((hull.T[pa[:, 0]] - hull.T[pa[:, 1]])**2, axis=1)
         ix = d2.argmax()
@@ -864,6 +913,82 @@ class Boundary(PolyShape):
         """
         self.plot(**kwargs)
         plt.show()
+
+    ########################################################################
+    # Boundary smooth and simplify methods (should return Boundary object) #
+    ########################################################################
+    # def spline(self, **kwargs):
+    #     """Spline based smoothing of grains.
+
+    #     Keywords:
+    #       densify: factor for geometry densification. Default 5
+
+    #     """
+    #     x, y = _spline_ring(*self.xy, densify=kwargs.get('densify', 5))
+    #     holes = []
+    #     for hole in self.interiors:
+    #         xh, yh = _spline_ring(*hole,
+    #                               densify=kwargs.get('densify', 5))
+    #         holes.append(LinearRing(coordinates=np.c_[xh, yh]))
+    #     shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
+    #     if shape.is_valid:
+    #         res = Grain(shape, self.name, self.fid)
+    #     else:
+    #         res = self
+    #         print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
+    #     return res
+
+    def chaikin(self, **kwargs):
+        """Chaikin corner-cutting smoothing algorithm.
+
+        Keywords:
+          repeat: Number of repetitions. Default 2
+
+        """
+        repeat = kwargs.get('repeat', 2)
+        x, y = _chaikin(*self.xy, repeat=repeat, is_ring=self.shape.is_ring)
+        shape = LineString(coordinates=np.c_[x, y])
+        if shape.is_valid:
+            res = Boundary(shape, self.name, self.fid)
+        else:
+            res = self
+            print('Invalid shape produced during smoothing of boundary FID={}'.format(self.fid))
+        return res
+
+    def vw(self, **kwargs):
+        """Visvalingam-Whyatt simplification.
+
+        The Visvalingam-Whyatt algorithm eliminates points based on their
+        effective area. A points effective area is defined as the change
+        in total area of the polygon by adding or removing that point.
+
+        Keywords:
+          threshold: Allowed total boundary length change in percents. Default 1
+
+        """
+        threshold = kwargs.get('threshold', 1)
+        x, y = _visvalingam_whyatt(*self.xy, threshold=threshold, is_ring=self.shape.is_ring)
+        shape = LineString(np.c_[x, y])
+        return Boundary(shape, self.name, self.fid)
+
+    def regularize(self, **kwargs):
+        """Boundary vertices regularization.
+
+        Returns ``Boundary`` object defined by vertices regularly distributed
+        along original ``Boundary``.
+
+        Keywords:
+          N: Number of vertices. Default 128.
+          length: approx. length of segments. Default None
+
+        """
+        N = kwargs.get('N', 128)
+        if 'length' in kwargs:
+            N = self.length // kwargs['length'] + 1
+            N = max(N, 2)
+        rc = np.asarray([self.shape.interpolate(d, normalized=True).xy
+                         for d in np.linspace(0, 1, N)])[:, :, 0]
+        return Boundary(LineString(rc), self.name, self.fid)
 
     ###################################################################
     # Boundary shape methods (should modify sa, la, sao, lao, xc, yc) #
@@ -1470,12 +1595,14 @@ class PolySet(object):
           >>> b = g.boundary_segments()
 
         """
-        from shapely.geometry import LineString
-
         shapes = []
         for g in self:
             for p0, p1 in zip(g.xy.T[:-1], g.xy.T[1:]):
                 shapes.append(Boundary(LineString([p0, p1]), g.name, len(shapes)))
+            if isinstance(g, Grain):
+                for hole in g.interiors:
+                    for p0, p1 in zip(hole.T[:-1], hole.T[1:]):
+                        shapes.append(Boundary(LineString([p0, p1]), g.name, len(shapes)))
         return Boundaries(shapes)
 
     def _autocolortable(self, cmap='jet'):
@@ -1624,8 +1751,17 @@ class PolySet(object):
         if kwargs.get('scaled', True):
             radii = np.sqrt(radii)
         ax.fill(theta, radii, **kwargs.get('fill_kwg', {}))
+        plt.show()
         return ax
 
+    def smooth(self, method='chaikin', **kwargs):
+        return type(self)([getattr(s, method)(**kwargs) for s in self])
+
+    def simplify(self, method='vw', **kwargs):
+        return type(self)([getattr(s, method)(**kwargs) for s in self])
+
+    def regularize(self, **kwargs):
+        return type(self)([s.regularize(**kwargs) for s in self])
 
 class Grains(PolySet):
     """Class to store set of ``Grains`` objects
@@ -1701,7 +1837,8 @@ class Grains(PolySet):
                 G.add_path(path, fid=fid, phase=g.name)
         # Create topology graph
         H = G.to_undirected(reciprocal=True)
-        for edge in H.edges_iter():
+        # for edge in H.edges_iter():
+        for edge in H.edges():
             e1 = G.get_edge_data(edge[0], edge[1])
             e2 = G.get_edge_data(edge[1], edge[0])
             bt = '%s-%s' % tuple(sorted([e1['phase'], e2['phase']]))
@@ -1709,7 +1846,8 @@ class Grains(PolySet):
             T.add_node(e2['fid'])
             T.add_edge(e1['fid'], e2['fid'], type=bt, bids=[])
         # Create boundaries
-        for edge in T.edges_iter():
+        # for edge in T.edges_iter():
+        for edge in T.edges():
             shared = self[edge[0]].intersection(self[edge[1]])
             bt = T[edge[0]][edge[1]]['type']
             bid = len(shapes)
@@ -1812,12 +1950,6 @@ class Grains(PolySet):
         ax.get_yaxis().set_tick_params(which='both', direction='out')
         ax.get_xaxis().set_tick_params(which='both', direction='out')
         return ax
-
-    def simplify(self, method='vw', **kwargs):
-        return Grains([getattr(s, method)(**kwargs) for s in self])
-
-    def smooth(self, method='chaikin', **kwargs):
-        return Grains([getattr(s, method)(**kwargs) for s in self])
 
 
 class Boundaries(PolySet):

@@ -80,3 +80,5 @@ Changes
 * Grain shape_vector property returns normalized Fourier descriptors
 * Grain regularize method returns Grain with regularly distributed vertices
 * Classification could be based on properties or any other values
+* boundary_segments method added
+* Smoothing, simplification and regularization of boundaries implemented
