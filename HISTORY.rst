@@ -72,7 +72,7 @@ Changes
 ~~~~~~~~~~~~~~~~~~~
 * bugfix
 
-0.4.9 (XX YYY 2017)
+0.4.9 (12 Dec 2017)
 ~~~~~~~~~~~~~~~~~~~
 * getindex method of Grains and Boundaries implemented
 * Grain cdist property return centroid-vertex distance function
