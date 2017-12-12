@@ -48,9 +48,6 @@ test:
     - polylx.utils
     - polylx.shell
 
-build:
-  script: python setup.py install
-
 about:
   home: https://github.com/ondrolexa/polylx.git
   license: BSD License
@@ -59,3 +56,6 @@ about:
   doc_url: https://polylx.readthedocs.io
   dev_url: https://github.com/ondrolexa/polylx.git
 
+extra:
+  maintainers:
+   - Ondrej Lexa <lexa.ondrej@gmail.com>
