@@ -15,7 +15,6 @@ import itertools
 
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.cm as cm
 from matplotlib.patches import PathPatch
 from matplotlib.path import Path
 import matplotlib.cbook as mcb
@@ -1105,10 +1104,13 @@ class PolySet(object):
         if isinstance(index, slice):
             index = np.arange(len(self))[index]
         if isinstance(index, np.ndarray):
-            if index.dtype == 'bool':
-                index = np.flatnonzero(index)
-            return type(self)([self.polys[ix] for ix in index],
-                              self.classes[index])
+            if index.size > 0:
+                if index.dtype == 'bool':
+                    index = np.flatnonzero(index)
+                return type(self)([self.polys[ix] for ix in index],
+                                  self.classes[index])
+            else:
+                print('No result...')
         else:
             return self.polys[index]
 
@@ -1465,12 +1467,13 @@ class PolySet(object):
         """
         return np.array([p.paror(angles, normalized) for p in self])
 
-    def classify(self, vals, rule='natural', k=5, label='User values'):
+    def classify(self, vals, **kwargs):
         """Define classification of objects.
 
         Args:
           vals: name of attribute (str) used for classification
                 or array of values
+        Keywords:
           label: used as classification label when vals is array
           k: number of classes for continuous values
           rule: type of classification
@@ -1480,15 +1483,20 @@ class PolySet(object):
             'natural': natural breaks. Default rule.
                        (beware not always unique solution)
             'jenks': fischer jenks scheme
+          cmap: matplotlib colormap. Default 'viridis'
 
         Examples:
           >>> g.classify('name', 'unique')
 
         """
         if isinstance(vals, str):
-            self.classes = Classify(getattr(self, vals), rule=rule, k=k, label=vals)
+            if 'label' not in kwargs:
+                kwargs['label'] = vals
+            self.classes = Classify(getattr(self, vals), **kwargs)
         else:
-            self.classes = Classify(vals, rule=rule, k=k, label=label)
+            if 'label' not in kwargs:
+                kwargs['label'] = 'User values'
+            self.classes = Classify(vals, **kwargs)
 
     def df(self, *attrs):
         """Returns ``pandas.DataFrame`` of object attributes.
@@ -1605,53 +1613,44 @@ class PolySet(object):
                         shapes.append(Boundary(LineString([p0, p1]), g.name, len(shapes)))
         return Boundaries(shapes)
 
-    def _autocolortable(self, cmap='jet'):
-        if isinstance(cmap, str):
-            cmap = cm.get_cmap(cmap)
-        n = len(self.classes.index)
-        if n > 1:
-            pos = np.round(np.linspace(0, cmap.N - 1, n))
-        else:
-            pos = [127]
-        return dict(zip(self.classes.index, [cmap(int(i)) for i in pos]))
-
-    def _makelegend(self, ax, pos='auto', ncol=3):
+    def _makelegend(self, ax, **kwargs):
+        pos = kwargs.get('pos', 'auto')
         if pos == 'auto':
             if self.width > self.height:
                 pos = 'top'
-                ncol = 3
+                ncol = kwargs.get('ncol', 3)
             else:
                 pos = 'right'
-                ncol = 1
+                ncol = kwargs.get('ncol', 1)
 
         if pos == 'top':
             h, lbls = ax.get_legend_handles_labels()
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes('top',
-                                      size=0.25 + 0.25 * np.ceil(len(h) / ncol))
-            cax.set_axis_off()
-            cax.legend(h, lbls, loc=9, borderaxespad=0.,
-                       ncol=ncol, bbox_to_anchor=[0.5, 1.1])
+            if h:
+                divider = make_axes_locatable(ax)
+                cax = divider.append_axes('top',
+                                          size=0.25 + 0.25 * np.ceil(len(h) / ncol))
+                cax.set_axis_off()
+                cax.legend(h, lbls, loc=9, borderaxespad=0.,
+                           ncol=ncol, bbox_to_anchor=[0.5, 1.1])
             plt.tight_layout()
         elif pos == 'right':
             h, lbls = ax.get_legend_handles_labels()
-            divider = make_axes_locatable(ax)
-            cax = divider.append_axes("right", size=0.2 + 1.6 * ncol)
-            cax.set_axis_off()
-            cax.legend(h, lbls, loc=7, borderaxespad=0.,
-                       bbox_to_anchor=[1.04, 0.5])
+            if h:
+                divider = make_axes_locatable(ax)
+                cax = divider.append_axes("right", size=0.2 + 1.6 * ncol)
+                cax.set_axis_off()
+                cax.legend(h, lbls, loc=7, borderaxespad=0.,
+                           bbox_to_anchor=[1.04, 0.5])
             plt.tight_layout()
 
     def plot(self, **kwargs):
         """Plot set of ``Grains`` or ``Boundaries`` objects.
 
-        Args:
-          legend: dictionary with classes as keys and RGB tuples as values
-                  Default "auto" (created by _autocolortable method)
-          pos: legend position "top", "right" or "none". Defalt "auto"
+        Keywords:
           alpha: transparency. Default 0.8
-          cmap: colormap. Default "jet"
+          pos: legend position "top", "right" or "none". Defalt "auto"
           ncol: number of columns for legend.
+          legend: Show legend. Default True
           show_fid: Show FID of objects. Default False
           show_index: Show index of objects. Default False
 
@@ -1659,24 +1658,17 @@ class PolySet(object):
 
         """
         if 'ax' in kwargs:
-            ax = kwargs['ax']
+            ax = kwargs.pop('ax')
             ax.set_aspect('equal')
         else:
             fig = plt.figure()
             ax = fig.add_subplot(111, aspect='equal')
-        legend = kwargs.get('legend',
-                            self._autocolortable(kwargs.get('cmap', 'jet')))
-        self._plot(ax, legend, kwargs.get('alpha', 0.8))
-        if kwargs.get('show_index', False):
-            for idx, p in enumerate(self):
-                ax.text(p.xc, p.yc, str(idx),
-                        bbox=dict(facecolor='yellow', alpha=0.5))
-        if kwargs.get('show_fid', False):
-            for p in self:
-                ax.text(p.xc, p.yc, str(p.fid),
-                        bbox=dict(facecolor='yellow', alpha=0.5))
+        self._plot(ax, **kwargs)
+        ax.margins(0.025, 0.025)
+        ax.get_yaxis().set_tick_params(which='both', direction='out')
+        ax.get_xaxis().set_tick_params(which='both', direction='out')
         plt.setp(plt.yticks()[1], rotation=90)
-        self._makelegend(ax, kwargs.get('pos', 'auto'), kwargs.get('ncol', 1))
+        self._makelegend(ax, **kwargs)
         return ax
 
     def show(self, **kwargs):
@@ -1695,13 +1687,14 @@ class PolySet(object):
           See `plot` for other kwargs
 
         """
-        legend = kwargs.get('legend',
-                            self._autocolortable(kwargs.get('cmap', 'jet')))
         fig = plt.figure()
         ax = fig.add_subplot(111, aspect='equal')
-        self._plot(ax, legend, kwargs.get('alpha', 0.8))
+        self._plot(ax, **kwargs)
+        ax.margins(0.025, 0.025)
+        ax.get_yaxis().set_tick_params(which='both', direction='out')
+        ax.get_xaxis().set_tick_params(which='both', direction='out')
         plt.setp(plt.yticks()[1], rotation=90)
-        self._makelegend(ax, kwargs.get('pos', 'auto'), kwargs.get('ncol', 1))
+        self._makelegend(ax, **kwargs)
         plt.savefig(kwargs.get('filename', 'figure.png'),
                     dpi=kwargs.get('dpi', 150))
         plt.close()
@@ -1927,7 +1920,10 @@ class Grains(PolySet):
         else:
             raise Exception('Shapefile must contains polygons!')
 
-    def _plot(self, ax, legend, alpha, ec='#222222'):
+    def _plot(self, ax, **kwargs):
+        alpha = kwargs.get('alpha', 0.8)
+        ec = kwargs.get('ec', '#222222')
+        legend = kwargs.get('legend', True)
         groups = self.groups('shape')
         keys = groups.groups.keys()
         for key in self.classes.index:
@@ -1936,19 +1932,30 @@ class Grains(PolySet):
                 group = groups.get_group(key)
                 for g in group['shape']:
                     paths.append(PolygonPath(g))
-                patch = PathPatch(Path.make_compound_path(*paths),
-                                  fc=legend[key],
-                                  ec=ec, alpha=alpha, zorder=2,
-                                  label='{} ({})'.format(key, len(group)))
+                if legend:
+                    patch = PathPatch(Path.make_compound_path(*paths),
+                                      fc=self.classes.ctable[key],
+                                      ec=ec, alpha=alpha, zorder=2,
+                                      label='{} ({})'.format(key, len(group)))
+                else:
+                    patch = PathPatch(Path.make_compound_path(*paths),
+                                      fc=self.classes.ctable[key],
+                                      ec=ec, alpha=alpha, zorder=2)
             else:
-                patch = PathPatch(Path([[None, None]]),
-                                  fc=legend[key],
-                                  ec=ec, alpha=alpha, zorder=2,
-                                  label='{} ({})'.format(key, 0))
+                if legend:
+                    patch = PathPatch(Path([[None, None]]),
+                                      fc=self.classes.ctable[key],
+                                      ec=ec, alpha=alpha, zorder=2,
+                                      label='{} ({})'.format(key, 0))
             ax.add_patch(patch)
-        ax.margins(0.025, 0.025)
-        ax.get_yaxis().set_tick_params(which='both', direction='out')
-        ax.get_xaxis().set_tick_params(which='both', direction='out')
+        if kwargs.get('show_index', False):
+            for idx, p in enumerate(self):
+                ax.text(p.xc, p.yc, str(idx),
+                        bbox=dict(facecolor='yellow', alpha=0.5))
+        if kwargs.get('show_fid', False):
+            for p in self:
+                ax.text(p.xc, p.yc, str(p.fid),
+                        bbox=dict(facecolor='yellow', alpha=0.5))
         return ax
 
 
@@ -1970,7 +1977,9 @@ class Boundaries(PolySet):
     def __add__(self, other):
         return Boundaries(self.polys + other.polys)
 
-    def _plot(self, ax, legend, alpha):
+    def _plot(self, ax, **kwargs):
+        alpha = kwargs.get('alpha', 0.8)
+        legend = kwargs.get('legend', True)
         groups = self.groups('shape')
         for key in self.classes.index:
             group = groups.get_group(key)
@@ -1982,11 +1991,19 @@ class Boundaries(PolySet):
                 x.append(np.nan)
                 y.extend(yb)
                 y.append(np.nan)
-            ax.plot(x, y, color=legend[key], alpha=alpha,
-                    label='{} ({})'.format(key, len(group)))
-        ax.margins(0.025, 0.025)
-        ax.get_yaxis().set_tick_params(which='both', direction='out')
-        ax.get_xaxis().set_tick_params(which='both', direction='out')
+            if legend:
+                ax.plot(x, y, color=self.classes.ctable[key], alpha=alpha,
+                        label='{} ({})'.format(key, len(group)))
+            else:
+                ax.plot(x, y, color=self.classes.ctable[key], alpha=alpha)
+        if kwargs.get('show_index', False):
+            for idx, p in enumerate(self):
+                ax.text(p.xc, p.yc, str(idx),
+                        bbox=dict(facecolor='white', alpha=0.5))
+        if kwargs.get('show_fid', False):
+            for p in self:
+                ax.text(p.xc, p.yc, str(p.fid),
+                        bbox=dict(facecolor='white', alpha=0.5))
         return ax
 
 
@@ -2108,12 +2125,8 @@ class Sample(object):
         """Plot overlay of ``Grains`` and ``Boundaries`` of ``Sample`` object.
 
         Args:
-          legend: dictionary with classes as keys and RGB tuples as values
-                  Default Auto (created by _autocolortable method)
-          pos: legend position "top" or "right". Defalt Auto
           alpha: Grains transparency. Default 0.8
-          gcmap: Grains colormap. Default "jet"
-          bcmap: Boundary colormap. Default "jet"
+          pos: legend position "top" or "right". Defalt Auto
           ncol: number of columns for legend.
           show_fid: Show FID of objects. Default False
           show_index: Show index of objects. Default False
@@ -2127,32 +2140,14 @@ class Sample(object):
         else:
             fig = plt.figure()
             ax = fig.add_subplot(111, aspect='equal')
-        legend = kwargs.get('legend',
-                            dict(list(self.g._autocolortable(kwargs.get('gcmap', 'jet')).items()) +
-                                 list(self.b._autocolortable(kwargs.get('bcmap', 'jet')).items())))
-        alpha = kwargs.get('alpha', 0.8)
         show_fid = kwargs.get('show_fid', False)
         show_index = kwargs.get('show_index', False)
-        self.g._plot(ax, legend, alpha, ec='none')
-        if show_index:
-            for idx, p in enumerate(self.g):
-                ax.text(p.xc, p.yc, str(idx),
-                        bbox=dict(facecolor='yellow', alpha=0.5))
-        if show_fid:
-            for p in self.g:
-                ax.text(p.xc, p.yc, str(p.fid),
-                        bbox=dict(facecolor='yellow', alpha=0.5))
-        self.b._plot(ax, legend, 1)
-        if show_index:
-            for idx, p in enumerate(self.b):
-                ax.text(p.xc, p.yc, str(idx),
-                        bbox=dict(facecolor='white', alpha=0.5))
-        if show_fid:
-            for p in self.b:
-                ax.text(p.xc, p.yc, str(p.fid),
-                        bbox=dict(facecolor='white', alpha=0.5))
+        self.g._plot(ax, **kwargs)
+        # non transparent bounbdaries
+        kwargs['alpha'] = 1
+        self.b._plot(ax, **kwargs)
         plt.setp(plt.yticks()[1], rotation=90)
-        self.g._makelegend(ax, kwargs.get('pos', 'auto'), kwargs.get('ncol', 1))
+        self.g._makelegend(ax, **kwargs)
         ax.set_ylabel(self.name)
         return ax
 

@@ -15,6 +15,7 @@ g.groups('lao').agg(circular.csd)
 from __future__ import division
 from copy import deepcopy
 import numpy as np
+import matplotlib.cm as cm
 
 
 def fixzero(x):
@@ -155,7 +156,14 @@ class deg(object):
 
 
 class Classify(object):
-    def __init__(self, vals, rule='natural', k=5, label='Default'):
+    """Class to store classification and colortable for legend
+
+    """
+    def __init__(self, vals, **kwargs):
+        rule = kwargs.get('rule', 'natural')
+        k = kwargs.get('k', 5)
+        label = kwargs.get('label', 'Default')
+        cmap = kwargs.get('cmap', 'viridis')
         self.rule = rule
         self.vals = vals
         self.label = label
@@ -165,23 +173,29 @@ class Classify(object):
             # if upper limit is maximum value, digitize it to last bin
             edge = len(bins) - 1
             index[np.flatnonzero(index == edge)] = edge - 1
-            self.index = ['%g-%g' % (bins[i], bins[i + 1]) for i in range(len(counts))]
+            prec = int(max(-np.floor(np.log10(np.diff(bins).min())) + 1, 0))
+            self.index = ['{:.{prec}f}-{:.{prec}f}'.format(bins[i], bins[i + 1], prec=prec) for i in range(len(counts))]
             self.names = np.array([self.index[i] for i in index])
         elif rule == 'natural':
             index, bins = natural_breaks(vals, k=k)
             counts = np.bincount(index)
-            self.index = ['%g-%g' % (bins[i], bins[i + 1]) for i in range(len(counts))]
+            prec = int(max(-np.floor(np.log10(np.diff(bins).min())) + 1, 0))
+            self.index = ['{:.{prec}f}-{:.{prec}f}'.format(bins[i], bins[i + 1], prec=prec) for i in range(len(counts))]
             self.names = np.array([self.index[i] for i in index])
         elif rule == 'jenks':
             bins = fisher_jenks(vals, k=k)
             index = np.digitize(vals, bins) - 1
             index[np.flatnonzero(index == k)] = k - 1
             counts = np.bincount(index)
-            self.index = ['%g-%g' % (bins[i], bins[i + 1]) for i in range(len(counts))]
+            prec = int(max(-np.floor(np.log10(np.diff(bins).min())) + 1, 0))
+            self.index = ['{:.{prec}f}-{:.{prec}f}'.format(bins[i], bins[i + 1], prec=prec) for i in range(len(counts))]
             self.names = np.array([self.index[i] for i in index])
         else:  # unique
             self.index = list(np.unique(vals))
             self.names = np.asarray(vals)
+            # other cmap for unique
+            cmap = kwargs.get('cmap', 'rainbow')
+        self.create_colortable(cmap=cmap)
 
     def __call__(self, num):
         return np.flatnonzero(self.names == self.index[num])
@@ -201,6 +215,16 @@ class Classify(object):
     def labels(self):
         index, inverse = np.unique(self.names, return_inverse=True)
         return ['%s (%d)' % p for p in zip(index, np.bincount(inverse))]
+
+    def create_colortable(self, cmap='viridis'):
+        if isinstance(cmap, str):
+            cmap = cm.get_cmap(cmap)
+        n = len(self.index)
+        if n > 1:
+            pos = np.round(np.linspace(0, cmap.N - 1, n))
+        else:
+            pos = [127]
+        self.ctable = dict(zip(self.index, [cmap(int(i)) for i in pos]))
 
 
 def PolygonPath(polygon):
