@@ -9,7 +9,7 @@ source:
   git_rev: {{ data.get('version') }}
 
 build:
-  # noarch_python: True
+  noarch_python: True
   # preserve_egg_dir: True
   entry_points:
     - ipolylx=polylx.shell:main
@@ -20,7 +20,7 @@ build:
 
 requirements:
   build:
-    - python # [py3k]
+    - python
     - setuptools
     - numpy
     - matplotlib
@@ -28,15 +28,17 @@ requirements:
     - pandas
     - networkx
     - scipy
+    - pyshp
 
   run:
-    - python # [py3k]
+    - python
     - numpy
     - matplotlib
     - shapely
     - pandas
     - networkx
     - scipy
+    - pyshp
 
 test:
   # Python imports

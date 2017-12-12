@@ -84,4 +84,5 @@ Changes
 * Smoothing, simplification and regularization of boundaries implemented
 * Colortable for legend is persistant trough indexing. Classify method
   could be used to change it
-* Default color table is rainbow for unique and viridis for continuous classes.
+* Default color table is rainbow for unique and viridis for continuous classes
+

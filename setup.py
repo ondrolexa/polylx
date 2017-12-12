@@ -15,7 +15,8 @@ requirements = [
     'pandas',
     'networkx',
     'scipy',
-    'shapely'
+    'shapely',
+    'pyshp'
 ]
 
 test_requirements = [

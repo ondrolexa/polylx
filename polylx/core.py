@@ -25,8 +25,8 @@ from shapely import affinity
 import networkx as nx
 import pandas as pd
 import warnings
+from shapefile import Reader
 
-from .shapefile import Reader
 from .utils import fixratio, fixzero, deg, Classify, PolygonPath
 from .utils import find_ellipse, densify, inertia_moments
 from .utils import _chaikin, _visvalingam_whyatt
@@ -822,8 +822,10 @@ class Grain(PolyShape):
         tol = self.ead / 100
         # Khachiyan Algorithm
         while err > tol:
-            X = Q @ np.diag(u) @ Q.T
-            M = np.diag(Q.T @ np.linalg.inv(X) @ Q)
+            # X = Q @ np.diag(u) @ Q.T
+            X = Q.dot(np.diag(u)).dot(Q.T)
+            # M = np.diag(Q.T @ np.linalg.inv(X) @ Q)
+            M = np.diag(Q.T.dot(np.linalg.inv(X)).dot(Q))
             maximum, j = M.max(), M.argmax()
             step_size = (maximum - d - 1) / ((d + 1) * (maximum - 1))
             new_u = (1 - step_size) * u
@@ -832,14 +834,15 @@ class Grain(PolyShape):
             err = np.linalg.norm(new_u - u)
             u = new_u
         U = np.diag(u)
-        A = np.linalg.inv(P @ U @ P.T - np.outer(P @ u, P @ u)) / d
+        # A = np.linalg.inv(P @ U @ P.T - np.outer(P @ u, P @ u)) / d
+        A = np.linalg.inv(P.dot(U).dot(P.T) - np.outer(P.dot(u), P.dot(u))) / d
         evals, evecs = np.linalg.eig(A)
         idx = evals.argsort()
         evals = evals[idx]
         evecs = evecs[:, idx]
         self.la, self.sa = 2 / np.sqrt(evals)
         self.lao, self.sao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
-        self.xc, self.yc = P @ u
+        self.xc, self.yc = P.dot(u)
         self._shape_method = 'maee'
 
 
@@ -1888,6 +1891,10 @@ class Grains(PolySet):
                 else:
                     raise Exception("There is no field '%s'. Available fields are: %s" % (phasefield, fieldnames))
             shapeRecs = sf.shapeRecords()
+            # until pyshp 2 will be released
+            sf.shp.close()
+            sf.shx.close()
+            sf.dbf.close()
             shapes = []
             for pos, rec in enumerate(shapeRecs):
                 # A valid polygon must have at least 4 coordinate tuples
@@ -1918,6 +1925,10 @@ class Grains(PolySet):
                     print('Invalid geometry (FID={}) skipped.'.format(pos))
             return cls(shapes)
         else:
+            # until pyshp 2 will be released
+            sf.shp.close()
+            sf.shx.close()
+            sf.dbf.close()
             raise Exception('Shapefile must contains polygons!')
 
     def _plot(self, ax, **kwargs):
