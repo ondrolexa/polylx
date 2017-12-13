@@ -12,6 +12,10 @@ before_install:
     # (not the scripts environment)
     - source ci/install-miniconda.sh
     - conda update -q conda
+    # The next couple lines fix a crash with multiprocessing on Travis and
+    # are not specific to using Miniconda
+    - sudo rm -rf /dev/shm
+    - sudo ln -s /run/shm /dev/shm
     # Install dependencies
     - conda install python=$TRAVIS_PYTHON_VERSION pip
     - conda install conda-build
