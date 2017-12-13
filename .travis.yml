@@ -28,6 +28,7 @@ install:
 
 script:
   - conda install polylx --use-local
+  - python -m unittest discover -v tests
 
 after_success:
   - chmod +x ci/deploy_anaconda.sh

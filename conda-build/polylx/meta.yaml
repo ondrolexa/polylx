@@ -48,9 +48,6 @@ test:
     - polylx.reports
     - polylx.utils
     - polylx.shell
-  # test suite
-  commands:
-    - python -m unittest discover -v tests
 
 about:
   home: https://github.com/ondrolexa/polylx.git
