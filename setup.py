@@ -32,7 +32,8 @@ setup(
     author_email='lexa.ondrej@gmail.com',
     url='https://github.com/ondrolexa/polylx',
     packages=find_packages(),
-    package_data={'polylx.example': ['*.*']},
+    package_data={'polylx': ['example/*.*']},
+    include_package_data=True,
     install_requires=requirements,
     entry_points="""
     [console_scripts]
