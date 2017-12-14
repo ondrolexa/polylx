@@ -86,3 +86,6 @@ Changes
   could be used to change it
 * Default color table is rainbow for unique and viridis for continuous classes
 
+0.5 (XX YYY 2017)
+-----------------
+ * rose method groupped according to classification

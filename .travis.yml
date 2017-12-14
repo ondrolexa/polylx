@@ -12,10 +12,6 @@ before_install:
     # (not the scripts environment)
     - source ci/install-miniconda.sh
     - conda update -q conda
-    # The next couple lines fix a crash with multiprocessing on Travis and
-    # are not specific to using Miniconda
-    - sudo rm -rf /dev/shm
-    - sudo ln -s /run/shm /dev/shm
     # Install dependencies
     - conda install python=$TRAVIS_PYTHON_VERSION pip
     - conda install conda-build
@@ -29,10 +25,10 @@ install:
   - conda create -n polylx $deps python=$TRAVIS_PYTHON_VERSION
   - source activate polylx
   - conda build --python $TRAVIS_PYTHON_VERSION conda-build/polylx
+  - conda install polylx --use-local
 
 script:
-  - conda install polylx --use-local
-  - python -m unittest discover -v tests
+  - python -m unittest discover -v
 
 after_success:
   - chmod +x ci/deploy_anaconda.sh

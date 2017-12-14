@@ -1470,8 +1470,11 @@ class PolySet(object):
         """
         return np.array([p.paror(angles, normalized) for p in self])
 
-    def classify(self, vals, **kwargs):
+    def classify(self, *args, **kwargs):
         """Define classification of objects.
+
+        When no aruments are provided, default unique classification
+        based on name attribute is used.
 
         Args:
           vals: name of attribute (str) used for classification
@@ -1489,17 +1492,28 @@ class PolySet(object):
           cmap: matplotlib colormap. Default 'viridis'
 
         Examples:
-          >>> g.classify('name', 'unique')
+          >>> g.classify('name', rule='unique')
+          >>> g.classify('ar', rule='jenks', k=5)
 
         """
-        if isinstance(vals, str):
-            if 'label' not in kwargs:
-                kwargs['label'] = vals
-            self.classes = Classify(getattr(self, vals), **kwargs)
+        assert len(args)<2, ('More than one argument passed...')
+        if len(args) == 0:
+            self.classify('name', rule='unique')
         else:
-            if 'label' not in kwargs:
-                kwargs['label'] = 'User values'
-            self.classes = Classify(vals, **kwargs)
+            vals = args[0]
+            if isinstance(vals, str):
+                if 'label' not in kwargs:
+                    kwargs['label'] = vals
+                self.classes = Classify(getattr(self, vals), **kwargs)
+            else:
+                if 'label' not in kwargs:
+                    kwargs['label'] = 'User values'
+                self.classes = Classify(vals, **kwargs)
+
+    def get_class(self, key):
+        assert key in self.classes.index, ("Nonexisting class...")
+        ix = self.classes.index.index(key)
+        return self[self.classes(ix)]
 
     def df(self, *attrs):
         """Returns ``pandas.DataFrame`` of object attributes.
@@ -1618,10 +1632,10 @@ class PolySet(object):
 
     def _makelegend(self, ax, **kwargs):
         pos = kwargs.get('pos', 'auto')
+        ncol = kwargs.get('ncol', 3)
         if pos == 'auto':
             if self.width > self.height:
                 pos = 'top'
-                ncol = kwargs.get('ncol', 3)
             else:
                 pos = 'right'
                 ncol = kwargs.get('ncol', 1)
@@ -1703,52 +1717,62 @@ class PolySet(object):
         plt.close()
 
     def rose(self, **kwargs):
-        ang = kwargs.get('angles', self.lao)
+        """Plot polar histogram of ``Grains`` or ``Boundaries`` orientations
+
+        Keywords:
+
+          attr: property used for orientation. Default 'lao'
+          density: If true plot probability density instead count. Default False
+          See `plot` for other kwargs
+
+            """
         if 'ax' in kwargs:
             ax = kwargs.get('ax')
         else:
             fig = plt.figure()
             ax = fig.add_subplot(111, polar=True)
+        attr = kwargs.get('attr', 'lao')
+        bins = kwargs.get('bins', 36)
+        weights = kwargs.get('weights', [])
+        width = 360 / bins
+        bin_edges = np.linspace(-width / 2, 360 + width / 2, bins + 2)
+        bin_centres = (bin_edges[:-1] + np.diff(bin_edges)/2)[:-1]
+        bt = np.zeros(bins)
+        for ix, key in enumerate(self.classes.index):
+            gix = self.classes(ix)
+            ang = getattr(self[gix], attr)
+            if 'weights' in kwargs:
+                n, bin_edges = np.histogram(np.concatenate((ang, ang + 180)), bin_edges,
+                                            weights=np.concatenate((weights[gix], weights[gix])),
+                                            density=kwargs.get('density', False))
+            else:
+                n, bin_edges = np.histogram(np.concatenate((ang, ang + 180)), bin_edges,
+                                            density=kwargs.get('density', False))
+            # wrap
+            n[0] += n[-1]
+            n = n[:-1]
+            if kwargs.get('scaled', True):
+                n = np.sqrt(n)
+            ax.bar(np.deg2rad(bin_centres), n, 
+                   width=np.deg2rad(width), bottom=bt,
+                   color=self.classes.ctable[key],
+                   label='{} ({})'.format(key, len(gix)))
+            bt += n
+
         ax.set_theta_zero_location('N')
         ax.set_theta_direction(-1)
-        if kwargs.get('pdf', False):
-            from scipy.stats import vonmises
-            theta = np.linspace(-np.pi, np.pi, 1801)
-            radii = np.zeros_like(theta)
-            kappa = kwargs.get('kappa', 250)
-            for a in ang:
-                radii += vonmises.pdf(theta, kappa, loc=np.radians(a))
-                radii += vonmises.pdf(theta, kappa, loc=np.radians(a + 180))
-            radii /= len(ang)
-        else:
-            bins = kwargs.get('bins', 36)
-            width = 360 / bins
-            if 'weights' in kwargs:
-                num, bin_edges = np.histogram(np.concatenate((ang, ang + 180)),
-                                              bins=bins + 1,
-                                              range=(-width / 2, 360 + width / 2),
-                                              weights=np.concatenate((kwargs.get('weights'), kwargs.get('weights'))),
-                                              density=kwargs.get('density', False))
-            else:
-                num, bin_edges = np.histogram(np.concatenate((ang, ang + 180)),
-                                              bins=bins + 1,
-                                              range=(-width / 2, 360 + width / 2),
-                                              density=kwargs.get('density', False))
-            num[0] += num[-1]
-            num = num[:-1]
-            theta, radii = [], []
-            arrow = kwargs.get('arrow', 0.95)
-            rwidth = kwargs.get('rwidth', 1)
-            for cc, val in zip(np.arange(0, 360, width), num):
-                theta.extend([cc - width / 2, cc - rwidth * width / 2, cc,
-                              cc + rwidth * width / 2, cc + width / 2, ])
-                radii.extend([0, val * arrow, val, val * arrow, 0])
-            theta = np.deg2rad(theta)
-        if kwargs.get('scaled', True):
-            radii = np.sqrt(radii)
-        ax.fill(theta, radii, **kwargs.get('fill_kwg', {}))
-        plt.show()
-        return ax
+        ax.set_thetagrids(np.arange(0, 360, 10), labels=np.arange(0, 360, 10))
+        # rg = np.arange(0, bt.max() + 1, np.ceil(bt.max()/5))
+        # ax.set_rgrids(rg, angle=0)
+        ax.set_rlabel_position(0)
+        if kwargs.get('legend', True):
+            nr = np.ceil(len(self.classes.index) / 3)
+            fig.subplots_adjust(top=0.9 - 0.05*nr)
+            ax.legend(loc=9, borderaxespad=0., ncol=3, bbox_to_anchor=[0.5, 1.1 + 0.08*nr])
+        #plt.tight_layout()
+        if not 'ax' in kwargs:
+            plt.show()
+
 
     def smooth(self, method='chaikin', **kwargs):
         return type(self)([getattr(s, method)(**kwargs) for s in self])
