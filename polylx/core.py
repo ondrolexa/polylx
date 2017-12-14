@@ -6,7 +6,7 @@ Python module to visualize and analyze digitized 2D microstructures.
 
 Examples:
   >>> from polylx import *
-  >>> g = Grains.from_shp('')
+  >>> g = Grains.from_shp()
   >>> b = g.boundaries()
 
 """
@@ -24,6 +24,7 @@ from shapely.geometry.polygon import orient
 from shapely import affinity
 import networkx as nx
 import pandas as pd
+import seaborn as sns
 import warnings
 from shapefile import Reader
 
@@ -1536,7 +1537,8 @@ class PolySet(object):
         idx = pd.Index(self.fid, name='fid')
         if 'class' in attrs:
             attrs.remove('class')
-            d = pd.DataFrame({self.classes.label + '_class': self.classes.names}, index=idx)
+            # d = pd.DataFrame({self.classes.label + '_class': self.classes.names}, index=idx)
+            d = pd.DataFrame({'class': self.classes.names}, index=idx)
         else:
             d = pd.DataFrame(index=idx)
         for attr in attrs:
@@ -1562,7 +1564,7 @@ class PolySet(object):
         Example:
           >>> g.agg('area', np.sum, 'ead', np.mean, 'lao', circular.mean)
                           area       ead        lao
-          name_class
+          class
           ksp         2.443733  0.089710  76.875488
           pl          1.083516  0.060629  94.197847
           qtz         1.166097  0.068071  74.320337
@@ -1583,7 +1585,7 @@ class PolySet(object):
           >>> g.classify('ar', 'natural')
           >>> g.groups('ead').mean()
                                 ead
-          ar_class
+          class
           1.01765-1.31807  0.067772
           1.31807-1.5445   0.076042
           1.5445-1.83304   0.065900
@@ -1592,7 +1594,7 @@ class PolySet(object):
 
         """
         df = self.df('class', *attrs)
-        return df.groupby(df.columns[0])
+        return df.groupby('class')
 
     def nndist(self, **kwargs):
         from scipy.spatial import Delaunay
@@ -1672,6 +1674,7 @@ class PolySet(object):
         """Plot set of ``Grains`` or ``Boundaries`` objects.
 
         Keywords:
+          show: If True matplotlib show is called. Default True
           alpha: transparency. Default 0.8
           pos: legend position "top", "right" or "none". Defalt "auto"
           ncol: number of columns for legend.
@@ -1679,7 +1682,7 @@ class PolySet(object):
           show_fid: Show FID of objects. Default False
           show_index: Show index of objects. Default False
 
-        Returns matplotlib axes object.
+        When show=False, returns matplotlib axes object.
 
         """
         if 'ax' in kwargs:
@@ -1694,14 +1697,10 @@ class PolySet(object):
         ax.get_xaxis().set_tick_params(which='both', direction='out')
         plt.setp(plt.yticks()[1], rotation=90)
         self._makelegend(ax, **kwargs)
-        return ax
-
-    def show(self, **kwargs):
-        """Show plot of ``Grains`` or ``Boundaries`` objects.
-
-        """
-        self.plot(**kwargs)
-        plt.show()
+        if kwargs.get('show', True):
+            plt.show()
+        else:
+            return ax
 
     def savefig(self, **kwargs):
         """Save grains or boudaries plot to file.
@@ -1712,14 +1711,17 @@ class PolySet(object):
           See `plot` for other kwargs
 
         """
-        fig = plt.figure()
-        ax = fig.add_subplot(111, aspect='equal')
-        self._plot(ax, **kwargs)
-        ax.margins(0.025, 0.025)
-        ax.get_yaxis().set_tick_params(which='both', direction='out')
-        ax.get_xaxis().set_tick_params(which='both', direction='out')
-        plt.setp(plt.yticks()[1], rotation=90)
-        self._makelegend(ax, **kwargs)
+        if 'ax' in kwargs:
+            ax = kwargs.pop('ax')
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111, aspect='equal')
+        # self._plot(ax, **kwargs)
+        # ax.margins(0.025, 0.025)
+        # ax.get_yaxis().set_tick_params(which='both', direction='out')
+        # ax.get_xaxis().set_tick_params(which='both', direction='out')
+        # plt.setp(plt.yticks()[1], rotation=90)
+        # self._makelegend(ax, **kwargs)
+        self.plot(**kwargs)
         plt.savefig(kwargs.get('filename', 'figure.png'),
                     dpi=kwargs.get('dpi', 150))
         plt.close()
@@ -1728,12 +1730,14 @@ class PolySet(object):
         """Plot polar histogram of ``Grains`` or ``Boundaries`` orientations
 
         Keywords:
-
+          show: If True matplotlib show is called. Default True
           attr: property used for orientation. Default 'lao'
           bins: number of bins
           weights: if provided histogram is weighted
           density: True for probability density otherwise counts
           grid: True to show grid
+
+        When show=False, returns matplotlib axes object.
 
             """
         if 'ax' in kwargs:
@@ -1785,8 +1789,88 @@ class PolySet(object):
             ax.legend(loc=9, borderaxespad=0., ncol=3, bbox_to_anchor=[0.5, 1.1 + 0.08 * nr])
         # plt.tight_layout()
         ax.set_axisbelow(True)
-        if 'ax' not in kwargs:
+        if kwargs.get('show', True):
             plt.show()
+        else:
+            return ax
+
+    def _seaborn_plot(self, sns_plot_fun, val, **kwargs):
+        """Plot seaborn categorical plots.
+
+        Keywords:
+          show: If True matplotlib show is called. Default True
+          attr: property used for plotting.
+          hue: When True attr is used for hue and names for x.
+
+        When show=False, returns matplotlib axes object.
+
+        """
+        if 'ax' in kwargs:
+            ax = kwargs.pop('ax')
+        else:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        hue = kwargs.get('hue', False)
+        if hue:
+            sns_plot_fun(x='name', y=val,
+                         data=self.df('class', 'name', val),
+                         hue='class', hue_order=self.classes.index,
+                         order=self.names,
+                         palette=self.classes._colors_dict)
+        else:
+            sns_plot_fun(x='class', y=val,
+                         data=self.df('class', val),
+                         order=self.classes.index,
+                         palette=self.classes._colors_dict)
+        if kwargs.get('show', True):
+            plt.show()
+        else:
+            return ax
+
+    def barplot(self, val, **kwargs):
+        """Plot seaborn swarmplot.
+
+        """
+        self._seaborn_plot(sns.barplot, val, **kwargs)
+
+    def swarmplot(self, val, **kwargs):
+        """Plot seaborn swarmplot.
+
+        """
+        self._seaborn_plot(sns.swarmplot, val, **kwargs)
+
+    def boxplot(self, val, **kwargs):
+        """Plot seaborn boxplot.
+
+        """
+        self._seaborn_plot(sns.boxplot, val, **kwargs)
+
+    def countplot(self, **kwargs):
+        """Plot seaborn countplot.
+
+        """
+        if 'ax' in kwargs:
+            ax = kwargs.pop('ax')
+        else:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        hue = kwargs.get('hue', False)
+        if hue:
+            sns.countplot(x='name',
+                          data=self.df('class', 'name'),
+                          hue='class', hue_order=self.classes.index,
+                          order=self.names,
+                          palette=self.classes._colors_dict)
+        else:
+            sns.countplot(x='class',
+                          data=self.df('class'),
+                          order=self.classes.index,
+                          palette=self.classes._colors_dict)
+        if kwargs.get('show', True):
+            plt.show()
+        else:
+            return ax
+
 
     def smooth(self, method='chaikin', **kwargs):
         return type(self)([getattr(s, method)(**kwargs) for s in self])

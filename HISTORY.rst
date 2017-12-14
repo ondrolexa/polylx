@@ -92,3 +92,5 @@ Changes
  * rose plot groupped according to classification
  * get_class, class_iter methods added to Grains and Boundaries
  * seaborn added to requirements
+ * several seaborn categorical plots are added as methods
+   (swarmplot, boxplot, barplot, countplot)
