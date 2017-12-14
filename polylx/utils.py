@@ -16,6 +16,7 @@ from __future__ import division
 from copy import deepcopy
 import numpy as np
 import matplotlib.cm as cm
+import seaborn as sns
 
 
 def fixzero(x):
@@ -194,8 +195,8 @@ class Classify(object):
             self.index = list(np.unique(vals))
             self.names = np.asarray(vals)
             # other cmap for unique
-            cmap = kwargs.get('cmap', 'rainbow')
-        self.create_colortable(cmap=cmap)
+            cmap = kwargs.get('cmap', self.sns2cmap('muted'))
+        self.set_colortable(cmap)
 
     def __call__(self, num):
         return np.flatnonzero(self.names == self.index[num])
@@ -216,7 +217,13 @@ class Classify(object):
         index, inverse = np.unique(self.names, return_inverse=True)
         return ['%s (%d)' % p for p in zip(index, np.bincount(inverse))]
 
-    def create_colortable(self, cmap='viridis'):
+    def set_colortable(self, cmap):
+        """Create color table for actual classification.
+
+        Args:
+          cmap: matplotlib ListedColormap
+
+        """
         if isinstance(cmap, str):
             cmap = cm.get_cmap(cmap)
         n = len(self.index)
@@ -224,7 +231,22 @@ class Classify(object):
             pos = np.round(np.linspace(0, cmap.N - 1, n))
         else:
             pos = [127]
-        self.ctable = dict(zip(self.index, [cmap(int(i)) for i in pos]))
+        self._colors_dict = dict(zip(self.index, [cmap(int(i)) for i in pos]))
+
+    def sns2cmap(self, palette):
+        """Create matplotlib ListedColormap from seaborn pallete
+
+        Args:
+          palette: name of seaborn palette or list of colors
+
+        """
+        from matplotlib.colors import ListedColormap
+        if isinstance(palette, str):
+            palette = sns.color_palette(palette, len(self.index))
+        return ListedColormap(sns.color_palette(palette))
+
+    def color(self, key):
+        return self._colors_dict.get(key, (0, 0, 0))
 
 
 def PolygonPath(polygon):

@@ -21,7 +21,7 @@ before_install:
 
 # install packages
 install:
-  - deps='numpy matplotlib scipy shapely pandas networkx pyshp'
+  - deps='numpy matplotlib scipy shapely pandas seaborn networkx pyshp'
   - conda create -n polylx $deps python=$TRAVIS_PYTHON_VERSION
   - source activate polylx
   - conda build --python $TRAVIS_PYTHON_VERSION conda-build/polylx

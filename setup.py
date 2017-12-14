@@ -13,6 +13,7 @@ requirements = [
     'numpy',
     'matplotlib',
     'pandas',
+    'seaborn',
     'networkx',
     'scipy',
     'shapely',

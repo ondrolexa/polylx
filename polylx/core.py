@@ -1496,7 +1496,7 @@ class PolySet(object):
           >>> g.classify('ar', rule='jenks', k=5)
 
         """
-        assert len(args)<2, ('More than one argument passed...')
+        assert len(args) < 2, ('More than one argument passed...')
         if len(args) == 0:
             self.classify('name', rule='unique')
         else:
@@ -1511,9 +1511,17 @@ class PolySet(object):
                 self.classes = Classify(vals, **kwargs)
 
     def get_class(self, key):
-        assert key in self.classes.index, ("Nonexisting class...")
-        ix = self.classes.index.index(key)
+        assert key in self.class_names, ("Nonexisting class...")
+        ix = self.class_names.index(key)
         return self[self.classes(ix)]
+
+    def class_iter(self):
+        for key in self.class_names:
+            yield key, self.get_class(key)
+
+    @property
+    def class_names(self):
+        return self.classes.index
 
     def df(self, *attrs):
         """Returns ``pandas.DataFrame`` of object attributes.
@@ -1564,7 +1572,7 @@ class PolySet(object):
         for attr, aggfunc in zip(pairs[0::2], pairs[1::2]):
             df = self.groups(attr).agg(aggfunc)
             pieces.append(df)
-        return pd.concat(pieces, axis=1).reindex(self.classes.index)
+        return pd.concat(pieces, axis=1).reindex(self.class_names)
 
     def groups(self, *attrs):
         """Returns ``pandas.GroupBy`` of object attributes.
@@ -1722,8 +1730,10 @@ class PolySet(object):
         Keywords:
 
           attr: property used for orientation. Default 'lao'
-          density: If true plot probability density instead count. Default False
-          See `plot` for other kwargs
+          bins: number of bins
+          weights: if provided histogram is weighted
+          density: True for probability density otherwise counts
+          grid: True to show grid
 
             """
         if 'ax' in kwargs:
@@ -1734,11 +1744,13 @@ class PolySet(object):
         attr = kwargs.get('attr', 'lao')
         bins = kwargs.get('bins', 36)
         weights = kwargs.get('weights', [])
+        grid = kwargs.get('grid', True)
+        ec = kwargs.get('ec', '#222222')
         width = 360 / bins
         bin_edges = np.linspace(-width / 2, 360 + width / 2, bins + 2)
-        bin_centres = (bin_edges[:-1] + np.diff(bin_edges)/2)[:-1]
+        bin_centres = (bin_edges[:-1] + np.diff(bin_edges) / 2)[:-1]
         bt = np.zeros(bins)
-        for ix, key in enumerate(self.classes.index):
+        for ix, key in enumerate(self.class_names):
             gix = self.classes(ix)
             ang = getattr(self[gix], attr)
             if 'weights' in kwargs:
@@ -1753,26 +1765,28 @@ class PolySet(object):
             n = n[:-1]
             if kwargs.get('scaled', True):
                 n = np.sqrt(n)
-            ax.bar(np.deg2rad(bin_centres), n, 
+            ax.bar(np.deg2rad(bin_centres), n,
                    width=np.deg2rad(width), bottom=bt,
-                   color=self.classes.ctable[key],
-                   label='{} ({})'.format(key, len(gix)))
+                   color=self.classes.color(key),
+                   label='{} ({})'.format(key, len(gix)),
+                   edgecolor=ec)
             bt += n
 
         ax.set_theta_zero_location('N')
         ax.set_theta_direction(-1)
         ax.set_thetagrids(np.arange(0, 360, 10), labels=np.arange(0, 360, 10))
-        # rg = np.arange(0, bt.max() + 1, np.ceil(bt.max()/5))
-        # ax.set_rgrids(rg, angle=0)
         ax.set_rlabel_position(0)
+        ax.grid(grid)
+        if not grid:
+            ax.get_yaxis().set_ticks([])
         if kwargs.get('legend', True):
-            nr = np.ceil(len(self.classes.index) / 3)
-            fig.subplots_adjust(top=0.9 - 0.05*nr)
-            ax.legend(loc=9, borderaxespad=0., ncol=3, bbox_to_anchor=[0.5, 1.1 + 0.08*nr])
-        #plt.tight_layout()
-        if not 'ax' in kwargs:
+            nr = np.ceil(len(self.class_names) / 3)
+            fig.subplots_adjust(top=0.9 - 0.05 * nr)
+            ax.legend(loc=9, borderaxespad=0., ncol=3, bbox_to_anchor=[0.5, 1.1 + 0.08 * nr])
+        # plt.tight_layout()
+        ax.set_axisbelow(True)
+        if 'ax' not in kwargs:
             plt.show()
-
 
     def smooth(self, method='chaikin', **kwargs):
         return type(self)([getattr(s, method)(**kwargs) for s in self])
@@ -1782,6 +1796,7 @@ class PolySet(object):
 
     def regularize(self, **kwargs):
         return type(self)([s.regularize(**kwargs) for s in self])
+
 
 class Grains(PolySet):
     """Class to store set of ``Grains`` objects
@@ -1961,7 +1976,7 @@ class Grains(PolySet):
         legend = kwargs.get('legend', True)
         groups = self.groups('shape')
         keys = groups.groups.keys()
-        for key in self.classes.index:
+        for key in self.class_names:
             paths = []
             if key in keys:
                 group = groups.get_group(key)
@@ -1969,17 +1984,17 @@ class Grains(PolySet):
                     paths.append(PolygonPath(g))
                 if legend:
                     patch = PathPatch(Path.make_compound_path(*paths),
-                                      fc=self.classes.ctable[key],
+                                      fc=self.classes.color(key),
                                       ec=ec, alpha=alpha, zorder=2,
                                       label='{} ({})'.format(key, len(group)))
                 else:
                     patch = PathPatch(Path.make_compound_path(*paths),
-                                      fc=self.classes.ctable[key],
+                                      fc=self.classes.color(key),
                                       ec=ec, alpha=alpha, zorder=2)
             else:
                 if legend:
                     patch = PathPatch(Path([[None, None]]),
-                                      fc=self.classes.ctable[key],
+                                      fc=self.classes.color(key),
                                       ec=ec, alpha=alpha, zorder=2,
                                       label='{} ({})'.format(key, 0))
             ax.add_patch(patch)
@@ -2016,7 +2031,7 @@ class Boundaries(PolySet):
         alpha = kwargs.get('alpha', 0.8)
         legend = kwargs.get('legend', True)
         groups = self.groups('shape')
-        for key in self.classes.index:
+        for key in self.class_names:
             group = groups.get_group(key)
             x = []
             y = []
@@ -2027,10 +2042,10 @@ class Boundaries(PolySet):
                 y.extend(yb)
                 y.append(np.nan)
             if legend:
-                ax.plot(x, y, color=self.classes.ctable[key], alpha=alpha,
+                ax.plot(x, y, color=self.classes.color(key), alpha=alpha,
                         label='{} ({})'.format(key, len(group)))
             else:
-                ax.plot(x, y, color=self.classes.ctable[key], alpha=alpha)
+                ax.plot(x, y, color=self.classes.color(key), alpha=alpha)
         if kwargs.get('show_index', False):
             for idx, p in enumerate(self):
                 ax.text(p.xc, p.yc, str(idx),
@@ -2116,8 +2131,8 @@ class Sample(object):
         for n0 in [n for n in G.degree() if G.degree()[n] == 3]:
             tri = set()
             for n1 in G.neighbors(n0):
-                tri.update(bb[G[n0][n1]['bid']])
-            res.append(tri)
+                tri.update({G[n0][n1]['bid']})
+            res.append(list(tri))
         return res
 
     def bids(self, idx, name=None):
@@ -2175,8 +2190,6 @@ class Sample(object):
         else:
             fig = plt.figure()
             ax = fig.add_subplot(111, aspect='equal')
-        show_fid = kwargs.get('show_fid', False)
-        show_index = kwargs.get('show_index', False)
         self.g._plot(ax, **kwargs)
         # non transparent bounbdaries
         kwargs['alpha'] = 1

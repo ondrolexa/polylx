@@ -1,25 +1,38 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from .core import PolySet
+
+##########################
+# Plots for polylx objects
+##########################
 
 
 def surfor_plot(ob, averaged=True):
-    if averaged:
-        res = [ob[name].surfor().mean(axis=0) for name in ob.names]
-    else:
-        res = [ob[name].surfor().sum(axis=0) for name in ob.names]
-    plt.plot(np.transpose(res))
-    plt.legend(ob.names)
+    assert isinstance(ob, PolySet), ('First argument must be Grains or Boundaries instance.')
+    for key, g in ob.class_iter():
+        if averaged:
+            res = g.surfor().mean(axis=0)
+        else:
+            res = g.surfor().sum(axis=0)
+        plt.plot(res, color=ob.classes.color(key), label=key)
+    plt.legend()
     plt.show()
 
 
 def paror_plot(ob, averaged=True):
-    if averaged:
-        res = [ob[name].paror().mean(axis=0) for name in ob.names]
-    else:
-        res = [ob[name].paror().sum(axis=0) for name in ob.names]
-    plt.plot(np.transpose(res))
-    plt.legend(ob.names)
+    assert isinstance(ob, PolySet), ('First argument must be Grains or Boundaries instance.')
+    for key, g in ob.class_iter():
+        if averaged:
+            res = g.paror().mean(axis=0)
+        else:
+            res = g.paror().sum(axis=0)
+        plt.plot(res, color=ob.classes.color(key), label=key)
+    plt.legend()
     plt.show()
+
+#############
+# Other plots
+#############
 
 
 def logdist_plot(d, **kwargs):
@@ -32,6 +45,7 @@ def logdist_plot(d, **kwargs):
     ax.set_title('Mode:{:g} Mean:{:g} Var:{:g}'.format(mode, *stats))
     plt.show()
 
+
 def normdist_plot(d, **kwargs):
     import seaborn as sns
     from scipy.stats import norm
@@ -40,6 +54,7 @@ def normdist_plot(d, **kwargs):
     stats = np.asarray(norm.stats(loc=loc, scale=scale, moments='mv'))
     ax.set_title('Mean:{:g} Var:{:g}'.format(*stats))
     plt.show()
+
 
 def rose_plot(ang, **kwargs):
     fig = plt.figure()

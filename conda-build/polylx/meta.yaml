@@ -26,6 +26,7 @@ requirements:
     - matplotlib
     - shapely
     - pandas
+    - seaborn
     - networkx
     - scipy
     - pyshp
@@ -36,6 +37,7 @@ requirements:
     - matplotlib
     - shapely
     - pandas
+    - seaborn
     - networkx
     - scipy
     - pyshp
