@@ -40,13 +40,13 @@ setup(
     [console_scripts]
     ipolylx=polylx.shell:main
     """,
-    license="BSD",
+    license="MIT",
     zip_safe=False,
     keywords='polylx',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Science/Research',
-        'License :: OSI Approved :: BSD License',
+        'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
