@@ -1940,27 +1940,27 @@ class Grains(PolySet):
             T = nx.Graph()
         G = nx.DiGraph()
         for fid, g in enumerate(self):
-            # get phase and add to list and legend
+            # get name and add to list and legend
             path = []
             for co in g.shape.exterior.coords:
                 if co not in lookup:
                     lookup[co] = len(lookup)
                 path.append(lookup[co])
-            G.add_path(path, fid=fid, phase=g.name)
+            G.add_path(path, fid=fid, name=g.name)
             for holes in g.shape.interiors:
                 path = []
                 for co in holes.coords:
                     if co not in lookup:
                         lookup[co] = len(lookup)
                     path.append(lookup[co])
-                G.add_path(path, fid=fid, phase=g.name)
+                G.add_path(path, fid=fid, name=g.name)
         # Create topology graph
         H = G.to_undirected(reciprocal=True)
         # for edge in H.edges_iter():
         for edge in H.edges():
             e1 = G.get_edge_data(edge[0], edge[1])
             e2 = G.get_edge_data(edge[1], edge[0])
-            bt = '%s-%s' % tuple(sorted([e1['phase'], e2['phase']]))
+            bt = '%s-%s' % tuple(sorted([e1['name'], e2['name']]))
             T.add_node(e1['fid'])
             T.add_node(e2['fid'])
             T.add_edge(e1['fid'], e2['fid'], type=bt, bids=[])
@@ -1995,24 +1995,24 @@ class Grains(PolySet):
 
     @classmethod
     def from_shp(cls, filename=os.path.join(respath, 'sg2.shp'),
-                 phasefield='phase', phase='None'):
+                 namefield='phase', name='None'):
         """Create Grains from ESRI shapefile.
 
         Args:
           filename: filename of shapefile. Default sg2.shp from examples
-          phasefield: name of attribute in shapefile that
+          namefield: name of attribute in shapefile that
             holds names of grains or None. Default "phase".
-          phase: value used for grain phase when phasefield is None
+          name: value used for grain name when namefield is None
 
         """
         sf = Reader(filename)
         if sf.shapeType == 5:
             fieldnames = [field[0].lower() for field in sf.fields[1:]]
-            if phasefield is not None:
-                if phasefield in fieldnames:
-                    phase_pos = fieldnames.index(phasefield)
+            if namefield is not None:
+                if namefield in fieldnames:
+                    name_pos = fieldnames.index(namefield)
                 else:
-                    raise Exception("There is no field '%s'. Available fields are: %s" % (phasefield, fieldnames))
+                    raise Exception("There is no field '%s'. Available fields are: %s" % (namefield, fieldnames))
             shapeRecs = sf.shapeRecords()
             # until pyshp 2 will be released
             sf.shp.close()
@@ -2028,10 +2028,10 @@ class Grains(PolySet):
                         geom = geom.buffer(0)
                     if geom.is_valid:
                         if not geom.is_empty:
-                            if phasefield is None:
-                                ph = phase
+                            if namefield is None:
+                                ph = name
                             else:
-                                ph = rec.record[phase_pos]
+                                ph = rec.record[name_pos]
                             if geom.geom_type == 'MultiPolygon':
                                 for g in geom:
                                     shapes.append(Grain(orient(g), ph, len(shapes)))
@@ -2111,6 +2111,64 @@ class Boundaries(PolySet):
     def __add__(self, other):
         return Boundaries(self.polys + other.polys)
 
+    @classmethod
+    def from_shp(cls, filename=None, namefield='phase', name='None'):
+        """Create Boundaries from ESRI shapefile.
+
+        Args:
+          filename: filename of shapefile.
+          namefield: name of attribute in shapefile that
+            holds names of boundairies or None. Default "phase".
+          name: value used for grain name when namefield is None
+
+        """
+        sf = Reader(filename)
+        if sf.shapeType == 3:
+            fieldnames = [field[0].lower() for field in sf.fields[1:]]
+            if namefield is not None:
+                if namefield in fieldnames:
+                    name_pos = fieldnames.index(namefield)
+                else:
+                    raise Exception("There is no field '%s'. Available fields are: %s" % (namefield, fieldnames))
+            shapeRecs = sf.shapeRecords()
+            # until pyshp 2 will be released
+            sf.shp.close()
+            sf.shx.close()
+            sf.dbf.close()
+            shapes = []
+            for pos, rec in enumerate(shapeRecs):
+                # A valid polyline must have at least 2 coordinate tuples
+                if len(rec.shape.points) > 1:
+                    geom = shape(rec.shape.__geo_interface__)
+                    if geom.is_valid:
+                        if not geom.is_empty:
+                            if namefield is None:
+                                ph = name
+                            else:
+                                ph = rec.record[name_pos]
+                            if geom.geom_type == 'MultiLineString':
+                                for g in geom:
+                                    shapes.append(Boundary(g, ph, len(shapes)))
+                                print('Multiline (FID={}) exploded.'.format(pos))
+                            elif geom.geom_type == 'LineString':
+                                shapes.append(Boundary(geom, ph, len(shapes)))
+                            else:
+                                raise Exception('Unexpected geometry type (FID={})!'.format(pos))
+                        else:
+                            print('Empty geometry (FID={}) skipped.'.format(pos))
+                    else:
+                        print('Invalid geometry (FID={}) skipped.'.format(pos))
+                else:
+                    print('Invalid geometry (FID={}) skipped.'.format(pos))
+            return cls(shapes)
+        else:
+            # until pyshp 2 will be released
+            sf.shp.close()
+            sf.shx.close()
+            sf.dbf.close()
+            raise Exception('Shapefile must contains polylines!')
+
+
     def _plot(self, ax, **kwargs):
         alpha = kwargs.get('alpha', 0.8)
         legend = kwargs.get('legend', True)
@@ -2162,8 +2220,8 @@ class Sample(object):
 
     @classmethod
     def from_shp(cls, filename=os.path.join(respath, 'sg2.shp'),
-                 phasefield='phase', name=''):
-        return cls.from_grains(Grains.from_shp(filename, phasefield), name=name)
+                 namefield='phase', name=''):
+        return cls.from_grains(Grains.from_shp(filename, namefield), name=name)
 
     @classmethod
     def from_grains(cls, grains, name=''):
