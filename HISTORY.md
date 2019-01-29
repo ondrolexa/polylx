@@ -1,6 +1,6 @@
 # Changes
 
-## Master version
+## 0.5 (29 Jan 2019)
 
  * rose plot groupped according to classification
  * get_class, class_iter methods added to Grains and Boundaries
