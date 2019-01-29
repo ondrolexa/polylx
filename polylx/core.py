@@ -6,7 +6,7 @@ Python module to visualize and analyze digitized 2D microstructures.
 
 Examples:
   >>> from polylx import *
-  >>> g = Grains.from_shp('')
+  >>> g = Grains.from_shp()
   >>> b = g.boundaries()
 
 """
@@ -24,6 +24,7 @@ from shapely.geometry.polygon import orient
 from shapely import affinity
 import networkx as nx
 import pandas as pd
+import seaborn as sns
 import warnings
 from shapefile import Reader
 
@@ -1470,8 +1471,11 @@ class PolySet(object):
         """
         return np.array([p.paror(angles, normalized) for p in self])
 
-    def classify(self, vals, **kwargs):
+    def classify(self, *args, **kwargs):
         """Define classification of objects.
+
+        When no aruments are provided, default unique classification
+        based on name attribute is used.
 
         Args:
           vals: name of attribute (str) used for classification
@@ -1489,17 +1493,36 @@ class PolySet(object):
           cmap: matplotlib colormap. Default 'viridis'
 
         Examples:
-          >>> g.classify('name', 'unique')
+          >>> g.classify('name', rule='unique')
+          >>> g.classify('ar', rule='jenks', k=5)
 
         """
-        if isinstance(vals, str):
-            if 'label' not in kwargs:
-                kwargs['label'] = vals
-            self.classes = Classify(getattr(self, vals), **kwargs)
+        assert len(args) < 2, ('More than one argument passed...')
+        if len(args) == 0:
+            self.classify('name', rule='unique')
         else:
-            if 'label' not in kwargs:
-                kwargs['label'] = 'User values'
-            self.classes = Classify(vals, **kwargs)
+            vals = args[0]
+            if isinstance(vals, str):
+                if 'label' not in kwargs:
+                    kwargs['label'] = vals
+                self.classes = Classify(getattr(self, vals), **kwargs)
+            else:
+                if 'label' not in kwargs:
+                    kwargs['label'] = 'User values'
+                self.classes = Classify(vals, **kwargs)
+
+    def get_class(self, key):
+        assert key in self.class_names, ("Nonexisting class...")
+        ix = self.class_names.index(key)
+        return self[self.classes(ix)]
+
+    def class_iter(self):
+        for key in self.class_names:
+            yield key, self.get_class(key)
+
+    @property
+    def class_names(self):
+        return self.classes.index
 
     def df(self, *attrs):
         """Returns ``pandas.DataFrame`` of object attributes.
@@ -1514,7 +1537,8 @@ class PolySet(object):
         idx = pd.Index(self.fid, name='fid')
         if 'class' in attrs:
             attrs.remove('class')
-            d = pd.DataFrame({self.classes.label + '_class': self.classes.names}, index=idx)
+            # d = pd.DataFrame({self.classes.label + '_class': self.classes.names}, index=idx)
+            d = pd.DataFrame({'class': self.classes.names}, index=idx)
         else:
             d = pd.DataFrame(index=idx)
         for attr in attrs:
@@ -1540,7 +1564,7 @@ class PolySet(object):
         Example:
           >>> g.agg('area', np.sum, 'ead', np.mean, 'lao', circular.mean)
                           area       ead        lao
-          name_class
+          class
           ksp         2.443733  0.089710  76.875488
           pl          1.083516  0.060629  94.197847
           qtz         1.166097  0.068071  74.320337
@@ -1550,7 +1574,7 @@ class PolySet(object):
         for attr, aggfunc in zip(pairs[0::2], pairs[1::2]):
             df = self.groups(attr).agg(aggfunc)
             pieces.append(df)
-        return pd.concat(pieces, axis=1).reindex(self.classes.index)
+        return pd.concat(pieces, axis=1).reindex(self.class_names)
 
     def groups(self, *attrs):
         """Returns ``pandas.GroupBy`` of object attributes.
@@ -1561,7 +1585,7 @@ class PolySet(object):
           >>> g.classify('ar', 'natural')
           >>> g.groups('ead').mean()
                                 ead
-          ar_class
+          class
           1.01765-1.31807  0.067772
           1.31807-1.5445   0.076042
           1.5445-1.83304   0.065900
@@ -1570,7 +1594,7 @@ class PolySet(object):
 
         """
         df = self.df('class', *attrs)
-        return df.groupby(df.columns[0])
+        return df.groupby('class')
 
     def nndist(self, **kwargs):
         from scipy.spatial import Delaunay
@@ -1618,10 +1642,10 @@ class PolySet(object):
 
     def _makelegend(self, ax, **kwargs):
         pos = kwargs.get('pos', 'auto')
+        ncol = kwargs.get('ncol', 3)
         if pos == 'auto':
             if self.width > self.height:
                 pos = 'top'
-                ncol = kwargs.get('ncol', 3)
             else:
                 pos = 'right'
                 ncol = kwargs.get('ncol', 1)
@@ -1650,6 +1674,7 @@ class PolySet(object):
         """Plot set of ``Grains`` or ``Boundaries`` objects.
 
         Keywords:
+          show: If True matplotlib show is called. Default True
           alpha: transparency. Default 0.8
           pos: legend position "top", "right" or "none". Defalt "auto"
           ncol: number of columns for legend.
@@ -1657,7 +1682,7 @@ class PolySet(object):
           show_fid: Show FID of objects. Default False
           show_index: Show index of objects. Default False
 
-        Returns matplotlib axes object.
+        When show=False, returns matplotlib axes object.
 
         """
         if 'ax' in kwargs:
@@ -1672,14 +1697,10 @@ class PolySet(object):
         ax.get_xaxis().set_tick_params(which='both', direction='out')
         plt.setp(plt.yticks()[1], rotation=90)
         self._makelegend(ax, **kwargs)
-        return ax
-
-    def show(self, **kwargs):
-        """Show plot of ``Grains`` or ``Boundaries`` objects.
-
-        """
-        self.plot(**kwargs)
-        plt.show()
+        if kwargs.get('show', True):
+            plt.show()
+        else:
+            return ax
 
     def savefig(self, **kwargs):
         """Save grains or boudaries plot to file.
@@ -1690,65 +1711,166 @@ class PolySet(object):
           See `plot` for other kwargs
 
         """
-        fig = plt.figure()
-        ax = fig.add_subplot(111, aspect='equal')
-        self._plot(ax, **kwargs)
-        ax.margins(0.025, 0.025)
-        ax.get_yaxis().set_tick_params(which='both', direction='out')
-        ax.get_xaxis().set_tick_params(which='both', direction='out')
-        plt.setp(plt.yticks()[1], rotation=90)
-        self._makelegend(ax, **kwargs)
+        if 'ax' in kwargs:
+            ax = kwargs.pop('ax')
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111, aspect='equal')
+        # self._plot(ax, **kwargs)
+        # ax.margins(0.025, 0.025)
+        # ax.get_yaxis().set_tick_params(which='both', direction='out')
+        # ax.get_xaxis().set_tick_params(which='both', direction='out')
+        # plt.setp(plt.yticks()[1], rotation=90)
+        # self._makelegend(ax, **kwargs)
+        self.plot(**kwargs)
         plt.savefig(kwargs.get('filename', 'figure.png'),
                     dpi=kwargs.get('dpi', 150))
         plt.close()
 
     def rose(self, **kwargs):
-        ang = kwargs.get('angles', self.lao)
+        """Plot polar histogram of ``Grains`` or ``Boundaries`` orientations
+
+        Keywords:
+          show: If True matplotlib show is called. Default True
+          attr: property used for orientation. Default 'lao'
+          bins: number of bins
+          weights: if provided histogram is weighted
+          density: True for probability density otherwise counts
+          grid: True to show grid
+
+        When show=False, returns matplotlib axes object.
+
+            """
         if 'ax' in kwargs:
             ax = kwargs.get('ax')
         else:
             fig = plt.figure()
             ax = fig.add_subplot(111, polar=True)
+        attr = kwargs.get('attr', 'lao')
+        bins = kwargs.get('bins', 36)
+        weights = kwargs.get('weights', [])
+        grid = kwargs.get('grid', True)
+        ec = kwargs.get('ec', '#222222')
+        width = 360 / bins
+        bin_edges = np.linspace(-width / 2, 360 + width / 2, bins + 2)
+        bin_centres = (bin_edges[:-1] + np.diff(bin_edges) / 2)[:-1]
+        bt = np.zeros(bins)
+        for ix, key in enumerate(self.class_names):
+            gix = self.classes(ix)
+            ang = getattr(self[gix], attr)
+            if 'weights' in kwargs:
+                n, bin_edges = np.histogram(np.concatenate((ang, ang + 180)), bin_edges,
+                                            weights=np.concatenate((weights[gix], weights[gix])),
+                                            density=kwargs.get('density', False))
+            else:
+                n, bin_edges = np.histogram(np.concatenate((ang, ang + 180)), bin_edges,
+                                            density=kwargs.get('density', False))
+            # wrap
+            n[0] += n[-1]
+            n = n[:-1]
+            if kwargs.get('scaled', True):
+                n = np.sqrt(n)
+            ax.bar(np.deg2rad(bin_centres), n,
+                   width=np.deg2rad(width), bottom=bt,
+                   color=self.classes.color(key),
+                   label='{} ({})'.format(key, len(gix)),
+                   edgecolor=ec)
+            bt += n
+
         ax.set_theta_zero_location('N')
         ax.set_theta_direction(-1)
-        if kwargs.get('pdf', False):
-            from scipy.stats import vonmises
-            theta = np.linspace(-np.pi, np.pi, 1801)
-            radii = np.zeros_like(theta)
-            kappa = kwargs.get('kappa', 250)
-            for a in ang:
-                radii += vonmises.pdf(theta, kappa, loc=np.radians(a))
-                radii += vonmises.pdf(theta, kappa, loc=np.radians(a + 180))
-            radii /= len(ang)
+        ax.set_thetagrids(np.arange(0, 360, 10), labels=np.arange(0, 360, 10))
+        ax.set_rlabel_position(0)
+        ax.grid(grid)
+        if not grid:
+            ax.get_yaxis().set_ticks([])
+        if kwargs.get('legend', True):
+            nr = np.ceil(len(self.class_names) / 3)
+            fig.subplots_adjust(top=0.9 - 0.05 * nr)
+            ax.legend(loc=9, borderaxespad=0., ncol=3, bbox_to_anchor=[0.5, 1.1 + 0.08 * nr])
+        # plt.tight_layout()
+        ax.set_axisbelow(True)
+        if kwargs.get('show', True):
+            plt.show()
         else:
-            bins = kwargs.get('bins', 36)
-            width = 360 / bins
-            if 'weights' in kwargs:
-                num, bin_edges = np.histogram(np.concatenate((ang, ang + 180)),
-                                              bins=bins + 1,
-                                              range=(-width / 2, 360 + width / 2),
-                                              weights=np.concatenate((kwargs.get('weights'), kwargs.get('weights'))),
-                                              density=kwargs.get('density', False))
-            else:
-                num, bin_edges = np.histogram(np.concatenate((ang, ang + 180)),
-                                              bins=bins + 1,
-                                              range=(-width / 2, 360 + width / 2),
-                                              density=kwargs.get('density', False))
-            num[0] += num[-1]
-            num = num[:-1]
-            theta, radii = [], []
-            arrow = kwargs.get('arrow', 0.95)
-            rwidth = kwargs.get('rwidth', 1)
-            for cc, val in zip(np.arange(0, 360, width), num):
-                theta.extend([cc - width / 2, cc - rwidth * width / 2, cc,
-                              cc + rwidth * width / 2, cc + width / 2, ])
-                radii.extend([0, val * arrow, val, val * arrow, 0])
-            theta = np.deg2rad(theta)
-        if kwargs.get('scaled', True):
-            radii = np.sqrt(radii)
-        ax.fill(theta, radii, **kwargs.get('fill_kwg', {}))
-        plt.show()
-        return ax
+            return ax
+
+    def _seaborn_plot(self, sns_plot_fun, val, **kwargs):
+        """Plot seaborn categorical plots.
+
+        Keywords:
+          show: If True matplotlib show is called. Default True
+          attr: property used for plotting.
+          hue: When True attr is used for hue and names for x.
+
+        When show=False, returns matplotlib axes object.
+
+        """
+        if 'ax' in kwargs:
+            ax = kwargs.pop('ax')
+        else:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        hue = kwargs.get('hue', False)
+        if hue:
+            sns_plot_fun(x='name', y=val,
+                         data=self.df('class', 'name', val),
+                         hue='class', hue_order=self.classes.index,
+                         order=self.names,
+                         palette=self.classes._colors_dict)
+        else:
+            sns_plot_fun(x='class', y=val,
+                         data=self.df('class', val),
+                         order=self.classes.index,
+                         palette=self.classes._colors_dict)
+        if kwargs.get('show', True):
+            plt.show()
+        else:
+            return ax
+
+    def barplot(self, val, **kwargs):
+        """Plot seaborn swarmplot.
+
+        """
+        self._seaborn_plot(sns.barplot, val, **kwargs)
+
+    def swarmplot(self, val, **kwargs):
+        """Plot seaborn swarmplot.
+
+        """
+        self._seaborn_plot(sns.swarmplot, val, **kwargs)
+
+    def boxplot(self, val, **kwargs):
+        """Plot seaborn boxplot.
+
+        """
+        self._seaborn_plot(sns.boxplot, val, **kwargs)
+
+    def countplot(self, **kwargs):
+        """Plot seaborn countplot.
+
+        """
+        if 'ax' in kwargs:
+            ax = kwargs.pop('ax')
+        else:
+            fig = plt.figure()
+            ax = fig.add_subplot(111)
+        hue = kwargs.get('hue', False)
+        if hue:
+            sns.countplot(x='name',
+                          data=self.df('class', 'name'),
+                          hue='class', hue_order=self.classes.index,
+                          order=self.names,
+                          palette=self.classes._colors_dict)
+        else:
+            sns.countplot(x='class',
+                          data=self.df('class'),
+                          order=self.classes.index,
+                          palette=self.classes._colors_dict)
+        if kwargs.get('show', True):
+            plt.show()
+        else:
+            return ax
+
 
     def smooth(self, method='chaikin', **kwargs):
         return type(self)([getattr(s, method)(**kwargs) for s in self])
@@ -1758,6 +1880,7 @@ class PolySet(object):
 
     def regularize(self, **kwargs):
         return type(self)([s.regularize(**kwargs) for s in self])
+
 
 class Grains(PolySet):
     """Class to store set of ``Grains`` objects
@@ -1817,27 +1940,27 @@ class Grains(PolySet):
             T = nx.Graph()
         G = nx.DiGraph()
         for fid, g in enumerate(self):
-            # get phase and add to list and legend
+            # get name and add to list and legend
             path = []
             for co in g.shape.exterior.coords:
                 if co not in lookup:
                     lookup[co] = len(lookup)
                 path.append(lookup[co])
-            G.add_path(path, fid=fid, phase=g.name)
+            G.add_path(path, fid=fid, name=g.name)
             for holes in g.shape.interiors:
                 path = []
                 for co in holes.coords:
                     if co not in lookup:
                         lookup[co] = len(lookup)
                     path.append(lookup[co])
-                G.add_path(path, fid=fid, phase=g.name)
+                G.add_path(path, fid=fid, name=g.name)
         # Create topology graph
         H = G.to_undirected(reciprocal=True)
         # for edge in H.edges_iter():
         for edge in H.edges():
             e1 = G.get_edge_data(edge[0], edge[1])
             e2 = G.get_edge_data(edge[1], edge[0])
-            bt = '%s-%s' % tuple(sorted([e1['phase'], e2['phase']]))
+            bt = '%s-%s' % tuple(sorted([e1['name'], e2['name']]))
             T.add_node(e1['fid'])
             T.add_node(e2['fid'])
             T.add_edge(e1['fid'], e2['fid'], type=bt, bids=[])
@@ -1872,24 +1995,24 @@ class Grains(PolySet):
 
     @classmethod
     def from_shp(cls, filename=os.path.join(respath, 'sg2.shp'),
-                 phasefield='phase', phase='None'):
+                 namefield='phase', name='None'):
         """Create Grains from ESRI shapefile.
 
         Args:
           filename: filename of shapefile. Default sg2.shp from examples
-          phasefield: name of attribute in shapefile that
+          namefield: name of attribute in shapefile that
             holds names of grains or None. Default "phase".
-          phase: value used for grain phase when phasefield is None
+          name: value used for grain name when namefield is None
 
         """
         sf = Reader(filename)
         if sf.shapeType == 5:
             fieldnames = [field[0].lower() for field in sf.fields[1:]]
-            if phasefield is not None:
-                if phasefield in fieldnames:
-                    phase_pos = fieldnames.index(phasefield)
+            if namefield is not None:
+                if namefield in fieldnames:
+                    name_pos = fieldnames.index(namefield)
                 else:
-                    raise Exception("There is no field '%s'. Available fields are: %s" % (phasefield, fieldnames))
+                    raise Exception("There is no field '%s'. Available fields are: %s" % (namefield, fieldnames))
             shapeRecs = sf.shapeRecords()
             # until pyshp 2 will be released
             sf.shp.close()
@@ -1905,10 +2028,10 @@ class Grains(PolySet):
                         geom = geom.buffer(0)
                     if geom.is_valid:
                         if not geom.is_empty:
-                            if phasefield is None:
-                                ph = phase
+                            if namefield is None:
+                                ph = name
                             else:
-                                ph = rec.record[phase_pos]
+                                ph = rec.record[name_pos]
                             if geom.geom_type == 'MultiPolygon':
                                 for g in geom:
                                     shapes.append(Grain(orient(g), ph, len(shapes)))
@@ -1937,7 +2060,7 @@ class Grains(PolySet):
         legend = kwargs.get('legend', True)
         groups = self.groups('shape')
         keys = groups.groups.keys()
-        for key in self.classes.index:
+        for key in self.class_names:
             paths = []
             if key in keys:
                 group = groups.get_group(key)
@@ -1945,17 +2068,17 @@ class Grains(PolySet):
                     paths.append(PolygonPath(g))
                 if legend:
                     patch = PathPatch(Path.make_compound_path(*paths),
-                                      fc=self.classes.ctable[key],
+                                      fc=self.classes.color(key),
                                       ec=ec, alpha=alpha, zorder=2,
                                       label='{} ({})'.format(key, len(group)))
                 else:
                     patch = PathPatch(Path.make_compound_path(*paths),
-                                      fc=self.classes.ctable[key],
+                                      fc=self.classes.color(key),
                                       ec=ec, alpha=alpha, zorder=2)
             else:
                 if legend:
                     patch = PathPatch(Path([[None, None]]),
-                                      fc=self.classes.ctable[key],
+                                      fc=self.classes.color(key),
                                       ec=ec, alpha=alpha, zorder=2,
                                       label='{} ({})'.format(key, 0))
             ax.add_patch(patch)
@@ -1988,11 +2111,69 @@ class Boundaries(PolySet):
     def __add__(self, other):
         return Boundaries(self.polys + other.polys)
 
+    @classmethod
+    def from_shp(cls, filename=None, namefield='phase', name='None'):
+        """Create Boundaries from ESRI shapefile.
+
+        Args:
+          filename: filename of shapefile.
+          namefield: name of attribute in shapefile that
+            holds names of boundairies or None. Default "phase".
+          name: value used for grain name when namefield is None
+
+        """
+        sf = Reader(filename)
+        if sf.shapeType == 3:
+            fieldnames = [field[0].lower() for field in sf.fields[1:]]
+            if namefield is not None:
+                if namefield in fieldnames:
+                    name_pos = fieldnames.index(namefield)
+                else:
+                    raise Exception("There is no field '%s'. Available fields are: %s" % (namefield, fieldnames))
+            shapeRecs = sf.shapeRecords()
+            # until pyshp 2 will be released
+            sf.shp.close()
+            sf.shx.close()
+            sf.dbf.close()
+            shapes = []
+            for pos, rec in enumerate(shapeRecs):
+                # A valid polyline must have at least 2 coordinate tuples
+                if len(rec.shape.points) > 1:
+                    geom = shape(rec.shape.__geo_interface__)
+                    if geom.is_valid:
+                        if not geom.is_empty:
+                            if namefield is None:
+                                ph = name
+                            else:
+                                ph = rec.record[name_pos]
+                            if geom.geom_type == 'MultiLineString':
+                                for g in geom:
+                                    shapes.append(Boundary(g, ph, len(shapes)))
+                                print('Multiline (FID={}) exploded.'.format(pos))
+                            elif geom.geom_type == 'LineString':
+                                shapes.append(Boundary(geom, ph, len(shapes)))
+                            else:
+                                raise Exception('Unexpected geometry type (FID={})!'.format(pos))
+                        else:
+                            print('Empty geometry (FID={}) skipped.'.format(pos))
+                    else:
+                        print('Invalid geometry (FID={}) skipped.'.format(pos))
+                else:
+                    print('Invalid geometry (FID={}) skipped.'.format(pos))
+            return cls(shapes)
+        else:
+            # until pyshp 2 will be released
+            sf.shp.close()
+            sf.shx.close()
+            sf.dbf.close()
+            raise Exception('Shapefile must contains polylines!')
+
+
     def _plot(self, ax, **kwargs):
         alpha = kwargs.get('alpha', 0.8)
         legend = kwargs.get('legend', True)
         groups = self.groups('shape')
-        for key in self.classes.index:
+        for key in self.class_names:
             group = groups.get_group(key)
             x = []
             y = []
@@ -2003,10 +2184,10 @@ class Boundaries(PolySet):
                 y.extend(yb)
                 y.append(np.nan)
             if legend:
-                ax.plot(x, y, color=self.classes.ctable[key], alpha=alpha,
+                ax.plot(x, y, color=self.classes.color(key), alpha=alpha,
                         label='{} ({})'.format(key, len(group)))
             else:
-                ax.plot(x, y, color=self.classes.ctable[key], alpha=alpha)
+                ax.plot(x, y, color=self.classes.color(key), alpha=alpha)
         if kwargs.get('show_index', False):
             for idx, p in enumerate(self):
                 ax.text(p.xc, p.yc, str(idx),
@@ -2039,8 +2220,8 @@ class Sample(object):
 
     @classmethod
     def from_shp(cls, filename=os.path.join(respath, 'sg2.shp'),
-                 phasefield='phase', name=''):
-        return cls.from_grains(Grains.from_shp(filename, phasefield), name=name)
+                 namefield='phase', name=''):
+        return cls.from_grains(Grains.from_shp(filename, namefield), name=name)
 
     @classmethod
     def from_grains(cls, grains, name=''):
@@ -2092,8 +2273,8 @@ class Sample(object):
         for n0 in [n for n in G.degree() if G.degree()[n] == 3]:
             tri = set()
             for n1 in G.neighbors(n0):
-                tri.update(bb[G[n0][n1]['bid']])
-            res.append(tri)
+                tri.update({G[n0][n1]['bid']})
+            res.append(list(tri))
         return res
 
     def bids(self, idx, name=None):
@@ -2151,8 +2332,6 @@ class Sample(object):
         else:
             fig = plt.figure()
             ax = fig.add_subplot(111, aspect='equal')
-        show_fid = kwargs.get('show_fid', False)
-        show_index = kwargs.get('show_index', False)
         self.g._plot(ax, **kwargs)
         # non transparent bounbdaries
         kwargs['alpha'] = 1

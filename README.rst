@@ -22,6 +22,6 @@ A package to visualize and analyze digitized 2D microstructures.
 Documentation is in progress, but you can see PolyLX in action in accompanied Jupyter notebook
 http://nbviewer.ipython.org/github/ondrolexa/polylx/blob/master/polylx_tutorial.ipynb
 
-* Free software: BSD license
+* Free software: MIT license
 * Documentation: https://polylx.readthedocs.org.
 

@@ -13,6 +13,7 @@ requirements = [
     'numpy',
     'matplotlib',
     'pandas',
+    'seaborn',
     'networkx',
     'scipy',
     'shapely',
@@ -32,19 +33,20 @@ setup(
     author_email='lexa.ondrej@gmail.com',
     url='https://github.com/ondrolexa/polylx',
     packages=find_packages(),
-    package_data={'polylx.example': ['*.*']},
+    package_data={'polylx': ['example/*.*']},
+    include_package_data=True,
     install_requires=requirements,
     entry_points="""
     [console_scripts]
     ipolylx=polylx.shell:main
     """,
-    license="BSD",
+    license="MIT",
     zip_safe=False,
     keywords='polylx',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Science/Research',
-        'License :: OSI Approved :: BSD License',
+        'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',

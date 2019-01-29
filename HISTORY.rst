@@ -84,5 +84,13 @@ Changes
 * Smoothing, simplification and regularization of boundaries implemented
 * Colortable for legend is persistant trough indexing. Classify method
   could be used to change it
-* Default color table is rainbow for unique and viridis for continuous classes
+* Default color table is seaborn muted for unique classification
+  and matplotlib viridis for continuous classes
 
+0.5 (XX YYY 2017)
+-----------------
+ * rose plot groupped according to classification
+ * get_class, class_iter methods added to Grains and Boundaries
+ * seaborn added to requirements
+ * several seaborn categorical plots are added as methods
+   (swarmplot, boxplot, barplot, countplot)
