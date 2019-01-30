@@ -522,7 +522,7 @@ class Grain(PolyShape):
             ax = kwargs['ax']
             ax.set_aspect('equal')
         else:
-            fig = plt.figure()
+            fig = plt.figure(figsize=kwargs.get('figsize', plt.rcParams.get('figure.figsize')))
             ax = fig.add_subplot(111, aspect='equal')
         hull = self.hull
         ax.plot(*hull, ls='--', c='green')
@@ -895,7 +895,7 @@ class Boundary(PolyShape):
             ax = kwargs.pop('ax')
             ax.set_aspect('equal')
         else:
-            fig = plt.figure()
+            fig = plt.figure(figsize=kwargs.get('figsize', plt.rcParams.get('figure.figsize')))
             ax = fig.add_subplot(111, aspect='equal')
         ax.plot(*self.xy, c='blue')
         if vertices:
@@ -1688,8 +1688,9 @@ class PolySet(object):
         if 'ax' in kwargs:
             ax = kwargs.pop('ax')
             ax.set_aspect('equal')
+            kwargs['show'] = False    # likely another axes will be used before show
         else:
-            fig = plt.figure()
+            fig = plt.figure(figsize=kwargs.get('figsize', plt.rcParams.get('figure.figsize')))
             ax = fig.add_subplot(111, aspect='equal')
         self._plot(ax, **kwargs)
         ax.margins(0.025, 0.025)
@@ -1741,7 +1742,9 @@ class PolySet(object):
 
             """
         if 'ax' in kwargs:
-            ax = kwargs.get('ax')
+            ax = kwargs.pop('ax')
+            kwargs['legend'] = False  # figure not available
+            kwargs['show'] = False    # likely another axes will be used before show
         else:
             fig = plt.figure()
             ax = fig.add_subplot(111, polar=True)
@@ -1807,6 +1810,7 @@ class PolySet(object):
         """
         if 'ax' in kwargs:
             ax = kwargs.pop('ax')
+            kwargs['show'] = False    # likely another axes will be used before show
         else:
             fig = plt.figure()
             ax = fig.add_subplot(111)
@@ -2330,7 +2334,7 @@ class Sample(object):
             ax = kwargs['ax']
             ax.set_aspect('equal')
         else:
-            fig = plt.figure()
+            fig = plt.figure(figsize=kwargs.get('figsize', plt.rcParams.get('figure.figsize')))
             ax = fig.add_subplot(111, aspect='equal')
         self.g._plot(ax, **kwargs)
         # non transparent bounbdaries
