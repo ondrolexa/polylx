@@ -544,7 +544,7 @@ class Grain(PolyShape):
         ax.plot(xx[[0, 180]], yy[[0, 180]], color='green')
         ax.plot(xx[[90, 270]], yy[[90, 270]], color='green')
         ax.autoscale_view(None, True, True)
-        plt.title('LAO:{g.lao:g} AR:{g.ar} ({g.shape_method})'.format(g=self))
+        ax.set_title('LAO:{g.lao:g} AR:{g.ar} ({g.shape_method})'.format(g=self))
         return ax
 
     def show(self, **kwargs):
@@ -907,7 +907,7 @@ class Boundary(PolyShape):
         ix = d2.argmax()
         ax.plot(*hull.T[pa[ix]].T, ls=':', lw=2, c='r')
         ax.autoscale_view(None, True, True)
-        plt.title('LAO:{b.lao:g} AR:{b.ar} ({b.shape_method})'.format(b=self))
+        ax.set_title('LAO:{b.lao:g} AR:{b.ar} ({b.shape_method})'.format(b=self))
         return ax
 
     def show(self, **kwargs):
@@ -1674,7 +1674,6 @@ class PolySet(object):
         """Plot set of ``Grains`` or ``Boundaries`` objects.
 
         Keywords:
-          show: If True matplotlib show is called. Default True
           alpha: transparency. Default 0.8
           pos: legend position "top", "right" or "none". Defalt "auto"
           ncol: number of columns for legend.
@@ -1688,7 +1687,6 @@ class PolySet(object):
         if 'ax' in kwargs:
             ax = kwargs.pop('ax')
             ax.set_aspect('equal')
-            kwargs['show'] = False    # likely another axes will be used before show
         else:
             fig = plt.figure(figsize=kwargs.get('figsize', plt.rcParams.get('figure.figsize')))
             ax = fig.add_subplot(111, aspect='equal')
@@ -1696,12 +1694,16 @@ class PolySet(object):
         ax.margins(0.025, 0.025)
         ax.get_yaxis().set_tick_params(which='both', direction='out')
         ax.get_xaxis().set_tick_params(which='both', direction='out')
-        plt.setp(plt.yticks()[1], rotation=90)
+        plt.setp(ax.get_yticklabels(), rotation=90)
         self._makelegend(ax, **kwargs)
-        if kwargs.get('show', True):
-            plt.show()
-        else:
-            return ax
+        return ax
+
+    def show(self, **kwargs):
+        """Show of ``Grains`` or ``Boundaries`` objects.
+
+        """
+        self.plot(**kwargs)
+        plt.show()
 
     def savefig(self, **kwargs):
         """Save grains or boudaries plot to file.
@@ -1720,7 +1722,7 @@ class PolySet(object):
         # ax.margins(0.025, 0.025)
         # ax.get_yaxis().set_tick_params(which='both', direction='out')
         # ax.get_xaxis().set_tick_params(which='both', direction='out')
-        # plt.setp(plt.yticks()[1], rotation=90)
+        # plt.setp(ax.get_yticklabels(), rotation=90)
         # self._makelegend(ax, **kwargs)
         self.plot(**kwargs)
         plt.savefig(kwargs.get('filename', 'figure.png'),
@@ -1978,20 +1980,23 @@ class Grains(PolySet):
                 shapes.append(Boundary(shared, bt, bid))
                 T[edge[0]][edge[1]]['bids'] = [bid]
             else:
-                # Skip points if polygon just touch
-                shared = linemerge([seg for seg in list(shared) if seg.geom_type is not 'Point'])
-                if shared.geom_type == 'LineString':
-                    shapes.append(Boundary(shared, bt, bid))
-                    T[edge[0]][edge[1]]['bids'] = [bid]
-                elif shared.geom_type == 'MultiLineString':
-                    bids = []
-                    for sub in list(shared):
-                        bid = len(shapes)
-                        shapes.append(Boundary(sub, bt, bid))
-                        bids.append(bid)
-                    T[edge[0]][edge[1]]['bids'] = bids
+                # Skip if shared geometry is not line
+                if shared.geom_type in ['LineString', 'MultiLineString', 'GeometryCollection']:
+                    # Skip points if polygon just touch
+                    shared = linemerge([seg for seg in list(shared) if seg.geom_type is not 'Point'])
+                    if shared.geom_type == 'LineString':
+                        shapes.append(Boundary(shared, bt, bid))
+                        T[edge[0]][edge[1]]['bids'] = [bid]
+                    elif shared.geom_type == 'MultiLineString':
+                        bids = []
+                        for sub in list(shared):
+                            bid = len(shapes)
+                            shapes.append(Boundary(sub, bt, bid))
+                            bids.append(bid)
+                        T[edge[0]][edge[1]]['bids'] = bids
+                    else: print('Wrong topology between polygons {} {}. Shared geometry is {}.'.format(edge[0], edge[1], shared.geom_type))
                 else:
-                    print('Upsss. Strange topology between polygons ', edge)
+                    print('Wrong topology between polygons {} {}. Shared geometry is {}.'.format(edge[0], edge[1], shared.geom_type))
         if not shapes:
             print('No shared boundaries found.')
         else:
@@ -2340,7 +2345,7 @@ class Sample(object):
         # non transparent bounbdaries
         kwargs['alpha'] = 1
         self.b._plot(ax, **kwargs)
-        plt.setp(plt.yticks()[1], rotation=90)
+        plt.setp(ax.get_yticklabels(), rotation=90)
         self.g._makelegend(ax, **kwargs)
         ax.set_ylabel(self.name)
         return ax
