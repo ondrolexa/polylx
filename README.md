@@ -51,7 +51,7 @@ Documentation is in progress, but you can see PolyLX in action in accompanied Ju
 
 ## Documentation
 
-Explore the full features of APSG. You can find detailed documentation [here](https://polylx.readthedocs.org).
+Explore the full features of PolyLX. You can find detailed documentation [here](https://polylx.readthedocs.org).
 
 ## Contributing
 
@@ -59,4 +59,4 @@ Most discussion happens on [Github](https://github.com/ondrolexa/polylx). Feel f
 
 ## License
 
-APSG is free software: you can redistribute it and/or modify it under the terms of the MIT License. A copy of this license is provided in ``LICENSE`` file.
+PolyLX is free software: you can redistribute it and/or modify it under the terms of the MIT License. A copy of this license is provided in ``LICENSE`` file.
