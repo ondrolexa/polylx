@@ -166,7 +166,6 @@ class Classify(object):
         label = kwargs.get('label', 'Default')
         cmap = kwargs.get('cmap', 'viridis')
         self.rule = rule
-        self.vals = vals
         self.label = label
         if rule == 'equal' or rule == 'user':
             counts, bins = np.histogram(vals, k)
@@ -196,17 +195,10 @@ class Classify(object):
             self.names = np.asarray(vals)
             # other cmap for unique
             cmap = kwargs.get('cmap', self.sns2cmap('muted'))
-        self.set_colortable(cmap)
+        self.set_cmap(cmap)
 
     def __call__(self, num):
         return np.flatnonzero(self.names == self.index[num])
-
-    def __getitem__(self, index):
-        cl = deepcopy(self)
-        cl.vals = [self.vals[ix] for ix in index]
-        cl.names = self.names[index]
-        cl.index = list(np.unique(cl.names))
-        return cl
 
     def __repr__(self):
         tmpl = 'Classification %s of %s with %g classes.'
@@ -217,8 +209,8 @@ class Classify(object):
         index, inverse = np.unique(self.names, return_inverse=True)
         return ['%s (%d)' % p for p in zip(index, np.bincount(inverse))]
 
-    def set_colortable(self, cmap):
-        """Create color table for actual classification.
+    def set_cmap(self, cmap):
+        """Set colormap for actual classification.
 
         Args:
           cmap: matplotlib ListedColormap
@@ -244,6 +236,22 @@ class Classify(object):
         if isinstance(palette, str):
             palette = sns.color_palette(palette, len(self.index))
         return ListedColormap(sns.color_palette(palette))
+
+    def set_colortable(self, ct):
+        """Update colors for actual classification from dictionary.
+
+        Args:
+          ct: dictionary with color definition
+
+        """
+        if isinstance(ct, dict):
+            self._colors_dict.update(ct)
+
+    def get_colortable(self):
+        """Get dictionary of colors used in actual classification.
+
+        """
+        return deepcopy(self._colors_dict)
 
     def color(self, key):
         return self._colors_dict.get(key, (0, 0, 0))
