@@ -1499,7 +1499,9 @@ class PolySet(object):
         """
         assert len(args) < 2, ('More than one argument passed...')
         if len(args) == 0:
-            self.classify('name', rule='unique')
+            if 'rule' not in kwargs:
+                kwargs['rule'] = 'unique'
+            self.classify('name', **kwargs)
         else:
             vals = args[0]
             if isinstance(vals, str):
