@@ -165,6 +165,7 @@ class Classify(object):
         k = kwargs.get('k', 5)
         label = kwargs.get('label', 'Default')
         cmap = kwargs.get('cmap', 'viridis')
+        self.vals = vals
         self.rule = rule
         self.label = label
         if rule == 'equal' or rule == 'user':
@@ -199,6 +200,13 @@ class Classify(object):
 
     def __call__(self, num):
         return np.flatnonzero(self.names == self.index[num])
+
+    def __getitem__(self, index):
+        cl = deepcopy(self)
+        cl.vals = [self.vals[ix] for ix in index]
+        cl.names = self.names[index]
+        cl.index = list(np.unique(cl.names))
+        return cl
 
     def __repr__(self):
         tmpl = 'Classification %s of %s with %g classes.'
@@ -247,7 +255,8 @@ class Classify(object):
         if isinstance(ct, dict):
             self._colors_dict.update(ct)
 
-    def get_colortable(self):
+    @property
+    def colortable(self):
         """Get dictionary of colors used in actual classification.
 
         """

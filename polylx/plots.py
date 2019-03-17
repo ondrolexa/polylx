@@ -57,10 +57,13 @@ def normdist_plot(d, **kwargs):
 
 
 def rose_plot(ang, **kwargs):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, polar=True)
-    ax.set_theta_zero_location('N')
-    ax.set_theta_direction(-1)
+    if 'ax' in kwargs:
+            ax = kwargs.pop('ax')
+    else:
+        fig = plt.figure(figsize=kwargs.get('figsize', plt.rcParams.get('figure.figsize')))
+        ax = fig.add_subplot(111, polar=True)
+        ax.set_theta_zero_location('N')
+        ax.set_theta_direction(-1)
     if kwargs.get('pdf', False):
         from scipy.stats import vonmises
         theta = np.linspace(-np.pi, np.pi, 1801)
@@ -97,5 +100,6 @@ def rose_plot(ang, **kwargs):
     if kwargs.get('scaled', False):
         radii = np.sqrt(radii)
     ax.fill(theta, radii, **kwargs.get('fill_kwg', {}))
-    plt.show()
+    if kwargs.get('show', True):
+        plt.show()
     return ax

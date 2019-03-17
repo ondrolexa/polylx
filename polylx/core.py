@@ -19,6 +19,7 @@ from matplotlib.patches import PathPatch
 from matplotlib.path import Path
 import matplotlib.cbook as mcb
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 from shapely.geometry import shape, Polygon, LinearRing, LineString
 from shapely.geometry.polygon import orient
 from shapely import affinity
@@ -1430,7 +1431,7 @@ class PolySet(object):
         guaranteed to be within the objects.
 
         """
-        return np.array([p.representative_point() for p in self])
+        return np.array([p.representative_point for p in self])
 
     def feret(self, angle=0):
         """Returns array of feret diameters for given angle.
@@ -1694,10 +1695,21 @@ class PolySet(object):
             ax = fig.add_subplot(111, aspect='equal')
         self._plot(ax, **kwargs)
         ax.margins(0.025, 0.025)
-        ax.get_yaxis().set_tick_params(which='both', direction='out')
-        ax.get_xaxis().set_tick_params(which='both', direction='out')
-        plt.setp(ax.get_yticklabels(), rotation=90)
         self._makelegend(ax, **kwargs)
+        if kwargs.get('scalebar', False):
+            sb_kwg = dict(size=1, label='1mm', loc='lower right', frameon=False, color='k', label_top=True)
+            sb_kwg.update(kwargs.get('scalebar_kwg', {}))
+            sb_size = sb_kwg.pop('size')
+            sb_label = sb_kwg.pop('label')
+            sb_loc = sb_kwg.pop('loc')
+            scalebar = AnchoredSizeBar(ax.transData, sb_size, sb_label, sb_loc, **sb_kwg)
+            #scalebar = AnchoredSizeBar(ax.transData, 1, '1 mm', 'lower right', frameon=False, color='k', label_top=True)
+            ax.add_artist(scalebar)
+            ax.set_axis_off()
+        else:
+            ax.get_yaxis().set_tick_params(which='both', direction='out')
+            ax.get_xaxis().set_tick_params(which='both', direction='out')
+            plt.setp(ax.get_yticklabels(), rotation=90)
         return ax
 
     def show(self, **kwargs):
@@ -1742,7 +1754,7 @@ class PolySet(object):
           density: True for probability density otherwise counts
           grid: True to show grid
 
-        When show=False, returns matplotlib axes object.
+        When show=False, returns matplotlib axes object
 
             """
         if 'ax' in kwargs:
@@ -1852,6 +1864,12 @@ class PolySet(object):
 
         """
         self._seaborn_plot(sns.boxplot, val, **kwargs)
+
+    def violinplot(self, val, **kwargs):
+        """Plot seaborn boxplot.
+
+        """
+        self._seaborn_plot(sns.violinplot, val, **kwargs)
 
     def countplot(self, **kwargs):
         """Plot seaborn countplot.
