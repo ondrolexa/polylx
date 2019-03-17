@@ -1205,11 +1205,12 @@ class PolySet(object):
     ###################################################################
 
     def clip(self, other):
-        assert isinstance(other, Grain), 'Clipping is possible only by Grain.'
+        assert isinstance(other, Polygon), 'Clipping is possible only by shapely Polygon.'
+        other = other.buffer(0) # fix common problems
         res = []
         for e in self:
-            if other.shape.intersects(e.shape):
-                x = other.shape.intersection(e.shape)
+            if other.intersects(e.shape):
+                x = other.intersection(e.shape)
                 if x.geom_type == e.shape.geom_type:
                     res.append(type(e)(x, e.name, e.fid))
                 elif x.geom_type == 'Multi' + e.shape.geom_type:
@@ -1217,7 +1218,8 @@ class PolySet(object):
                         res.append(type(e)(xx, e.name, e.fid))
                 else:
                     pass
-        return type(self)(res)
+        if res:
+            return type(self)(res)
 
     @property
     def shape_method(self):
@@ -1261,13 +1263,11 @@ class PolySet(object):
         xmin, ymin, xmax, ymax = self.extent
         yoff = (ymax - ymin) / m
         xoff = (xmax - xmin) / n
-        o = Grain.from_coords([xmin, xmin + xoff, xmin + xoff, xmin, xmin],
-                              [ymin, ymin, ymin + yoff, ymin + yoff, ymin])
+        o = Polygon([(xmin, ymin), (xmin + xoff, ymin), (xmin + xoff, ymin + yoff), (xmin, ymin + yoff)])
 
         for iy in range(m):
             for ix in range(n):
-                c = o.translate(xoff=ix * xoff, yoff=iy * yoff)
-                yield self.clip(c)
+                yield self.clip(affinity.translate(o, xoff=ix * xoff, yoff=iy * yoff))
 
     def clipstrap(self, num=100, f=0.3):
         """Bootstrap random rectangular clip generator.
@@ -1286,9 +1286,7 @@ class PolySet(object):
         for i in range(num):
             x = xmin + (1 - f) * (xmax - xmin) * np.random.random()
             y = ymin + (1 - f) * (ymax - ymin) * np.random.random()
-            c = Grain.from_coords([x, x + w, x + w, x, x],
-                                  [y, y, y + h, y + h, y])
-            yield self.clip(c)
+            yield self.clip(Polygon([(x, y), (x + w, y),  (x + w, y + h), (x, y + h)]))
 
     @property
     def width(self):
@@ -1585,15 +1583,15 @@ class PolySet(object):
         Note that grouping is based on actual classification.
 
         Example:
-          >>> g.classify('ar', 'natural')
+          >>> g.classify('ar', rule='natural')
           >>> g.groups('ead').mean()
-                                ead
-          class
-          1.01765-1.31807  0.067772
-          1.31807-1.5445   0.076042
-          1.5445-1.83304   0.065900
-          1.83304-2.36773  0.073338
-          2.36773-12.1571  0.084016
+                           ead
+          class               
+          1.02-1.32   0.067772
+          1.32-1.54   0.076042
+          1.54-1.82   0.065479
+          1.82-2.37   0.073690
+          2.37-12.16  0.084016
 
         """
         df = self.df('class', *attrs)
