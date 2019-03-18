@@ -1204,7 +1204,14 @@ class PolySet(object):
     # Shapely set-theoretic methods                                   #
     ###################################################################
 
-    def clip(self, other):
+    def clip(self, *bounds):
+        """Clip by bounds rectangle (minx, miny, maxx, maxy) tuple (float values)
+        """
+        assert len(bounds) == 4, 'Bound must be defined by (minx, miny, maxx, maxy) tuple.'
+        minx, miny, maxx, maxy = bounds
+        return self.clip_by_shape(Polygon([(minx, miny), (minx, maxy), (maxx, maxy), (maxx, miny)]))
+
+    def clip_by_shape(self, other):
         assert isinstance(other, Polygon), 'Clipping is possible only by shapely Polygon.'
         other = other.buffer(0) # fix common problems
         res = []
@@ -1267,7 +1274,7 @@ class PolySet(object):
 
         for iy in range(m):
             for ix in range(n):
-                yield self.clip(affinity.translate(o, xoff=ix * xoff, yoff=iy * yoff))
+                yield self.clip_by_shape(affinity.translate(o, xoff=ix * xoff, yoff=iy * yoff))
 
     def clipstrap(self, num=100, f=0.3):
         """Bootstrap random rectangular clip generator.
@@ -1286,7 +1293,7 @@ class PolySet(object):
         for i in range(num):
             x = xmin + (1 - f) * (xmax - xmin) * np.random.random()
             y = ymin + (1 - f) * (ymax - ymin) * np.random.random()
-            yield self.clip(Polygon([(x, y), (x + w, y),  (x + w, y + h), (x, y + h)]))
+            yield self.clip_by_shape(Polygon([(x, y), (x + w, y),  (x + w, y + h), (x, y + h)]))
 
     @property
     def width(self):
