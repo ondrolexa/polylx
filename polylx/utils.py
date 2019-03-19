@@ -553,3 +553,14 @@ def _visvalingam_whyatt(x, y, threshold=1, is_ring=False):
             else:
                 do = False
     return x, y
+
+def weighted_avg_and_std(values, weights):
+    """
+    Return the weighted average and standard deviation.
+
+    values, weights -- Numpy ndarrays with the same shape.
+    """
+    average = np.average(values, weights=weights)
+    # Fast and numerically precise:
+    variance = np.average((values-average)**2, weights=weights)
+    return (average, np.sqrt(variance))

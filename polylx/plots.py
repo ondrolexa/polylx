@@ -1,6 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import stats
+import seaborn as sns
 from .core import PolySet
+from .utils import weighted_avg_and_std
 
 ##########################
 # Plots for polylx objects
@@ -36,23 +39,25 @@ def paror_plot(ob, averaged=True):
 
 
 def logdist_plot(d, **kwargs):
-    import seaborn as sns
-    from scipy.stats import lognorm
-    ax = sns.distplot(d, fit=lognorm, **kwargs)
-    shape, loc, scale = lognorm.fit(d)
+    kwargs['fit'] = stats.lognorm
+    if 'kde' not in kwargs:
+        kwargs['kde'] = False
+    ax = sns.distplot(d, **kwargs)
+    shape, loc, scale = stats.lognorm.fit(d)
     mode = loc + np.exp(np.log(scale) - shape**2)
-    stats = np.asarray(lognorm.stats(shape, loc=loc, scale=scale, moments='mv'))
-    ax.set_title('Mode:{:g} Mean:{:g} Var:{:g}'.format(mode, *stats))
+    sts = np.asarray(stats.lognorm.stats(shape, loc=loc, scale=scale, moments='mv'))
+    ax.set_title('Mode:{:g} Mean:{:g} Var:{:g}'.format(mode, *sts))
     plt.show()
 
 
 def normdist_plot(d, **kwargs):
-    import seaborn as sns
-    from scipy.stats import norm
-    ax = sns.distplot(d, fit=norm, **kwargs)
-    loc, scale = norm.fit(d)
-    stats = np.asarray(norm.stats(loc=loc, scale=scale, moments='mv'))
-    ax.set_title('Mean:{:g} Var:{:g}'.format(*stats))
+    kwargs['fit'] = stats.norm
+    if 'kde' not in kwargs:
+        kwargs['kde'] = False
+    ax = sns.distplot(d, **kwargs)
+    loc, scale = stats.norm.fit(d)
+    sts = np.asarray(stats.norm.stats(loc=loc, scale=scale, moments='mv'))
+    ax.set_title('Mean:{:g} Var:{:g}'.format(*sts))
     plt.show()
 
 
@@ -103,3 +108,60 @@ def rose_plot(ang, **kwargs):
     if kwargs.get('show', True):
         plt.show()
     return ax
+
+def grainsize_plot(d, weights=None, bins='auto', left=None, right=None, num=500, alpha=95, bootstrap=False, title=None):
+    d = np.asarray(d)
+    if weights is None:
+        weights = np.ones_like(d)
+    ld = np.log10(d)
+    bins_log = np.histogram_bin_edges(ld, bins=bins)
+    bins = 10**bins_log
+    bw = bins[1:] - bins[:-1]
+    bc = (bins[:-1] + bins[1:])/2
+    lbw = bins_log[1:] - bins_log[:-1]
+    # statistics
+    loc, scale = weighted_avg_and_std(ld, weights)
+
+    # default left right values
+    if left is None:
+        left = 10**(loc - 3.5*scale)
+    if right is None:
+        right = 10**(loc + 3.5*scale)
+    # PDF
+    lxx = np.linspace(np.log10(left), np.log10(right), 500)
+    pdf = stats.norm.pdf(lxx, loc=loc, scale=scale)
+
+    # hist counts
+    counts,_ = np.histogram(d, bins, density=True, weights=weights)
+
+    # plot
+    f, ax = plt.subplots(figsize=(9, 5))
+    if title is not None:
+        f.suptitle(title)
+
+    # bootstrap CI on mean
+    if bootstrap:
+        bcnt, bpdf, mu = [], [], []
+        for i in range(num):
+            ix = np.random.choice(len(d), len(d))
+            cnt, _ = np.histogram(d[ix], bins=bins, weights=weights[ix], density=True)
+            bcnt.append(cnt)
+            loc, scale = weighted_avg_and_std(np.log10(d[ix]), weights[ix])
+            bpdf.append(stats.norm.pdf(lxx, loc=loc, scale=scale))
+            mu.append(loc)
+        # confidence interval
+        delta = np.array(mu) - loc
+        conf = np.power(10, loc + np.percentile(delta, [(100-alpha)/2, alpha + (100-alpha)/2]))
+        # plot
+        ax.fill_between(10**lxx, np.min(bpdf, axis=0), np.max(bpdf, axis=0), color='lightsteelblue', alpha=0.5)
+        ax.bar(bc, np.mean(bcnt, axis=0)*bw/lbw, width=0.9*bw, yerr=np.std(bcnt, axis=0)*bw/lbw/2, color='mediumseagreen')
+        ax.text(0.02, 0.9, 'AW mean EAD: {:.2f}\n{:.1f}% CI: {:.2f}-{:.2f}'.format(10**loc, alpha, *conf),
+             horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
+    else:
+        ax.bar(bc, counts*bw/lbw, width=0.9*bw, color='mediumseagreen')
+        ax.text(0.02, 0.9, 'AW mean EAD: {:.2f}'.format(10**loc),
+             horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
+    ax.plot(10**lxx, pdf, 'k')
+    ax.set_xscale('log')
+    ax.set_xlim(left=left, right=right)
+    plt.show()

@@ -2126,6 +2126,17 @@ class Grains(PolySet):
                         bbox=dict(facecolor='yellow', alpha=0.5))
         return ax
 
+    def grainsize_plot(self, areaweighted=True, **kwargs):
+        from .plots import grainsize_plot
+        if 'weights' in kwargs:
+            _ = kwargs.pop('weights')
+        if 'title' not in kwargs:
+            kwargs['title'] = 'Grainsize plot'
+        if areaweighted:
+            grainsize_plot(self.ead, weights=self.area, **kwargs)
+        else:
+            grainsize_plot(self.ead, **kwargs)
+
 
 class Boundaries(PolySet):
     """Class to store set of ``Boundaries`` objects
