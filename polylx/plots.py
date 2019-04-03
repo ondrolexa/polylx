@@ -63,7 +63,7 @@ def normdist_plot(d, **kwargs):
 
 def rose_plot(ang, **kwargs):
     if 'ax' in kwargs:
-            ax = kwargs.pop('ax')
+        ax = kwargs.pop('ax')
     else:
         fig = plt.figure(figsize=kwargs.get('figsize', plt.rcParams.get('figure.figsize')))
         ax = fig.add_subplot(111, polar=True)
@@ -109,10 +109,22 @@ def rose_plot(ang, **kwargs):
         plt.show()
     return ax
 
-def grainsize_plot(d, weights=None, bins='auto', left=None, right=None, num=500, alpha=95, bootstrap=False, title=None):
+def grainsize_plot(d, **kwargs):
+    # weights=None, bins='auto', left=None, right=None, num=500, alpha=95, bootstrap=False, title=None
+    weights = kwargs.get('weights', np.ones_like(d))
+    bins = kwargs.get('bins', 'auto')
+    bootstrap = kwargs.get('bootstrap', False)
+    alpha = kwargs.get('alpha', 95)
+    num = kwargs.get('num', 500)
+    bootstrap = kwargs.get('bootstrap', False)
+    title = kwargs.get('set_title', None)
+    if 'ax' in kwargs:
+        ax = kwargs.pop('ax')
+        show = False
+    else:
+        f, ax = plt.subplots(figsize=(9, 5))
+        show = True
     d = np.asarray(d)
-    if weights is None:
-        weights = np.ones_like(d)
     ld = np.log10(d)
     bins_log = np.histogram_bin_edges(ld, bins=bins)
     bins = 10**bins_log
@@ -123,10 +135,8 @@ def grainsize_plot(d, weights=None, bins='auto', left=None, right=None, num=500,
     loc, scale = weighted_avg_and_std(ld, weights)
 
     # default left right values
-    if left is None:
-        left = 10**(loc - 3.5*scale)
-    if right is None:
-        right = 10**(loc + 3.5*scale)
+    left = kwargs.get('left', 10**(loc - 3.5*scale))
+    right = kwargs.get('right', 10**(loc + 3.5*scale))
     # PDF
     lxx = np.linspace(np.log10(left), np.log10(right), 500)
     pdf = stats.norm.pdf(lxx, loc=loc, scale=scale)
@@ -135,8 +145,8 @@ def grainsize_plot(d, weights=None, bins='auto', left=None, right=None, num=500,
     counts,_ = np.histogram(d, bins, density=True, weights=weights)
 
     # plot
-    f, ax = plt.subplots(figsize=(9, 5))
-    if title is not None:
+    
+    if title is not None and show:
         f.suptitle(title)
 
     # bootstrap CI on mean
@@ -164,4 +174,5 @@ def grainsize_plot(d, weights=None, bins='auto', left=None, right=None, num=500,
     ax.plot(10**lxx, pdf, 'k')
     ax.set_xscale('log')
     ax.set_xlim(left=left, right=right)
-    plt.show()
+    if show:
+        plt.show()
