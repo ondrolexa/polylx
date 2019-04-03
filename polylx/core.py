@@ -2007,8 +2007,10 @@ class Grains(PolySet):
             else:
                 # Skip if shared geometry is not line
                 if shared.geom_type in ['LineString', 'MultiLineString', 'GeometryCollection']:
+                    if 'Polygon' in [seg.geom_type for seg in shared]:
+                        print('Overlap between polygons {} {}.'.format(edge[0], edge[1]))
                     # Skip points if polygon just touch
-                    shared = linemerge([seg for seg in list(shared) if seg.geom_type is not 'Point'])
+                    shared = linemerge([seg for seg in list(shared) if seg.geom_type is 'LineString'])
                     if shared.geom_type == 'LineString':
                         shapes.append(Boundary(shared, bt, bid))
                         T[edge[0]][edge[1]]['bids'] = [bid]
@@ -2046,7 +2048,7 @@ class Grains(PolySet):
                 if namefield in fieldnames:
                     name_pos = fieldnames.index(namefield)
                 else:
-                    raise Exception("There is no field '%s'. Available fields are: %s" % (namefield, fieldnames))
+                    raise Exception("There is no field '{}'. Available fields are: {}".format(namefield, fieldnames))
             shapeRecs = sf.shapeRecords()
             # until pyshp 2 will be released
             sf.shp.close()
@@ -2059,6 +2061,7 @@ class Grains(PolySet):
                     geom = shape(rec.shape.__geo_interface__)
                     # try  to "clean" self-touching or self-crossing polygons
                     if not geom.is_valid:
+                        print('Cleaning FID={}...'.format(pos))
                         geom = geom.buffer(0)
                     if geom.is_valid:
                         if not geom.is_empty:
