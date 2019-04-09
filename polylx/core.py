@@ -1340,6 +1340,16 @@ class PolySet(object):
         return [p.shape for p in self]
 
     @property
+    def features(self):
+        """Generator of feature records
+
+        """
+        for p in self:
+            feature = {'geometry': p.shape.__geo_interface__,
+                       'properties': {'id':p.fid, 'name': p.name}}
+            yield feature    
+
+    @property
     def la(self):
         """Return array of long axes of objects according to shape_method.
 
