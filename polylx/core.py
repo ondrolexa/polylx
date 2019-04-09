@@ -12,7 +12,7 @@ Examples:
 """
 import os
 import itertools
-
+from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import PathPatch
@@ -2101,6 +2101,66 @@ class Grains(PolySet):
             sf.dbf.close()
             raise Exception('Shapefile must contains polygons!')
 
+    @classmethod
+    def from_file(cls, filename=os.path.join(respath, 'sg2.shp'), **kwargs):
+        """Create Grains from ESRI shapefile.
+
+        Args:
+          filename: filename of shapefile. Default sg2.shp from examples
+          namefield: name of attribute in shapefile that
+            holds names of grains or None. Default "phase".
+          name: value used for grain name when namefield is None
+
+        """
+        import fiona
+
+        namefield = kwargs.pop('namefield', 'phase')
+        name = kwargs.pop('name', 'None')
+
+        with fiona.open('/home/ondro/develrepo/polylx/polylx/example/sg2.shp', **kwargs) as src:
+            schema = src.schema
+            assert schema['geometry'] == 'Polygon', 'The file must contains polygons!'
+            fieldnames = list(schema['properties'].keys())
+            if namefield is not None:
+                if namefield not in fieldnames:
+                    raise Exception("There is no field '{}'. Available fields are: {}".format(namefield, fieldnames))
+            shapes = []
+            for feature in src:
+                geom = shape(feature['geometry'])
+                # try  to "clean" self-touching or self-crossing polygons
+                if not geom.is_valid:
+                    print('Cleaning FID={}...'.format(feature['id']))
+                    geom = geom.buffer(0)
+                if geom.is_valid:
+                    if not geom.is_empty:
+                        if namefield is None:
+                            ph = name
+                        else:
+                            ph = feature['properties'][namefield]
+                        if geom.geom_type == 'MultiPolygon':
+                            for g in geom:
+                                shapes.append(Grain(orient(g), ph, len(shapes)))
+                            print('Multipolygon (FID={}) exploded.'.format(feature['id']))
+                        elif geom.geom_type == 'Polygon':
+                            shapes.append(Grain(orient(geom), ph, len(shapes)))
+                        else:
+                            raise Exception('Unexpected geometry type (FID={})!'.format(feature['id']))
+                    else:
+                        print('Empty geometry (FID={}) skipped.'.format(feature['id']))
+                else:
+                    print('Invalid geometry (FID={}) skipped.'.format(feature['id']))
+            return cls(shapes)
+
+    def to_file(self, filename='grains.gpkg', driver='GPKG'):
+        """
+        driver: 'ESRI Shapefile', 'GeoJSON', 'GPKG' or 'GML'. Default 'GPKG'
+
+        """
+        import fiona
+        _schema = {'geometry':'Polygon', 'properties':OrderedDict([('id', 'int'), ('name', 'str')])}
+        with fiona.open(filename, 'w', layer='grains', driver=driver, schema=_schema, crs={}) as dst:
+            dst.writerecords(self.features)
+
     def _plot(self, ax, **kwargs):
         alpha = kwargs.get('alpha', 0.8)
         ec = kwargs.get('ec', '#222222')
@@ -2226,6 +2286,15 @@ class Boundaries(PolySet):
             sf.dbf.close()
             raise Exception('Shapefile must contains polylines!')
 
+    def to_file(self, filename='boundaries.gpkg', driver='GPKG'):
+        """
+        driver: 'ESRI Shapefile', 'GeoJSON', 'GPKG' or 'GML'. Default 'GPKG'
+
+        """
+        import fiona
+        _schema = {'geometry':'LineString', 'properties':OrderedDict([('id', 'int'), ('name', 'str')])}
+        with fiona.open(filename, 'w', layer='boundaries', driver=driver, schema=_schema, crs={}) as dst:
+            dst.writerecords(self.features)
 
     def _plot(self, ax, **kwargs):
         alpha = kwargs.get('alpha', 0.8)
