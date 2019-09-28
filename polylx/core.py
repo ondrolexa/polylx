@@ -23,6 +23,7 @@ from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 from shapely.geometry import shape, Polygon, LinearRing, LineString
 from shapely.geometry.polygon import orient
 from shapely import affinity
+from shapely.ops import cascaded_union
 import networkx as nx
 import pandas as pd
 import seaborn as sns
@@ -2405,11 +2406,57 @@ class Sample(object):
         return res
 
     def bids(self, idx, name=None):
+        """Return array of indexes of boundaries creating grain idx
+
+        If name keyword is provided only boundaries with grains of
+        given name are returned.
+
+        """
         nids = self.neighbors(idx, name=name)
         bids = []
         for nid in nids:
             bids.extend(self.T[idx][nid]['bids'])
         return bids
+
+    def get_cluster(self, idx, name=None):
+        """Return array of indexes of clustered grains seeded from idx.
+
+        If name keyword is provided only neighbours with given name
+        are returned.
+
+        """
+        last = 0
+        cluster = set([idx])
+        while len(cluster)>last:
+            last = len(cluster)
+            for idx in list(cluster):
+                cluster.update(self.neighbors(idx, name=name))
+        return list(cluster)
+
+    def get_clusters(self):
+        """Return dictionary with lists of clusters for each name.
+
+        """
+        res = {}
+        for name in self.g.names:
+            aid = set(self.g.getindex(name))
+            clusters = []
+            while aid:
+                cluster = self.get_cluster(aid.pop(), name=name)
+                aid = aid.difference(cluster)
+                clusters.append(list(cluster))
+            res[name] = clusters
+        return res
+
+    def dissolve(self):
+        grains = []
+        fid = 0
+        clusters = self.get_clusters()
+        for name in clusters:
+            for cidx in clusters[name]:
+                grains.append(Grain(cascaded_union([g.shape for g in self.g[cidx]]), name, fid))
+                fid += 1
+        return Grains(grains)
 
     def neighbors_dist(self, show=False, name=None):
         """Return array of nearest neighbors distances.
