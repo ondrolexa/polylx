@@ -2070,6 +2070,8 @@ class Grains(PolySet):
                 # A valid polygon must have at least 4 coordinate tuples
                 if len(rec.shape.points) > 3:
                     geom = shape(rec.shape.__geo_interface__)
+                    # fix duplicate vertexes
+                    geom = geom.simplify(0)
                     # try  to "clean" self-touching or self-crossing polygons
                     if not geom.is_valid:
                         print('Cleaning FID={}...'.format(pos))
@@ -2082,10 +2084,18 @@ class Grains(PolySet):
                                 ph = rec.record[name_pos]
                             if geom.geom_type == 'MultiPolygon':
                                 for g in geom:
-                                    shapes.append(Grain(orient(g), ph, len(shapes)))
+                                    go = orient(g)
+                                    if not any(go.equals(gr.shape) for gr in shapes):
+                                        shapes.append(Grain(go, ph, len(shapes)))
+                                    else:
+                                        print('Duplicate polygon (FID={}) skipped.'.format(pos))
                                 print('Multipolygon (FID={}) exploded.'.format(pos))
                             elif geom.geom_type == 'Polygon':
-                                shapes.append(Grain(orient(geom), ph, len(shapes)))
+                                go = orient(geom)
+                                if not any(go.equals(gr.shape) for gr in shapes):
+                                    shapes.append(Grain(go, ph, len(shapes)))
+                                else:
+                                    print('Duplicate polygon (FID={}) skipped.'.format(pos))
                             else:
                                 raise Exception('Unexpected geometry type (FID={})!'.format(pos))
                         else:
