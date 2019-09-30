@@ -1699,8 +1699,14 @@ class PolySet(object):
           legend: Show legend. Default True
           show_fid: Show FID of objects. Default False
           show_index: Show index of objects. Default False
+          scalebar: When True scalebar is drawn instead axes frame
+          scalebar_kwg: Dict of scalebar properties
+            size: Default 1
+            label: Default 1mm
+            loc: Default 'lower right'
+            See AnchoredSizeBar for others
 
-        When show=False, returns matplotlib axes object.
+        Returns matplotlib axes object.
 
         """
         if 'ax' in kwargs:
@@ -2071,7 +2077,7 @@ class Grains(PolySet):
                 if len(rec.shape.points) > 3:
                     geom = shape(rec.shape.__geo_interface__)
                     # fix duplicate vertexes
-                    geom = geom.simplify(0)
+                    #geom = geom.simplify(0)
                     # try  to "clean" self-touching or self-crossing polygons
                     if not geom.is_valid:
                         print('Cleaning FID={}...'.format(pos))
@@ -2138,6 +2144,8 @@ class Grains(PolySet):
             shapes = []
             for feature in src:
                 geom = shape(feature['geometry'])
+                # fix duplicate vertexes
+                #geom = geom.simplify(0)
                 # try  to "clean" self-touching or self-crossing polygons
                 if not geom.is_valid:
                     print('Cleaning FID={}...'.format(feature['id']))
@@ -2150,10 +2158,18 @@ class Grains(PolySet):
                             ph = feature['properties'][namefield]
                         if geom.geom_type == 'MultiPolygon':
                             for g in geom:
-                                shapes.append(Grain(orient(g), ph, len(shapes)))
+                                go = orient(g)
+                                if not any(go.equals(gr.shape) for gr in shapes):
+                                    shapes.append(Grain(go, ph, len(shapes)))
+                                else:
+                                    print('Duplicate polygon (FID={}) skipped.'.format(feature['id']))
                             print('Multipolygon (FID={}) exploded.'.format(feature['id']))
                         elif geom.geom_type == 'Polygon':
-                            shapes.append(Grain(orient(geom), ph, len(shapes)))
+                            go = orient(geom)
+                            if not any(go.equals(gr.shape) for gr in shapes):
+                                shapes.append(Grain(go, ph, len(shapes)))
+                            else:
+                                print('Duplicate polygon (FID={}) skipped.'.format(feature['id']))
                         else:
                             raise Exception('Unexpected geometry type (FID={})!'.format(feature['id']))
                     else:
