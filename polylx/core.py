@@ -2046,6 +2046,66 @@ class Grains(PolySet):
         else:
             return Boundaries(shapes)
 
+    def boundaries_slow(self, T=None):
+        """Create Boundaries from Grains. Slower but more robust implementation.
+
+        Example:
+          >>> g = Grains.from_shp()
+          >>> b = g.boundaries_slow()
+
+        """
+        from shapely.ops import linemerge
+
+        if T is None:
+            T = nx.Graph()
+
+        allgrains = [(gid, grain) for gid, grain in enumerate(self)]
+        while allgrains:
+            gid, grain = allgrains.pop(0)
+            T.add_node(gid, name=grain.name)
+            for oid, other in allgrains:
+                rel = grain.shape.relate(other.shape)
+                if rel != 'FF2FF1212':  # disconnected
+                    if rel == 'FF2F11212':  # shared boundary
+                        T.add_node(oid, name=other.name)
+                        T.add_edge(gid, oid, type='%s-%s' % tuple(sorted([grain.name, other.name])), bids=[])
+                    elif rel == 'FF2F112F2':  # grain-incl
+                        T.add_node(oid, name=other.name)
+                        T.add_edge(gid, oid, type='%s-%s' % tuple(sorted([grain.name, other.name])), bids=[])
+                    elif rel == 'FF2F1F212':  # incl-grain
+                        T.add_node(oid, name=other.name)
+                        T.add_edge(gid, oid, type='%s-%s' % tuple(sorted([grain.name, other.name])), bids=[])
+                    elif rel == 'FF2F01212':  #Silently skip shared point for polygons
+                        pass
+                    elif rel == '212111212':
+                        print('Skipping overlaped polygons {} {}'.format(gid, oid))
+                    else:
+                        print('Hoops!!! Polygons {}-{} have relation {}'.format(gid, oid, rel))
+
+        shapes = []
+        for (id1, id2, bt) in T.edges.data('type'):
+            shared = self[id1].intersection(self[id2])
+            if shared.geom_type in ['MultiLineString', 'GeometryCollection']:
+                shared = linemerge([part for part in list(shared) if part.geom_type is 'LineString'])
+            if shared.geom_type in ['MultiLineString', 'LineString']:
+                if shared.geom_type == 'MultiLineString':
+                    shared_single = list(shared)
+                else:
+                    shared_single = [shared]
+                bids = []
+                for bnd in shared_single:
+                    bid = len(shapes)
+                    shapes.append(Boundary(bnd, bt, bid))
+                    bids.append(bid)
+                T[id1][id2]['bids'] = bids
+            else:
+                print('Unpredicted intersection geometry {} for polygons {}-{}'.format(shared.geom_type, id1, id2))
+
+        if not shapes:
+            print('No shared boundaries found.')
+        else:
+            return Boundaries(shapes)
+
     @classmethod
     def from_shp(cls, filename=os.path.join(respath, 'sg2.shp'),
                  namefield='phase', name='None'):
