@@ -284,7 +284,7 @@ class PolyShape(object):
         """Returns True if geometries touch, else False
 
         """
-        return self.shape.relate(other.shape)
+        return self.shape.touches(other.shape)
 
     def union(self, other):
         """Returns the union of the geometries (Shapely geometry)
@@ -1972,12 +1972,12 @@ class Grains(PolySet):
         """
         return np.array([p.nholes for p in self])
 
-    def boundaries(self, T=None):
-        """Create Boundaries from Grains.
+    def boundaries_fast(self, T=None):
+        """Create Boundaries from Grains. Faster but not always safe implementation
 
         Example:
           >>> g = Grains.from_shp()
-          >>> b = g.boundaries()
+          >>> b = g.boundaries_fast()
 
         """
         from shapely.ops import linemerge
@@ -2046,65 +2046,64 @@ class Grains(PolySet):
         else:
             return Boundaries(shapes)
 
-    def boundaries_slow(self, T=None):
-        """Create Boundaries from Grains. Slower but more robust implementation.
+    def boundaries(self, T=None):
+        """Create Boundaries from Grains.
 
         Example:
           >>> g = Grains.from_shp()
-          >>> b = g.boundaries_slow()
+          >>> b = g.boundaries()
 
         """
         from shapely.ops import linemerge
+
+        def add_shared(gid, grain, oid, other, boundaries, T):
+            shared = grain.intersection(other)
+            if shared.geom_type in ['MultiLineString', 'GeometryCollection']:
+                shared = linemerge([part for part in list(shared) if part.geom_type is 'LineString'])
+            if shared.geom_type in ['MultiLineString', 'LineString']:
+                if shared.geom_type == 'MultiLineString':
+                    shared = list(shared)
+                else:
+                    shared = [shared]
+                bids = []
+                bt = '{}-{}'.format(*sorted([grain.name, other.name]))
+                for bnd in shared:
+                    bid = len(boundaries)
+                    boundaries.append(Boundary(bnd, bt, bid))
+                    bids.append(bid)
+                T.add_node(oid, name=other.name)
+                T.add_edge(gid, oid, type=bt, bids=bids)
+            else:
+                print('Unpredicted intersection geometry {} for polygons {}-{}'.format(shared.geom_type, gid, oid))
 
         if T is None:
             T = nx.Graph()
 
         allgrains = [(gid, grain) for gid, grain in enumerate(self)]
+        boundaries = []
         while allgrains:
             gid, grain = allgrains.pop(0)
             T.add_node(gid, name=grain.name)
             for oid, other in allgrains:
-                rel = grain.shape.relate(other.shape)
+                rel = grain.relate(other)
                 if rel != 'FF2FF1212':  # disconnected
                     if rel == 'FF2F11212':  # shared boundary
-                        T.add_node(oid, name=other.name)
-                        T.add_edge(gid, oid, type='%s-%s' % tuple(sorted([grain.name, other.name])), bids=[])
+                        add_shared(gid, grain, oid, other, boundaries, T)
                     elif rel == 'FF2F112F2':  # grain-incl
-                        T.add_node(oid, name=other.name)
-                        T.add_edge(gid, oid, type='%s-%s' % tuple(sorted([grain.name, other.name])), bids=[])
+                        add_shared(gid, grain, oid, other, boundaries, T)
                     elif rel == 'FF2F1F212':  # incl-grain
-                        T.add_node(oid, name=other.name)
-                        T.add_edge(gid, oid, type='%s-%s' % tuple(sorted([grain.name, other.name])), bids=[])
+                        add_shared(gid, grain, oid, other, boundaries, T)
                     elif rel == 'FF2F01212':  #Silently skip shared point for polygons
                         pass
                     elif rel == '212111212':
-                        print('Skipping overlaped polygons {} {}'.format(gid, oid))
+                        print('Skipping overlapping polygons {}-{}'.format(gid, oid))
                     else:
                         print('Hoops!!! Polygons {}-{} have relation {}'.format(gid, oid, rel))
 
-        shapes = []
-        for (id1, id2, bt) in T.edges.data('type'):
-            shared = self[id1].intersection(self[id2])
-            if shared.geom_type in ['MultiLineString', 'GeometryCollection']:
-                shared = linemerge([part for part in list(shared) if part.geom_type is 'LineString'])
-            if shared.geom_type in ['MultiLineString', 'LineString']:
-                if shared.geom_type == 'MultiLineString':
-                    shared_single = list(shared)
-                else:
-                    shared_single = [shared]
-                bids = []
-                for bnd in shared_single:
-                    bid = len(shapes)
-                    shapes.append(Boundary(bnd, bt, bid))
-                    bids.append(bid)
-                T[id1][id2]['bids'] = bids
-            else:
-                print('Unpredicted intersection geometry {} for polygons {}-{}'.format(shared.geom_type, id1, id2))
-
-        if not shapes:
+        if not boundaries:
             print('No shared boundaries found.')
         else:
-            return Boundaries(shapes)
+            return Boundaries(boundaries)
 
     @classmethod
     def from_shp(cls, filename=os.path.join(respath, 'sg2.shp'),
@@ -2136,7 +2135,7 @@ class Grains(PolySet):
                 # A valid polygon must have at least 4 coordinate tuples
                 if len(rec.shape.points) > 3:
                     geom = shape(rec.shape.__geo_interface__)
-                    # fix duplicate vertexes
+                    # remove duplicate and subsequent colinear vertexes
                     #geom = geom.simplify(0)
                     # try  to "clean" self-touching or self-crossing polygons
                     if not geom.is_valid:
@@ -2180,7 +2179,7 @@ class Grains(PolySet):
 
     @classmethod
     def from_file(cls, filename=os.path.join(respath, 'sg2.shp'), **kwargs):
-        """Create Grains from ESRI shapefile.
+        """Create Grains from geospatial file.
 
         Args:
           filename: filename of shapefile. Default sg2.shp from examples
@@ -2191,10 +2190,10 @@ class Grains(PolySet):
         """
         import fiona
 
-        namefield = kwargs.pop('namefield', 'phase')
+        namefield = kwargs.pop('namefield', 'PHASE')
         name = kwargs.pop('name', 'None')
 
-        with fiona.open('/home/ondro/develrepo/polylx/polylx/example/sg2.shp', **kwargs) as src:
+        with fiona.open(filename, **kwargs) as src:
             schema = src.schema
             assert schema['geometry'] == 'Polygon', 'The file must contains polygons!'
             fieldnames = list(schema['properties'].keys())
@@ -2204,7 +2203,7 @@ class Grains(PolySet):
             shapes = []
             for feature in src:
                 geom = shape(feature['geometry'])
-                # fix duplicate vertexes
+                # remove duplicate and subsequent colinear vertexes
                 #geom = geom.simplify(0)
                 # try  to "clean" self-touching or self-crossing polygons
                 if not geom.is_valid:
