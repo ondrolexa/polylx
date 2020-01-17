@@ -564,3 +564,16 @@ def weighted_avg_and_std(values, weights):
     # Fast and numerically precise:
     variance = np.average((values-average)**2, weights=weights)
     return (average, np.sqrt(variance))
+
+def classify_shapes(g, n=2, **kwargs):
+    from sklearn.decomposition import PCA
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.cluster import KMeans
+
+    X = StandardScaler().fit_transform(g.shape_vector())
+    pca = PCA(n_components=1)
+    pcs = pca.fit_transform(X)
+    Y = StandardScaler().fit_transform(np.array([pcs.T[0], np.log10(g.ead)]).T)
+    kmeans = KMeans(n_clusters=n, init='k-means++', max_iter=300, n_init=10, random_state=0)
+    pred_y = kmeans.fit_predict(Y)
+    g.classify(pred_y, rule='unique')

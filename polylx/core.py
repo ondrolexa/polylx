@@ -34,6 +34,7 @@ from .utils import fixratio, fixzero, deg, Classify, PolygonPath
 from .utils import find_ellipse, densify, inertia_moments
 from .utils import _chaikin, _visvalingam_whyatt
 from .utils import _spline_ring
+from .utils import weighted_avg_and_std
 
 from pkg_resources import resource_filename
 
@@ -318,40 +319,61 @@ class PolyShape(object):
         The angle of rotation can be specified in either degrees (default)
         or radians by setting use_radians=True. Positive angles are
         counter-clockwise and negative are clockwise rotations.
-        The point of origin can be a keyword ‘center’ for the object bounding
-        box center (default), ‘centroid’ for the geometry’s centroid,
+        The point of origin can be a keyword 'center' for the object bounding
+        box center (default), 'centroid' for the geometry’s centroid,
         or coordinate tuple (x0, y0) for fixed point.
+
+        Args:
+            angle
+        Kwargs:
+            origin='center'
+            use_radians=False
 
         """
         return type(self)(affinity.rotate(self.shape, angle, **kwargs),
                           name=self.name, fid=self.fid)
 
     def scale(self, **kwargs):
-        """Returns a scaled geometry, scaled by factors along each dimension.
-        The point of origin can be a keyword ‘center’ for the object bounding
-        box center (default), ‘centroid’ for the geometry’s centroid,
-        or coordinate tuple (x0, y0) for fixed point.
+        """Returns a scaled geometry, scaled by factors 'xfact' and 'yfact'
+        along each dimension. The 'origin' keyword can be 'center' for the
+        object bounding box center (default), 'centroid' for the geometry’s
+        centroid, or coordinate tuple (x0, y0) for fixed point.
         Negative scale factors will mirror or reflect coordinates.
+
+        Kwargs:
+            xfact=1.0
+            yfact=1.0
+            origin='center'
 
         """
         return type(self)(affinity.scale(self.shape, **kwargs),
                           name=self.name, fid=self.fid)
 
     def skew(self, **kwargs):
-        """Returns a skewed geometry, sheared by angles ‘xs’ along x and
-        ‘ys’ along y direction. The shear angle can be specified in either
+        """Returns a skewed geometry, sheared by angles 'xs' along x and
+        'ys' along y direction. The shear angle can be specified in either
         degrees (default) or radians by setting use_radians=True.
-        The point of origin can be a keyword ‘center’ for the object bounding
-        box center (default), ‘centroid’ for the geometry’s centroid,
+        The point of origin can be a keyword 'center' for the object bounding
+        box center (default), 'centroid' for the geometry’s centroid,
         or a coordinate tuple (x0, y0) for fixed point.
+
+        Kwrags:
+            xs=0.0
+            ys=0.0
+            origin='center'
+            use_radians=False
 
         """
         return type(self)(affinity.skew(self.shape, **kwargs),
                           name=self.name, fid=self.fid)
 
     def translate(self, **kwargs):
-        """Returns a translated geometry shifted by offsets ‘xoff’ along x
-        and ‘yoff’ along y direction.
+        """Returns a translated geometry shifted by offsets 'xoff' along x
+        and 'yoff' along y direction.
+
+        Kwargs:
+            xoff=0.0
+            yoff=0.0
 
         """
         return type(self)(affinity.translate(self.shape, **kwargs),
@@ -501,7 +523,12 @@ class Grain(PolyShape):
 
         """
         N = kwargs.get('N', 128)
-        r = self.regularize(N=N).cdist
+        reg = self.regularize(N=N)
+        r = reg.cdist
+        if kwargs.get('method', 'new') == 'new':
+            xx = np.linspace(0, 2*np.pi, N)
+            pp = 2*np.pi*np.insert(np.cumsum(np.sqrt(np.sum(np.diff(reg.xy, axis=1)**2, axis=0))), 0, 0)/reg.length
+            r = np.interp(xx, pp, r, period=2*np.pi)  # need numpy version 1.10.0.
         fft = np.fft.fft(r)
         f = abs(fft[1:]) / abs(fft[0])
         return f[:N // 2]
@@ -1582,11 +1609,11 @@ class PolySet(object):
 
         Example:
           >>> g.agg('area', np.sum, 'ead', np.mean, 'lao', circular.mean)
-                          area       ead        lao
-          class
-          ksp         2.443733  0.089710  76.875488
-          pl          1.083516  0.060629  94.197847
-          qtz         1.166097  0.068071  74.320337
+                     area       ead        lao
+          class                               
+          ksp    2.443733  0.089710  76.875488
+          pl     1.083516  0.060629  94.197847
+          qtz    1.166097  0.068071  74.320337
 
         """
         pieces = []
@@ -1594,6 +1621,27 @@ class PolySet(object):
             df = self.groups(attr).agg(aggfunc)
             pieces.append(df)
         return pd.concat(pieces, axis=1).reindex(self.class_names)
+
+    def accumulate(self, *methods):
+        """Returns accumulated result of multiple Group methods based
+        on actual classification.
+
+        Example:
+          >>> g.accumulate('rms_ead', 'aw_ead', 'aw_ead_log')
+                  rms_ead    aw_ead  aw_ead_log
+          class                                
+          ksp    0.110679  0.185953    0.161449
+          pl     0.068736  0.095300    0.086762
+          qtz    0.097872  0.297476    0.210481
+
+        """
+        pieces = []
+        for key, g in self.class_iter():
+            row = {'class':key}
+            for method in methods:
+                row[method] = getattr(g, method)
+            pieces.append(row)
+        return pd.DataFrame(pieces).set_index('class')
 
     def groups(self, *attrs):
         """Returns ``pandas.GroupBy`` of object attributes.
@@ -1954,6 +2002,29 @@ class Grains(PolySet):
 
         """
         return np.array([p.ead for p in self])
+
+    @property
+    def aw_ead(self):
+        """Returns normal area weighted mean of ead
+
+        """
+        loc, _ = weighted_avg_and_std(self.ead, self.area)
+        return loc
+
+    @property
+    def aw_ead_log(self):
+        """Returns lognormal area weighted mean of ead
+
+        """
+        loc, _ = weighted_avg_and_std(np.log10(self.ead), self.area)
+        return 10**loc
+
+    @property
+    def rms_ead(self):
+        """Returns root mean square of ead
+
+        """
+        return np.sqrt(np.mean(self.ead**2))
 
     def shape_vector(self, **kwargs):
         """Returns array of shape (feature) vectors.

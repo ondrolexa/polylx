@@ -111,13 +111,17 @@ def rose_plot(ang, **kwargs):
 
 def grainsize_plot(d, **kwargs):
     # weights=None, bins='auto', left=None, right=None, num=500, alpha=95, bootstrap=False, title=None
+    if 'weights' in kwargs:
+        avgtxt = 'WMean'
+    else:
+        avgtxt = 'Mean'
     weights = kwargs.get('weights', np.ones_like(d))
     bins = kwargs.get('bins', 'auto')
     bootstrap = kwargs.get('bootstrap', False)
     alpha = kwargs.get('alpha', 95)
     num = kwargs.get('num', 500)
     bootstrap = kwargs.get('bootstrap', False)
-    title = kwargs.get('set_title', None)
+    title = kwargs.get('title', None)
     if 'ax' in kwargs:
         ax = kwargs.pop('ax')
         show = False
@@ -133,7 +137,7 @@ def grainsize_plot(d, **kwargs):
     lbw = bins_log[1:] - bins_log[:-1]
     # statistics
     loc, scale = weighted_avg_and_std(ld, weights)
-
+    rms = np.sqrt(np.mean(d**2))
     # default left right values
     left = kwargs.get('left', 10**(loc - 3.5*scale))
     right = kwargs.get('right', 10**(loc + 3.5*scale))
@@ -151,25 +155,28 @@ def grainsize_plot(d, **kwargs):
 
     # bootstrap CI on mean
     if bootstrap:
-        bcnt, bpdf, mu = [], [], []
+        bcnt, bpdf, bmu, brms = [], [], [], []
         for i in range(num):
             ix = np.random.choice(len(d), len(d))
             cnt, _ = np.histogram(d[ix], bins=bins, weights=weights[ix], density=True)
             bcnt.append(cnt)
-            loc, scale = weighted_avg_and_std(np.log10(d[ix]), weights[ix])
-            bpdf.append(stats.norm.pdf(lxx, loc=loc, scale=scale))
-            mu.append(loc)
-        # confidence interval
-        delta = np.array(mu) - loc
-        conf = np.power(10, loc + np.percentile(delta, [(100-alpha)/2, alpha + (100-alpha)/2]))
+            bloc, bscale = weighted_avg_and_std(np.log10(d[ix]), weights[ix])
+            bpdf.append(stats.norm.pdf(lxx, loc=bloc, scale=bscale))
+            bmu.append(bloc)
+            brms.append(np.sqrt(np.mean(d[ix]**2)))
+        # confidence intervals
+        mudelta = np.array(bmu) - loc
+        muconf = np.power(10, loc + np.percentile(mudelta, [(100-alpha)/2, alpha + (100-alpha)/2]))
+        rmsdelta = np.array(brms) - rms
+        rmsconf = rms + np.percentile(rmsdelta, [(100-alpha)/2, alpha + (100-alpha)/2])
         # plot
         ax.fill_between(10**lxx, np.min(bpdf, axis=0), np.max(bpdf, axis=0), color='lightsteelblue', alpha=0.5)
         ax.bar(bc, np.mean(bcnt, axis=0)*bw/lbw, width=0.9*bw, yerr=np.std(bcnt, axis=0)*bw/lbw/2, color='mediumseagreen')
-        ax.text(0.02, 0.9, 'AW mean EAD: {:.2f}\n{:.1f}% CI: {:.2f}-{:.2f}'.format(10**loc, alpha, *conf),
+        ax.text(0.02, 0.9, '{} EAD: {:.2f}\n{:.1f}% CI: {:.2f}-{:.2f}\nRMS EAD: {:.2f}\n{:.1f}% CI: {:.2f}-{:.2f}'.format(avgtxt, 10**loc, alpha, muconf[0], muconf[1], rms, alpha, rmsconf[0], rmsconf[1]),
              horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
     else:
         ax.bar(bc, counts*bw/lbw, width=0.9*bw, color='mediumseagreen')
-        ax.text(0.02, 0.9, 'AW mean EAD: {:.2f}'.format(10**loc),
+        ax.text(0.02, 0.9, '{} EAD: {:.2f}\nRMS EAD: {:.2f}'.format(avgtxt, 10**loc, rms),
              horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
     ax.plot(10**lxx, pdf, 'k')
     ax.set_xscale('log')

@@ -1,5 +1,11 @@
 # Changes
 
+### 0.5.1 (XX YYY 2020)
+
+ * added grainsize plot
+ * added accumulate method to Grains and Boundaries
+ * simple fiona reader implemented
+
 ## 0.5 (29 Jan 2019)
 
  * rose plot groupped according to classification
