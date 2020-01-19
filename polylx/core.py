@@ -34,7 +34,7 @@ from .utils import fixratio, fixzero, deg, Classify, PolygonPath
 from .utils import find_ellipse, densify, inertia_moments
 from .utils import _chaikin, _visvalingam_whyatt
 from .utils import _spline_ring
-from .utils import weighted_avg_and_std
+from .utils import weighted_avg_and_std, efd
 
 from pkg_resources import resource_filename
 
@@ -679,6 +679,40 @@ class Grain(PolyShape):
                              for d in np.linspace(0, 1, N)])[:, :, 0]
             holes.append(LinearRing(rh))
         return Grain(Polygon(rc, holes=holes), self.name, self.fid)
+
+    def fourier(self, **kwargs):
+        """Eliptic Fourier reconstruction.
+
+        Returns reconstructed ``Grain`` object using Fourier coefficients
+        for characterizing closed contours.
+
+        Keywords:
+          order: The order of FDC to calculate. Default 12.
+          smooth: The number of FDC used for reconstructing the contour. Default 6.
+          N: number of vertices for reconstructed grain. Default 128.
+
+        """
+        order = kwargs.get('order', self.xy.shape[1])
+        smooth = kwargs.get('smooth', order // 2)
+        N = kwargs.get('N', 128)
+        coeffs = efd.elliptic_fourier_descriptors(self.xy.T, order=order)
+        x, y = efd.reconstruct_contour(coeffs, locus=self.centroid, num_points=N, num_coeffs=smooth)
+        holes = []
+        for hole in self.interiors:
+            order = kwargs.get('order', hole.shape[1])
+            smooth = kwargs.get('smooth', order // 2)
+            coeffs = efd.elliptic_fourier_descriptors(hole.T, order=order)
+            centroid = LinearRing(coordinates=hole.T).centroid.coords[0]
+            xh, yh = efd.reconstruct_contour(coeffs, locus=centroid, num_points=N, num_coeffs=smooth)
+            holes.append(LinearRing(coordinates=np.c_[xh, yh]))
+        shape = Polygon(LinearRing(coordinates=np.c_[x, y]), holes=holes)
+        if shape.is_valid:
+            res = Grain(shape, self.name, self.fid)
+        else:
+            res = self
+            print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
+        return res
+
 
     ################################################################
     # Grain shape methods (should modify sa, la, sao, lao, xc, yc) #

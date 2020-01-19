@@ -2,6 +2,7 @@
 
 ### 0.5.1 (XX YYY 2020)
 
+ * eliptic fourier smoothing for Grains added
  * added grainsize plot
  * added accumulate method to Grains and Boundaries
  * simple fiona reader implemented
