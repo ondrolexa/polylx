@@ -2,6 +2,7 @@
 
 ### 0.5.1 (XX YYY 2020)
 
+ * fourier_ellipse shape method for Grains added
  * eliptic fourier smoothing for Grains added
  * added grainsize plot
  * added accumulate method to Grains and Boundaries

@@ -134,6 +134,15 @@ class PolyShape(object):
         """
         return self.shape.representative_point().coords[0]
 
+    @property
+    def pdist(self):
+        """Returns a cummulative along-perimeter distances.
+
+        """
+        dxy = np.diff(self.xy, axis=1)
+        dt = np.sqrt((dxy ** 2).sum(axis=0))
+        return np.insert(np.cumsum(dt), 0, 0)
+
     def feret(self, angle=0):
         """Returns the ferret diameter for given angle.
 
@@ -522,16 +531,13 @@ class Grain(PolyShape):
              Routine return N/2 of FDs
 
         """
-        N = kwargs.get('N', 128)
-        reg = self.regularize(N=N)
-        r = reg.cdist
-        if kwargs.get('method', 'new') == 'new':
-            xx = np.linspace(0, 2*np.pi, N)
-            pp = 2*np.pi*np.insert(np.cumsum(np.sqrt(np.sum(np.diff(reg.xy, axis=1)**2, axis=0))), 0, 0)/reg.length
-            r = np.interp(xx, pp, r, period=2*np.pi)  # need numpy version 1.10.0.
+        N = kwargs.get('N', 16)
+        r = self.cdist
         fft = np.fft.fft(r)
         f = abs(fft[1:]) / abs(fft[0])
-        return f[:N // 2]
+        fd = np.zeros(N)
+        fd[:len(f[:N])] = f[:N]
+        return fd
 
     @property
     def nholes(self):
@@ -695,15 +701,16 @@ class Grain(PolyShape):
         order = kwargs.get('order', self.xy.shape[1])
         smooth = kwargs.get('smooth', order // 2)
         N = kwargs.get('N', 128)
-        coeffs = efd.elliptic_fourier_descriptors(self.xy.T, order=order)
-        x, y = efd.reconstruct_contour(coeffs, locus=self.centroid, num_points=N, num_coeffs=smooth)
+        coeffs = efd.elliptic_fourier_descriptors(self.xy, order=order)
+        locus = efd.calculate_dc_coefficients(self.xy)
+        x, y = efd.reconstruct_contour(coeffs, locus=locus, num_points=N, num_coeffs=smooth)
         holes = []
         for hole in self.interiors:
             order = kwargs.get('order', hole.shape[1])
             smooth = kwargs.get('smooth', order // 2)
-            coeffs = efd.elliptic_fourier_descriptors(hole.T, order=order)
-            centroid = LinearRing(coordinates=hole.T).centroid.coords[0]
-            xh, yh = efd.reconstruct_contour(coeffs, locus=centroid, num_points=N, num_coeffs=smooth)
+            coeffs = efd.elliptic_fourier_descriptors(hole, order=order)
+            locus = efd.calculate_dc_coefficients(hole)
+            xh, yh = efd.reconstruct_contour(coeffs, locus=locus, num_points=N, num_coeffs=smooth)
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
@@ -871,7 +878,7 @@ class Grain(PolyShape):
     def maee(self):
         """`shape_method`: maee
 
-        Short and long axes are calculated from minimum volume enclosing
+        Short and long axes are calculated from minimum area enclosing
         ellipse. The solver is based on Khachiyan Algorithm, and the final
         solution is different from the optimal value by the pre-specified
         amount of tolerance of EAD/100.
@@ -908,6 +915,21 @@ class Grain(PolyShape):
         self.lao, self.sao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
         self.xc, self.yc = P.dot(u)
         self._shape_method = 'maee'
+
+    def fourier_ellipse(self):
+        """`shape_method`: cov
+
+        Short and long axes are calculated from eigenvalue analysis
+        of coordinate covariance matrix.
+        Center coordinates are set to centroid of exterior.
+
+        """
+        coeffs = efd.elliptic_fourier_descriptors(self.xy, order=1)
+        coeffs, psi = efd.normalize_efd(coeffs, size_invariant=False)
+        self.xc, self.yc = efd.calculate_dc_coefficients(self.xy)
+        self.sa, self.la = 2 * coeffs[0, [3, 0]]
+        self.sao, self.lao = np.degrees(np.pi - psi) % 180, np.degrees(np.pi / 2 - psi) % 180
+        self._shape_method = 'fourier_ellipse'
 
 
 class Boundary(PolyShape):

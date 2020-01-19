@@ -179,10 +179,10 @@ class efd(object):
     """
 
     @staticmethod
-    def elliptic_fourier_descriptors(contour, order=10, normalize=False):
+    def elliptic_fourier_descriptors(xy, order=10, normalize=False):
         """Calculate elliptical Fourier descriptors for a contour.
 
-        :param numpy.ndarray contour: A contour array of size ``[M x 2]``.
+        :param numpy.ndarray xy: A xy array of size ``[2 x M]``.
         :param int order: The order of Fourier coefficients to calculate.
         :param bool normalize: If the coefficients should be normalized;
             see references for details.
@@ -190,9 +190,9 @@ class efd(object):
         :rtype: :py:class:`numpy.ndarray`
 
         """
-        dxy = np.diff(contour, axis=0)
-        dt = np.sqrt((dxy ** 2).sum(axis=1))
-        t = np.concatenate([([0.]), np.cumsum(dt)])
+        dxy = np.diff(xy, axis=1)
+        dt = np.sqrt((dxy ** 2).sum(axis=0))
+        t = np.insert(np.cumsum(dt), 0, 0)
         T = t[-1]
 
         phi = (2 * np.pi * t) / T
@@ -202,11 +202,10 @@ class efd(object):
         phi = phi * orders.reshape((order, -1))
         d_cos_phi = np.cos(phi[:, 1:]) - np.cos(phi[:, :-1])
         d_sin_phi = np.sin(phi[:, 1:]) - np.sin(phi[:, :-1])
-        cos_phi = (dxy[:, 0] / dt) * d_cos_phi
-        a = consts * np.sum(cos_phi, axis=1)
-        b = consts * np.sum((dxy[:, 0] / dt) * d_sin_phi, axis=1)
-        c = consts * np.sum((dxy[:, 1] / dt) * d_cos_phi, axis=1)
-        d = consts * np.sum((dxy[:, 1] / dt) * d_sin_phi, axis=1)
+        a = consts * np.sum((dxy[0, :] / dt) * d_cos_phi, axis=1)
+        b = consts * np.sum((dxy[0, :] / dt) * d_sin_phi, axis=1)
+        c = consts * np.sum((dxy[1, :] / dt) * d_cos_phi, axis=1)
+        d = consts * np.sum((dxy[1, :] / dt) * d_sin_phi, axis=1)
 
         coeffs = np.concatenate(
             [
@@ -219,7 +218,7 @@ class efd(object):
         )
 
         if normalize:
-            coeffs = efd.normalize_efd(coeffs)
+            coeffs, _ = efd.normalize_efd(coeffs)
 
         return coeffs
 
@@ -285,30 +284,30 @@ class efd(object):
             # Obtain size-invariance by normalizing.
             coeffs /= np.abs(coeffs[0, 0])
 
-        return coeffs
+        return coeffs, psi_1
 
     @staticmethod
-    def calculate_dc_coefficients(contour):
+    def calculate_dc_coefficients(xy):
         """Calculate the :math:`A_0` and :math:`C_0` coefficients of the elliptic Fourier series.
 
-        :param numpy.ndarray contour: A contour array of size ``[M x 2]``.
+        :param numpy.ndarray xy: A xy array of size ``[2 x M]``.
         :return: The :math:`A_0` and :math:`C_0` coefficients.
         :rtype: tuple
 
         """
-        dxy = np.diff(contour, axis=0)
-        dt = np.sqrt((dxy ** 2).sum(axis=1))
-        t = np.concatenate([([0.]), np.cumsum(dt)])
+        dxy = np.diff(xy, axis=1)
+        dt = np.sqrt((dxy ** 2).sum(axis=0))
+        t = np.insert(np.cumsum(dt), 0, 0)
         T = t[-1]
 
-        xi = np.cumsum(dxy[:, 0]) - (dxy[:, 0] / dt) * t[1:]
-        A0 = (1 / T) * np.sum(((dxy[:, 0] / (2 * dt)) * np.diff(t ** 2)) + xi * dt)
-        delta = np.cumsum(dxy[:, 1]) - (dxy[:, 1] / dt) * t[1:]
-        C0 = (1 / T) * np.sum(((dxy[:, 1] / (2 * dt)) * np.diff(t ** 2)) + delta * dt)
+        xi = np.cumsum(dxy[0, :]) - (dxy[0, :] / dt) * t[1:]
+        A0 = (1 / T) * np.sum(((dxy[0, :] / (2 * dt)) * np.diff(t ** 2)) + xi * dt)
+        delta = np.cumsum(dxy[1, :]) - (dxy[1, :] / dt) * t[1:]
+        C0 = (1 / T) * np.sum(((dxy[1, :] / (2 * dt)) * np.diff(t ** 2)) + delta * dt)
 
-        # A0 and CO relate to the first point of the contour array as origin.
+        # A0 and CO relate to the first point of the xy array as origin.
         # Adding those values to the coefficients to make them relate to true origin.
-        return contour[0, 0] + A0, contour[0, 1] + C0
+        return xy[0, 0] + A0, xy[1, 0] + C0
 
     @staticmethod
     def reconstruct_contour(coeffs, num_coeffs=None, locus=(0, 0), num_points=300):
@@ -770,3 +769,4 @@ def classify_shapes(g, n=2, **kwargs):
     kmeans = KMeans(n_clusters=n, init='k-means++', max_iter=300, n_init=10, random_state=0)
     pred_y = kmeans.fit_predict(Y)
     g.classify(pred_y, rule='unique')
+    
