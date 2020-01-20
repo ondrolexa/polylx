@@ -527,17 +527,15 @@ class Grain(PolyShape):
         of the FDs are needed to index the shape.
 
         Keywords:
-          N: number of points to regularize shape. Default 128
-             Routine return N/2 of FDs
+          N: number of vertices to regularize outline. Default 128
+             Note that number returned FDs is half of N.
 
         """
-        N = kwargs.get('N', 16)
-        r = self.cdist
+        N = kwargs.get('N', 128)
+        r = self.regularize(N=N).cdist
         fft = np.fft.fft(r)
         f = abs(fft[1:]) / abs(fft[0])
-        fd = np.zeros(N)
-        fd[:len(f[:N])] = f[:N]
-        return fd
+        return f[:N // 2]
 
     @property
     def nholes(self):
