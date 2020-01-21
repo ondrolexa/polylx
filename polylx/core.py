@@ -503,6 +503,23 @@ class Grain(PolyShape):
         return 2 * np.sqrt(self.area / np.pi)
 
     @property
+    def circularity(self):
+        """Return circularity (also called compactness) of the object.
+        circ = length**2/area
+
+        """
+        return self.length**2 / self.area
+
+    @property
+    def haralick(self):
+        """Return Haralick’s circularity of the object.
+        hcirc = mean(R) / std(R) where R is array of centroid-vertex distances
+
+        """
+        r = self.cdist
+        return np.mean(r) / np.std(r)
+
+    @property
     def cdist(self):
         """Returns centroid-vertex distances of grain exterior
 
@@ -2056,6 +2073,22 @@ class Grains(PolySet):
 
         """
         return np.array([p.ead for p in self])
+
+    @property
+    def circularity(self):
+        """Return array of circularities (also called compactness) of the objects.
+        circ = length**2/area
+
+        """
+        return np.array([p.circularity for p in self])
+
+    @property
+    def haralick(self):
+        """Return array of Haralick’s circularities of the objects.
+        hcirc = mean(R) / std(R) where R is array of centroid-vertex distances
+
+        """
+        return np.array([p.haralick for p in self])
 
     @property
     def aw_ead(self):
