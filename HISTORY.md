@@ -7,6 +7,7 @@
  * added grainsize plot
  * added accumulate method to Grains and Boundaries
  * simple fiona reader implemented
+ * added kde plot
 
 ## 0.5 (29 Jan 2019)
 

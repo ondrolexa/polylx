@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from scipy import stats
 import seaborn as sns
 from .core import PolySet
-from .utils import weighted_avg_and_std
+from .utils import weighted_avg_and_std, gaussian_kde
 
 ##########################
 # Plots for polylx objects
@@ -126,7 +126,7 @@ def grainsize_plot(d, **kwargs):
         ax = kwargs.pop('ax')
         show = False
     else:
-        f, ax = plt.subplots(figsize=(9, 5))
+        f, ax = plt.subplots(figsize=kwargs.get('figsize', plt.rcParams.get('figure.figsize')))
         show = True
     d = np.asarray(d)
     ld = np.log10(d)
@@ -181,5 +181,56 @@ def grainsize_plot(d, **kwargs):
     ax.plot(10**lxx, pdf, 'k')
     ax.set_xscale('log')
     ax.set_xlim(left=left, right=right)
+    if show:
+        plt.show()
+
+def plot_kde(g, **kwargs):
+    bins = kwargs.get('bins', 'auto')
+    grouped = kwargs.get('grouped', True)
+    title = kwargs.get('title', None)
+    weighted = kwargs.get('weighted', True)
+    if weighted:
+        from .utils import gaussian_kde
+    else:
+        from scipy.stats import gaussian_kde
+    if 'ax' in kwargs:
+        ax = kwargs.pop('ax')
+        show = False
+    else:
+        f, ax = plt.subplots(figsize=kwargs.get('figsize', plt.rcParams.get('figure.figsize')))
+        show = True
+    logead = np.log10(g.ead)
+    weights = g.area
+    ed = np.histogram_bin_edges(logead, bins=bins)
+    xmin = 2*ed[0] - ed[1]
+    xmax = 2*ed[-1] - ed[-2]
+    x = np.linspace(xmin, xmax, 250)
+    ax.hist(logead, ed, histtype='bar', alpha=.2, normed=True, color='k', weights=weights, rwidth=0.8)
+    if weighted:
+        pdf = gaussian_kde(logead, weights=weights)
+    else:
+        pdf = gaussian_kde(logead)
+    y = pdf(x)
+    if grouped:
+        ysum = np.zeros_like(x)
+        for key, gg in g.class_iter():
+            if weighted:
+                pdf = gaussian_kde(np.log10(gg.ead), weights=gg.area)
+            else:
+                pdf = gaussian_kde(np.log10(gg.ead))
+            yy = pdf(x)
+            ss = sum(gg.area)/sum(g.area)
+            ax.fill_between(x, 0, yy*ss, label='{}'.format(key), alpha=0.4, color=g.classes.color(key))
+            ysum += yy*ss
+        ax.plot(x, y, label='Summed', color='k', lw=1, ls='--')
+    else:
+        ax.fill_between(x, 0, y, alpha=0.4, color='b')
+    if weighted:
+        ax.plot(x, y, label='AW-KDE', color='k', lw=2)
+    else:
+        ax.plot(x, y, label='KDE', color='k', lw=1, ls='--')
+    ax.legend()
+    if title is not None and show:
+        f.suptitle(title)
     if show:
         plt.show()
