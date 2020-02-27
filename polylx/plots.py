@@ -120,7 +120,6 @@ def grainsize_plot(d, **kwargs):
     bootstrap = kwargs.get('bootstrap', False)
     alpha = kwargs.get('alpha', 95)
     num = kwargs.get('num', 500)
-    bootstrap = kwargs.get('bootstrap', False)
     title = kwargs.get('title', None)
     if 'ax' in kwargs:
         ax = kwargs.pop('ax')
@@ -156,6 +155,7 @@ def grainsize_plot(d, **kwargs):
     # bootstrap CI on mean
     if bootstrap:
         bcnt, bpdf, bmu, brms = [], [], [], []
+        lxx = np.linspace(np.log10(left), np.log10(right), 500)
         for i in range(num):
             ix = np.random.choice(len(d), len(d))
             cnt, _ = np.histogram(d[ix], bins=bins, weights=weights[ix], density=True)
@@ -189,6 +189,9 @@ def plot_kde(g, **kwargs):
     grouped = kwargs.get('grouped', True)
     title = kwargs.get('title', None)
     weighted = kwargs.get('weighted', True)
+    bootstrap = kwargs.get('bootstrap', False)
+    num = kwargs.get('num', 500)
+    alpha = kwargs.get('alpha', 95)
     if weighted:
         from .utils import gaussian_kde
     else:
@@ -199,37 +202,67 @@ def plot_kde(g, **kwargs):
     else:
         f, ax = plt.subplots(figsize=kwargs.get('figsize', plt.rcParams.get('figure.figsize')))
         show = True
-    logead = np.log10(g.ead)
+    ead = g.ead
+    logead = np.log10(ead)
     weights = g.area
     ed = np.histogram_bin_edges(logead, bins=bins)
     xmin = 2*ed[0] - ed[1]
     xmax = 2*ed[-1] - ed[-2]
-    x = np.linspace(xmin, xmax, 250)
-    ax.hist(logead, ed, histtype='bar', alpha=.2, normed=True, color='k', weights=weights, rwidth=0.8)
+    x = np.logspace(xmin, xmax, 250)
+    cntrs = 10**((ed[:-1] + ed[1:]) / 2)
+    #ax.hist(logead, ed, histtype='bar', alpha=.2, normed=True, color='k', weights=weights, rwidth=0.8)
     if weighted:
+        n, _ = np.histogram(logead, ed, weights=weights, density=True)
         pdf = gaussian_kde(logead, weights=weights)
     else:
+        n, _ = np.histogram(logead, ed, density=True)
         pdf = gaussian_kde(logead)
-    y = pdf(x)
+    ax.bar(cntrs, n, width=0.8*np.diff(10**ed), alpha=.2, color='k')
+    y = pdf(np.log10(x))
     if grouped:
         ysum = np.zeros_like(x)
+        poc = 0
         for key, gg in g.class_iter():
             if weighted:
                 pdf = gaussian_kde(np.log10(gg.ead), weights=gg.area)
             else:
                 pdf = gaussian_kde(np.log10(gg.ead))
-            yy = pdf(x)
+            yy = pdf(np.log10(x))
             ss = sum(gg.area)/sum(g.area)
             ax.fill_between(x, 0, yy*ss, label='{}'.format(key), alpha=0.4, color=g.classes.color(key))
             ysum += yy*ss
-        ax.plot(x, y, label='Summed', color='k', lw=1, ls='--')
+            poc += 1
+        if poc > 1:
+            ax.plot(x, y, label='Summed', color='k', lw=1, ls='--')
     else:
         ax.fill_between(x, 0, y, alpha=0.4, color='b')
     if weighted:
         ax.plot(x, y, label='AW-KDE', color='k', lw=2)
     else:
         ax.plot(x, y, label='KDE', color='k', lw=1, ls='--')
-    ax.legend()
+    ax.set_xscale('log')
+    ax.legend(loc=1)
+    loc, scale = weighted_avg_and_std(logead, weights)
+    rms = np.sqrt(np.mean(ead**2))
+    if bootstrap:
+        bcnt, bmu, brms = [], [], []
+        for i in range(num):
+            ix = np.random.choice(len(ead), len(ead))
+            cnt, _ = np.histogram(ead[ix], bins=10**ed, weights=weights[ix], density=True)
+            bcnt.append(cnt)
+            bloc, bscale = weighted_avg_and_std(np.log10(ead[ix]), weights[ix])
+            bmu.append(bloc)
+            brms.append(np.sqrt(np.mean(ead[ix]**2)))
+        # confidence intervals
+        mudelta = np.array(bmu) - loc
+        muconf = np.power(10, loc + np.percentile(mudelta, [(100-alpha)/2, alpha + (100-alpha)/2]))
+        rmsdelta = np.array(brms) - rms
+        rmsconf = rms + np.percentile(rmsdelta, [(100-alpha)/2, alpha + (100-alpha)/2])
+        ax.text(0.02, 0.85, 'AW mean EAD: {:.2f}\n{:.1f}% CI: {:.2f}-{:.2f}\nRMS EAD: {:.2f}\n{:.1f}% CI: {:.2f}-{:.2f}'.format(10**loc, alpha, muconf[0], muconf[1], rms, alpha, rmsconf[0], rmsconf[1]),
+             horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
+    else:
+        ax.text(0.02, 0.85, 'AW mean EAD: {:.2f}\nRMS EAD: {:.2f}'.format( 10**loc, rms),
+             horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
     if title is not None and show:
         f.suptitle(title)
     if show:
