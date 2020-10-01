@@ -2448,12 +2448,68 @@ class Grains(PolySet):
         if 'weights' in kwargs:
             _ = kwargs.pop('weights')
         if 'title' not in kwargs:
-            kwargs['title'] = 'Grainsize plot'
+            kwargs['title'] = 'Grainsize plot [EAD]'
         if areaweighted:
             grainsize_plot(self.ead, weights=self.area, **kwargs)
         else:
             grainsize_plot(self.ead, **kwargs)
 
+    def areafraction_plot(self, **kwargs):
+        if 'title' not in kwargs:
+            kwargs['title'] = 'Area fraction plot'
+        bins = kwargs.get('bins', 'auto')
+        title = kwargs.get('title', None)
+        xlog = kwargs.get('log', False)
+        d = self.ead
+        ld = np.log10(d)
+        areas = self.area
+        rms = np.sqrt(np.mean(d**2))
+        if 'ax' in kwargs:
+            ax = kwargs.pop('ax')
+            show = False
+        else:
+            f, ax = plt.subplots(figsize=kwargs.get('figsize', plt.rcParams.get('figure.figsize')))
+            show = True
+        if xlog:
+            bin_edges = np.histogram_bin_edges(ld, bins='auto')
+            inds = np.digitize(ld, bin_edges, right=False)
+            # statistics
+            loc, scale = weighted_avg_and_std(ld, areas)
+            # default left right values
+            left = kwargs.get('left', 10**(loc - 3.5*scale))
+            right = kwargs.get('right', 10**(loc + 3.5*scale))
+        else:
+            bin_edges = np.histogram_bin_edges(d, bins=bins)
+            inds = np.digitize(d, bin_edges, right=False)
+            bw = bin_edges[1:] - bin_edges[:-1]
+            left = kwargs.get('left', bin_edges[0] - bw[0])
+            right = kwargs.get('right', bin_edges[-1] + bw[-1])
+        # include right to last bin
+        inds[inds == len(bin_edges)] = len(bin_edges) - 1
+        if xlog:
+            bin_edges = 10**bin_edges
+        bw = bin_edges[1:] - bin_edges[:-1]
+        bc = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+        # area fractions
+        af = []
+        for ind in range(1, len(bin_edges)):
+            if ind in inds:
+                af.append(areas[inds == ind].sum())
+            else:
+                af.append(0)
+        af = 100 * np.array(af) / sum(areas)
+        # plot
+        ax.bar(bc, af, width=0.9*bw, color='mediumseagreen')
+        if xlog:
+            ax.set_xscale('log')
+        ax.set_xlim(left=left, right=right)
+        if show:
+            if title is not None and show:
+                f.suptitle(title)
+            ax.set_xlabel('EAD')
+            ax.set_ylabel('Area fraction [%]')
+            plt.show()
 
 class Boundaries(PolySet):
     """Class to store set of ``Boundaries`` objects

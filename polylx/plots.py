@@ -113,8 +113,10 @@ def grainsize_plot(d, **kwargs):
     # weights=None, bins='auto', left=None, right=None, num=500, alpha=95, bootstrap=False, title=None
     if 'weights' in kwargs:
         avgtxt = 'WMean'
+        ylbl = 'Weighted probability density'
     else:
         avgtxt = 'Mean'
+        ylbl = 'Probability density'
     weights = kwargs.get('weights', np.ones_like(d))
     bins = kwargs.get('bins', 'auto')
     bootstrap = kwargs.get('bootstrap', False)
@@ -147,11 +149,6 @@ def grainsize_plot(d, **kwargs):
     # hist counts
     counts,_ = np.histogram(d, bins, density=True, weights=weights)
 
-    # plot
-    
-    if title is not None and show:
-        f.suptitle(title)
-
     # bootstrap CI on mean
     if bootstrap:
         bcnt, bpdf, bmu, brms = [], [], [], []
@@ -182,6 +179,9 @@ def grainsize_plot(d, **kwargs):
     ax.set_xscale('log')
     ax.set_xlim(left=left, right=right)
     if show:
+        if title is not None and show:
+            f.suptitle(title)
+        ax.set_ylabel(ylbl)
         plt.show()
 
 def plot_kde(g, **kwargs):
@@ -263,7 +263,7 @@ def plot_kde(g, **kwargs):
     else:
         ax.text(0.02, 0.85, 'AW mean EAD: {:.2f}\nRMS EAD: {:.2f}'.format( 10**loc, rms),
              horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
-    if title is not None and show:
-        f.suptitle(title)
     if show:
+        if title is not None and show:
+            f.suptitle(title)
         plt.show()
