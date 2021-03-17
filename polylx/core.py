@@ -2185,7 +2185,7 @@ class Grains(PolySet):
                     if 'Polygon' in [seg.geom_type for seg in shared]:
                         print('Overlap between polygons {} {}.'.format(edge[0], edge[1]))
                     # Skip points if polygon just touch
-                    shared = linemerge([seg for seg in list(shared) if seg.geom_type is 'LineString'])
+                    shared = linemerge([seg for seg in list(shared) if seg.geom_type == 'LineString'])
                     if shared.geom_type == 'LineString':
                         shapes.append(Boundary(shared, bt, bid))
                         T[edge[0]][edge[1]]['bids'] = [bid]
@@ -2217,7 +2217,7 @@ class Grains(PolySet):
         def add_shared(gid, grain, oid, other, boundaries, T):
             shared = grain.intersection(other)
             if shared.geom_type in ['MultiLineString', 'GeometryCollection']:
-                shared = linemerge([part for part in list(shared) if part.geom_type is 'LineString'])
+                shared = linemerge([part for part in list(shared) if part.geom_type == 'LineString'])
             if shared.geom_type in ['MultiLineString', 'LineString']:
                 if shared.geom_type == 'MultiLineString':
                     shared = list(shared)
