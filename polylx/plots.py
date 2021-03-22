@@ -69,6 +69,9 @@ def rose_plot(ang, **kwargs):
         ax = fig.add_subplot(111, polar=True)
         ax.set_theta_zero_location('N')
         ax.set_theta_direction(-1)
+        thetagrid = kwargs.get('thetagrid', np.arange(0, 360, 10))
+        ax.set_thetagrids(thetagrid, labels=thetagrid)
+        ax.set_rlabel_position(0)
     if kwargs.get('pdf', False):
         from scipy.stats import vonmises
         theta = np.linspace(-np.pi, np.pi, 1801)
@@ -95,16 +98,17 @@ def rose_plot(ang, **kwargs):
         num[0] += num[-1]
         num = num[:-1]
         theta, radii = [], []
-        arrow = kwargs.get('arrow', 0.95)
+        arrow = kwargs.get('arrow', 1)
         rwidth = kwargs.get('rwidth', 1)
         for cc, val in zip(np.arange(0, 360, width), num):
             theta.extend([cc - width / 2, cc - rwidth * width / 2, cc,
                           cc + rwidth * width / 2, cc + width / 2, ])
             radii.extend([0, val * arrow, val, val * arrow, 0])
         theta = np.deg2rad(theta)
-    if kwargs.get('scaled', False):
+    if kwargs.get('scaled', True):
         radii = np.sqrt(radii)
     ax.fill(theta, radii, **kwargs.get('fill_kwg', {}))
+    ax.set_axisbelow(True)
     if kwargs.get('show', True):
         plt.show()
     return ax

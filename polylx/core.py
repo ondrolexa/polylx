@@ -1894,6 +1894,9 @@ class PolySet(object):
           weights: if provided histogram is weighted
           density: True for probability density otherwise counts
           grid: True to show grid
+          color: Bars color. Default is taken classification.
+          ec: edgecolor. Default '#222222'
+          alpha: alpha value. Default 1
 
         When show=False, returns matplotlib axes object
 
@@ -1909,7 +1912,7 @@ class PolySet(object):
         bins = kwargs.get('bins', 36)
         weights = kwargs.get('weights', [])
         grid = kwargs.get('grid', True)
-        ec = kwargs.get('ec', '#222222')
+        gridstep = kwargs.get('gridstep', 10)
         width = 360 / bins
         bin_edges = np.linspace(-width / 2, 360 + width / 2, bins + 2)
         bin_centres = (bin_edges[:-1] + np.diff(bin_edges) / 2)[:-1]
@@ -1931,14 +1934,15 @@ class PolySet(object):
                 n = np.sqrt(n)
             ax.bar(np.deg2rad(bin_centres), n,
                    width=np.deg2rad(width), bottom=bt,
-                   color=self.classes.color(key),
+                   color=kwargs.get('color', self.classes.color(key)),
                    label='{} ({})'.format(key, len(gix)),
-                   edgecolor=ec)
+                   edgecolor=kwargs.get('ec', '#222222'),
+                   alpha=kwargs.get('alpha', 1))
             bt += n
 
         ax.set_theta_zero_location('N')
         ax.set_theta_direction(-1)
-        ax.set_thetagrids(np.arange(0, 360, 10), labels=np.arange(0, 360, 10))
+        ax.set_thetagrids(np.arange(0, 360, gridstep), labels=np.arange(0, 360, gridstep))
         ax.set_rlabel_position(0)
         ax.grid(grid)
         if not grid:
