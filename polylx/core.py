@@ -552,7 +552,7 @@ class Grain(PolyShape):
         r = self.regularize(N=N).cdist
         fft = np.fft.fft(r)
         f = abs(fft[1:]) / abs(fft[0])
-        return f[:N // 2]
+        return f[:int(N / 2)]
 
     @property
     def nholes(self):
@@ -687,14 +687,14 @@ class Grain(PolyShape):
         """
         N = kwargs.get('N', 128)
         if 'length' in kwargs:
-            N = self.shape.exterior.length // kwargs['length'] + 1
+            N = int(self.shape.exterior.length / kwargs['length']) + 1
             N = max(N, 4)
         rc = np.asarray([self.shape.exterior.interpolate(d, normalized=True).xy
                          for d in np.linspace(0, 1, N)])[:, :, 0]
         holes = []
         for hole in self.shape.interiors:
             if 'length' in kwargs:
-                N = hole.length // kwargs['length'] + 1
+                N = int(hole.length / kwargs['length']) + 1
                 N = max(N, 4)
             rh = np.asarray([hole.interpolate(d, normalized=True).xy
                              for d in np.linspace(0, 1, N)])[:, :, 0]
@@ -714,7 +714,7 @@ class Grain(PolyShape):
 
         """
         order = kwargs.get('order', self.xy.shape[1])
-        smooth = kwargs.get('smooth', order // 2)
+        smooth = kwargs.get('smooth', int(order / 2))
         N = kwargs.get('N', 128)
         coeffs = efd.elliptic_fourier_descriptors(self.xy, order=order)
         locus = efd.calculate_dc_coefficients(self.xy)
@@ -722,7 +722,7 @@ class Grain(PolyShape):
         holes = []
         for hole in self.interiors:
             order = kwargs.get('order', hole.shape[1])
-            smooth = kwargs.get('smooth', order // 2)
+            smooth = kwargs.get('smooth', int(order / 2))
             coeffs = efd.elliptic_fourier_descriptors(hole, order=order)
             locus = efd.calculate_dc_coefficients(hole)
             xh, yh = efd.reconstruct_contour(coeffs, locus=locus, num_points=N, num_coeffs=smooth)
@@ -1087,7 +1087,7 @@ class Boundary(PolyShape):
         """
         N = kwargs.get('N', 128)
         if 'length' in kwargs:
-            N = self.length // kwargs['length'] + 1
+            N = int(self.length / kwargs['length']) + 1
             N = max(N, 2)
         rc = np.asarray([self.shape.interpolate(d, normalized=True).xy
                          for d in np.linspace(0, 1, N)])[:, :, 0]
