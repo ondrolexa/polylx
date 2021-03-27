@@ -8,10 +8,12 @@ test_polylx
 Tests for `polylx` module.
 """
 
+import numpy as np
 from polylx import *
 import unittest
 
 sample = Sample.from_shp()
+
 
 class TestPolylx(unittest.TestCase):
 
@@ -50,26 +52,24 @@ class TestPolylx(unittest.TestCase):
     def test_surfor(self):
         self.assertTrue(np.allclose(sample.g.surfor(normalized=False).mean(axis=1).mean(), 0.091372541656203621))
 
-    def test_surfor(self):
-        self.assertTrue(np.allclose(sample.g.surfor(normalized=False).mean(axis=1).mean(), 0.091372541656203621))
-
     def test_smooth_chaikin(self):
         try:
-            gs = sample.g.smooth()
-        except:
+            sample.g.smooth()
+        except Exception:
             self.fail('Chaikin corner-cutting smoothing failed.')
 
     def test_smooth_vw(self):
         try:
-            gs = sample.g.simplify()
-        except:
+            sample.g.simplify()
+        except Exception:
             self.fail('Visvalingam-Whyatt simplification failed.')
 
     def test_regularization(self):
         try:
-            gs = sample.g.regularize()
-        except:
+            sample.g.regularize()
+        except Exception:
             self.fail('Regularization failed.')
+
 
 if __name__ == '__main__':
     unittest.main()

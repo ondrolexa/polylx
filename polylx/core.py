@@ -406,10 +406,7 @@ class PolyShape(object):
                 i1 = np.arange(len(x) - 2)
                 i2 = i1 + 2
                 i0 = i1 + 1
-                d = (abs((y[i2] - y[i1]) * x[i0] -
-                         (x[i2] - x[i1]) * y[i0] +
-                         x[i2] * y[i1] - y[i2] * x[i1]) /
-                     np.sqrt((y[i2] - y[i1]) ** 2 + (x[i2] - x[i1]) ** 2))
+                d = (abs((y[i2] - y[i1]) * x[i0] - (x[i2] - x[i1]) * y[i0] + x[i2] * y[i1] - y[i2] * x[i1]) / np.sqrt((y[i2] - y[i1]) ** 2 + (x[i2] - x[i1]) ** 2))
                 tolerance = d.mean()
             shape = self.shape.simplify(kwargs.get('tolerance', tolerance), False)
             if shape.is_empty:
@@ -735,10 +732,10 @@ class Grain(PolyShape):
             print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
         return res
 
-
     ################################################################
     # Grain shape methods (should modify sa, la, sao, lao, xc, yc) #
     ################################################################
+
     def maxferet(self):
         """`shape_method`: maxferet
 
@@ -1312,7 +1309,7 @@ class PolySet(object):
 
     def clip_by_shape(self, other):
         assert isinstance(other, Polygon), 'Clipping is possible only by shapely Polygon.'
-        other = other.buffer(0) # fix common problems
+        other = other.buffer(0)  # fix common problems
         res = []
         for e in self:
             if other.intersects(e.shape):
@@ -1392,7 +1389,7 @@ class PolySet(object):
         for i in range(num):
             x = xmin + (1 - f) * (xmax - xmin) * np.random.random()
             y = ymin + (1 - f) * (ymax - ymin) * np.random.random()
-            yield self.clip_by_shape(Polygon([(x, y), (x + w, y),  (x + w, y + h), (x, y + h)]))
+            yield self.clip_by_shape(Polygon([(x, y), (x + w, y), (x + w, y + h), (x, y + h)]))
 
     @property
     def width(self):
@@ -1445,8 +1442,8 @@ class PolySet(object):
         """
         for p in self:
             feature = {'geometry': p.shape.__geo_interface__,
-                       'properties': {'id':p.fid, 'name': p.name}}
-            yield feature    
+                       'properties': {'id': p.fid, 'name': p.name}}
+            yield feature
 
     @property
     def la(self):
@@ -1681,7 +1678,7 @@ class PolySet(object):
         Example:
           >>> g.agg('area', np.sum, 'ead', np.mean, 'lao', circular.mean)
                      area       ead        lao
-          class                               
+          class
           ksp    2.443733  0.089710  76.875488
           pl     1.083516  0.060629  94.197847
           qtz    1.166097  0.068071  74.320337
@@ -1700,7 +1697,7 @@ class PolySet(object):
         Example:
           >>> g.accumulate('rms_ead', 'aw_ead', 'aw_ead_log')
                   rms_ead    aw_ead  aw_ead_log
-          class                                
+          class
           ksp    0.110679  0.185953    0.161449
           pl     0.068736  0.095300    0.086762
           qtz    0.097872  0.297476    0.210481
@@ -1708,7 +1705,7 @@ class PolySet(object):
         """
         pieces = []
         for key, g in self.class_iter():
-            row = {'class':key}
+            row = {'class': key}
             for method in methods:
                 row[method] = getattr(g, method)
             pieces.append(row)
@@ -1723,7 +1720,7 @@ class PolySet(object):
           >>> g.classify('ar', rule='natural')
           >>> g.groups('ead').mean()
                            ead
-          class               
+          class
           1.02-1.32   0.067772
           1.32-1.54   0.076042
           1.54-1.82   0.065479
@@ -1844,7 +1841,7 @@ class PolySet(object):
             sb_label = sb_kwg.pop('label')
             sb_loc = sb_kwg.pop('loc')
             scalebar = AnchoredSizeBar(ax.transData, sb_size, sb_label, sb_loc, **sb_kwg)
-            #scalebar = AnchoredSizeBar(ax.transData, 1, '1 mm', 'lower right', frameon=False, color='k', label_top=True)
+            # scalebar = AnchoredSizeBar(ax.transData, 1, '1 mm', 'lower right', frameon=False, color='k', label_top=True)
             ax.add_artist(scalebar)
             ax.set_axis_off()
         else:
@@ -1869,8 +1866,8 @@ class PolySet(object):
           See `plot` for other kwargs
 
         """
-        if 'ax' in kwargs:
-            ax = kwargs.pop('ax')
+        # if 'ax' in kwargs:
+        #     ax = kwargs.pop('ax')
         # fig = plt.figure()
         # ax = fig.add_subplot(111, aspect='equal')
         # self._plot(ax, **kwargs)
@@ -2042,7 +2039,6 @@ class PolySet(object):
         else:
             return ax
 
-
     def smooth(self, method='chaikin', **kwargs):
         return type(self)([getattr(s, method)(**kwargs) for s in self])
 
@@ -2200,7 +2196,8 @@ class Grains(PolySet):
                             shapes.append(Boundary(sub, bt, bid))
                             bids.append(bid)
                         T[edge[0]][edge[1]]['bids'] = bids
-                    else: print('Wrong topology between polygons {} {}. Shared geometry is {}.'.format(edge[0], edge[1], shared.geom_type))
+                    else:
+                        print('Wrong topology between polygons {} {}. Shared geometry is {}.'.format(edge[0], edge[1], shared.geom_type))
                 else:
                     print('Wrong topology between polygons {} {}. Shared geometry is {}.'.format(edge[0], edge[1], shared.geom_type))
         if not shapes:
@@ -2255,7 +2252,7 @@ class Grains(PolySet):
                         add_shared(gid, grain, oid, other, boundaries, T)
                     elif rel == 'FF2F1F212':  # incl-grain
                         add_shared(gid, grain, oid, other, boundaries, T)
-                    elif rel == 'FF2F01212':  #Silently skip shared point for polygons
+                    elif rel == 'FF2F01212':  # Silently skip shared point for polygons
                         pass
                     elif rel == '212111212':
                         print('Skipping overlapping polygons {}-{}'.format(gid, oid))
@@ -2298,7 +2295,7 @@ class Grains(PolySet):
                 if len(rec.shape.points) > 3:
                     geom = shape(rec.shape.__geo_interface__)
                     # remove duplicate and subsequent colinear vertexes
-                    #geom = geom.simplify(0)
+                    # geom = geom.simplify(0)
                     # try  to "clean" self-touching or self-crossing polygons
                     if not geom.is_valid:
                         print('Cleaning FID={}...'.format(pos))
@@ -2366,7 +2363,7 @@ class Grains(PolySet):
             for feature in src:
                 geom = shape(feature['geometry'])
                 # remove duplicate and subsequent colinear vertexes
-                #geom = geom.simplify(0)
+                # geom = geom.simplify(0)
                 # try  to "clean" self-touching or self-crossing polygons
                 if not geom.is_valid:
                     print('Cleaning FID={}...'.format(feature['id']))
@@ -2405,7 +2402,7 @@ class Grains(PolySet):
 
         """
         import fiona
-        _schema = {'geometry':'Polygon', 'properties':OrderedDict([('id', 'int'), ('name', 'str')])}
+        _schema = {'geometry': 'Polygon', 'properties': OrderedDict([('id', 'int'), ('name', 'str')])}
         with fiona.open(filename, 'w', layer='grains', driver=driver, schema=_schema, crs={}) as dst:
             dst.writerecords(self.features)
 
@@ -2467,7 +2464,7 @@ class Grains(PolySet):
         d = self.ead
         ld = np.log10(d)
         areas = self.area
-        rms = np.sqrt(np.mean(d**2))
+        # rms = np.sqrt(np.mean(d**2))
         if 'ax' in kwargs:
             ax = kwargs.pop('ax')
             show = False
@@ -2514,6 +2511,7 @@ class Grains(PolySet):
             ax.set_xlabel('EAD')
             ax.set_ylabel('Area fraction [%]')
             plt.show()
+
 
 class Boundaries(PolySet):
     """Class to store set of ``Boundaries`` objects
@@ -2596,7 +2594,7 @@ class Boundaries(PolySet):
 
         """
         import fiona
-        _schema = {'geometry':'LineString', 'properties':OrderedDict([('id', 'int'), ('name', 'str')])}
+        _schema = {'geometry': 'LineString', 'properties': OrderedDict([('id', 'int'), ('name', 'str')])}
         with fiona.open(filename, 'w', layer='boundaries', driver=driver, schema=_schema, crs={}) as dst:
             dst.writerecords(self.features)
 
@@ -2730,7 +2728,7 @@ class Sample(object):
         """
         last = 0
         cluster = set([idx])
-        while len(cluster)>last:
+        while len(cluster) > last:
             last = len(cluster)
             for idx in list(cluster):
                 cluster.update(self.neighbors(idx, name=name))

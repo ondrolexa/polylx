@@ -239,12 +239,7 @@ class efd(object):
         # the first major axis. Theta_1 is that shift angle.
         theta_1 = 0.5 * np.arctan2(
             2 * ((coeffs[0, 0] * coeffs[0, 1]) + (coeffs[0, 2] * coeffs[0, 3])),
-            (
-                (coeffs[0, 0] ** 2)
-                - (coeffs[0, 1] ** 2)
-                + (coeffs[0, 2] ** 2)
-                - (coeffs[0, 3] ** 2)
-            ),
+            ((coeffs[0, 0] ** 2) - (coeffs[0, 1] ** 2) + (coeffs[0, 2] ** 2) - (coeffs[0, 3] ** 2))
         )
         # Rotate all coefficients by theta_1.
         for n in range(1, coeffs.shape[0] + 1):
@@ -469,10 +464,8 @@ def PolygonPath(polygon):
         vals[0] = Path.MOVETO
         return vals
 
-    vertices = np.concatenate([np.asarray(polygon.exterior)] +
-                              [np.asarray(r) for r in polygon.interiors])
-    codes = np.concatenate([coding(polygon.exterior)] +
-                           [coding(r) for r in polygon.interiors])
+    vertices = np.concatenate([np.asarray(polygon.exterior)] + [np.asarray(r) for r in polygon.interiors])
+    codes = np.concatenate([coding(polygon.exterior)] + [coding(r) for r in polygon.interiors])
     return Path(vertices, codes)
 
 
@@ -746,6 +739,7 @@ def _visvalingam_whyatt(x, y, threshold=1, is_ring=False):
                 do = False
     return x, y
 
+
 def weighted_avg_and_std(values, weights):
     """
     Return the weighted average and standard deviation.
@@ -757,6 +751,7 @@ def weighted_avg_and_std(values, weights):
     variance = np.average((values-average)**2, weights=weights)
     return (average, np.sqrt(variance))
 
+
 def classify_shapes(g, **kwargs):
     from sklearn.decomposition import PCA
     from sklearn.preprocessing import StandardScaler
@@ -766,8 +761,8 @@ def classify_shapes(g, **kwargs):
     X = StandardScaler().fit_transform(g.shape_vector(N=N))
     pca = PCA(n_components=N // 2)
     pcs = pca.fit_transform(X)
-    #Y = StandardScaler().fit_transform(np.array([pcs.T[0], np.log10(g.ead)]).T)
-    Y = np.append(pcs[:,:kwargs.get('n_pcas', 1)], np.atleast_2d(np.log10(g.ead)).T, axis=1)
+    # Y = StandardScaler().fit_transform(np.array([pcs.T[0], np.log10(g.ead)]).T)
+    Y = np.append(pcs[:, :kwargs.get('n_pcas', 1)], np.atleast_2d(np.log10(g.ead)).T, axis=1)
     Z = StandardScaler().fit_transform(Y)
     kmeans = KMeans(n_clusters=kwargs.get('n_clusters', 2),
                     init=kwargs.get('init', 'k-means++'),
@@ -919,13 +914,13 @@ class gaussian_kde(object):
         if not self.dataset.size > 1:
             raise ValueError("`dataset` input should have multiple elements.")
         self.d, self.n = self.dataset.shape
-            
+
         if weights is not None:
             self.weights = weights / np.sum(weights)
         else:
             self.weights = np.ones(self.n) / self.n
-            
-        # Compute the effective sample size 
+
+        # Compute the effective sample size
         # http://surveyanalysis.org/wiki/Design_Effects_and_Effective_Sample_Size#Kish.27s_approximate_formula_for_computing_effective_sample_size
         self.neff = 1.0 / np.sum(self.weights ** 2)
 
@@ -952,7 +947,7 @@ class gaussian_kde(object):
 
         """
         from scipy.spatial.distance import cdist
-        
+
         points = np.atleast_2d(points)
 
         d, m = points.shape
@@ -962,8 +957,7 @@ class gaussian_kde(object):
                 points = np.reshape(points, (self.d, 1))
                 m = 1
             else:
-                msg = "points have dimension %s, dataset has dimension %s" % (d,
-                    self.d)
+                msg = "points have dimension %s, dataset has dimension %s" % (d, self.d)
                 raise ValueError(msg)
 
         # compute the normalised residuals
@@ -1027,7 +1021,7 @@ class gaussian_kde(object):
 
         """
         from six import string_types
-        
+
         if bw_method is None:
             pass
         elif bw_method == 'scott':
@@ -1065,4 +1059,4 @@ class gaussian_kde(object):
 
         self.covariance = self._data_covariance * self.factor**2
         self.inv_cov = self._data_inv_cov / self.factor**2
-        self._norm_factor = np.sqrt(np.linalg.det(2*np.pi*self.covariance)) #* self.n
+        self._norm_factor = np.sqrt(np.linalg.det(2*np.pi*self.covariance))  # * self.n

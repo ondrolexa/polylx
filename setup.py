@@ -1,16 +1,15 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys
 from os import path
 from setuptools import setup, find_packages
 
-this_directory = path.abspath(path.dirname(__file__))
+CURRENT_PATH = path.abspath(path.dirname(__file__))
 
-with open(path.join(this_directory, 'README.md')) as f:
+with open(path.join(CURRENT_PATH, 'README.md')) as f:
     readme = f.read()
 
-with open(path.join(this_directory, 'HISTORY.md')) as f:
+with open(path.join(CURRENT_PATH, 'HISTORY.md')) as f:
     history = f.read()
 
 requirements = [

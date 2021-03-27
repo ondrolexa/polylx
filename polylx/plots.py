@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from scipy import stats
 import seaborn as sns
 from .core import PolySet
-from .utils import weighted_avg_and_std, gaussian_kde
+from .utils import weighted_avg_and_std
 
 ##########################
 # Plots for polylx objects
@@ -113,6 +113,7 @@ def rose_plot(ang, **kwargs):
         plt.show()
     return ax
 
+
 def grainsize_plot(d, **kwargs):
     # weights=None, bins='auto', left=None, right=None, num=500, alpha=95, bootstrap=False, title=None
     if 'weights' in kwargs:
@@ -136,22 +137,22 @@ def grainsize_plot(d, **kwargs):
     d = np.asarray(d)
     ld = np.log10(d)
     bins_log = np.histogram_bin_edges(ld, bins=bins)
-    bins = 10**bins_log
+    bins = 10 ** bins_log
     bw = bins[1:] - bins[:-1]
-    bc = (bins[:-1] + bins[1:])/2
+    bc = (bins[:-1] + bins[1:]) / 2
     lbw = bins_log[1:] - bins_log[:-1]
     # statistics
     loc, scale = weighted_avg_and_std(ld, weights)
-    rms = np.sqrt(np.mean(d**2))
+    rms = np.sqrt(np.mean(d ** 2))
     # default left right values
-    left = kwargs.get('left', 10**(loc - 3.5*scale))
-    right = kwargs.get('right', 10**(loc + 3.5*scale))
+    left = kwargs.get('left', 10**(loc - 3.5 * scale))
+    right = kwargs.get('right', 10**(loc + 3.5 * scale))
     # PDF
     lxx = np.linspace(np.log10(left), np.log10(right), 500)
     pdf = stats.norm.pdf(lxx, loc=loc, scale=scale)
 
     # hist counts
-    counts,_ = np.histogram(d, bins, density=True, weights=weights)
+    counts, _ = np.histogram(d, bins, density=True, weights=weights)
 
     # bootstrap CI on mean
     if bootstrap:
@@ -174,11 +175,11 @@ def grainsize_plot(d, **kwargs):
         ax.fill_between(10**lxx, np.min(bpdf, axis=0), np.max(bpdf, axis=0), color='lightsteelblue', alpha=0.5)
         ax.bar(bc, np.mean(bcnt, axis=0)*bw/lbw, width=0.9*bw, yerr=np.std(bcnt, axis=0)*bw/lbw/2, color='mediumseagreen')
         ax.text(0.02, 0.9, '{} EAD: {:.2f}\n{:.1f}% CI: {:.2f}-{:.2f}\nRMS EAD: {:.2f}\n{:.1f}% CI: {:.2f}-{:.2f}'.format(avgtxt, 10**loc, alpha, muconf[0], muconf[1], rms, alpha, rmsconf[0], rmsconf[1]),
-             horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
+                horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
     else:
         ax.bar(bc, counts*bw/lbw, width=0.9*bw, color='mediumseagreen')
         ax.text(0.02, 0.9, '{} EAD: {:.2f}\nRMS EAD: {:.2f}'.format(avgtxt, 10**loc, rms),
-             horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
+                horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
     ax.plot(10**lxx, pdf, 'k')
     ax.set_xscale('log')
     ax.set_xlim(left=left, right=right)
@@ -187,6 +188,7 @@ def grainsize_plot(d, **kwargs):
             f.suptitle(title)
         ax.set_ylabel(ylbl)
         plt.show()
+
 
 def plot_kde(g, **kwargs):
     bins = kwargs.get('bins', 'auto')
@@ -214,7 +216,7 @@ def plot_kde(g, **kwargs):
     xmax = 2*ed[-1] - ed[-2]
     x = np.logspace(xmin, xmax, 250)
     cntrs = 10**((ed[:-1] + ed[1:]) / 2)
-    #ax.hist(logead, ed, histtype='bar', alpha=.2, normed=True, color='k', weights=weights, rwidth=0.8)
+    # ax.hist(logead, ed, histtype='bar', alpha=.2, normed=True, color='k', weights=weights, rwidth=0.8)
     if weighted:
         n, _ = np.histogram(logead, ed, weights=weights, density=True)
         pdf = gaussian_kde(logead, weights=weights)
@@ -263,10 +265,10 @@ def plot_kde(g, **kwargs):
         rmsdelta = np.array(brms) - rms
         rmsconf = rms + np.percentile(rmsdelta, [(100-alpha)/2, alpha + (100-alpha)/2])
         ax.text(0.02, 0.85, 'AW mean EAD: {:.2f}\n{:.1f}% CI: {:.2f}-{:.2f}\nRMS EAD: {:.2f}\n{:.1f}% CI: {:.2f}-{:.2f}'.format(10**loc, alpha, muconf[0], muconf[1], rms, alpha, rmsconf[0], rmsconf[1]),
-             horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
+                horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
     else:
-        ax.text(0.02, 0.85, 'AW mean EAD: {:.2f}\nRMS EAD: {:.2f}'.format( 10**loc, rms),
-             horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
+        ax.text(0.02, 0.85, 'AW mean EAD: {:.2f}\nRMS EAD: {:.2f}'.format(10**loc, rms),
+                horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
     if show:
         if title is not None and show:
             f.suptitle(title)
