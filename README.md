@@ -1,8 +1,7 @@
 # PolyLX - python package to visualize and analyze digitized 2D microstructures
 
 [![PyPI version](https://badge.fury.io/py/polylx.svg)](https://badge.fury.io/py/polylx)
-[![Testing](https://github.com/ondrolexa/polylx/actions/workflows/pythontest.yml/badge.svg?event=push)
-[![Release](https://github.com/ondrolexa/polylx/actions/workflows/release.yml/badge.svg)
+[![Testing](https://github.com/ondrolexa/polylx/actions/workflows/pythontest.yml/badge.svg?event=push)](https://github.com/ondrolexa/polylx)
 [![Documentation Status](https://readthedocs.org/projects/polylx/badge/?version=stable)](https://polylx.readthedocs.io/en/stable/?badge=stable)
 [![DOI](https://zenodo.org/badge/30773592.svg)](https://zenodo.org/badge/latestdoi/30773592)
 
