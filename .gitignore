@@ -47,3 +47,6 @@ docs/_build
 
 #gedit backups
 *~
+
+#codium
+.vscode/
