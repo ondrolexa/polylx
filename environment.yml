@@ -1,5 +1,6 @@
 name: polylx
 dependencies:
+  - pip
   - numpy
   - matplotlib
   - scipy
@@ -8,3 +9,5 @@ dependencies:
   - networkx
   - shapely
   - pyshp
+  - pip:
+    - pyefd

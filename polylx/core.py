@@ -28,13 +28,20 @@ import networkx as nx
 import pandas as pd
 import seaborn as sns
 import warnings
+import pyefd
 from shapefile import Reader
+
+try:
+    import fiona
+    fiona_OK = True
+except ImportError:
+    fiona_OK = False
 
 from .utils import fixratio, fixzero, deg, Classify, PolygonPath
 from .utils import find_ellipse, densify, inertia_moments
 from .utils import _chaikin, _visvalingam_whyatt
 from .utils import _spline_ring
-from .utils import weighted_avg_and_std, efd
+from .utils import weighted_avg_and_std
 
 from pkg_resources import resource_filename
 
@@ -102,7 +109,7 @@ class PolyShape(object):
 
     @property
     def ar(self):
-        """Returns axial ratio
+        """Returns axial ratio (eccentricity)
 
         Note that axial ratio is calculated from long and short axes
         calculated by actual ``shape method``.
@@ -502,10 +509,10 @@ class Grain(PolyShape):
     @property
     def circularity(self):
         """Return circularity (also called compactness) of the object.
-        circ = length**2/area
+        circ = length**2/ (4 * pi * area)
 
         """
-        return self.length**2 / self.area
+        return self.length**2 / (4 * np.pi * self.area)
 
     @property
     def haralick(self):
@@ -706,23 +713,20 @@ class Grain(PolyShape):
 
         Keywords:
           order: The order of FDC to calculate. Default 12.
-          smooth: The number of FDC used for reconstructing the contour. Default 6.
           N: number of vertices for reconstructed grain. Default 128.
 
         """
         order = kwargs.get('order', self.xy.shape[1])
-        smooth = kwargs.get('smooth', int(order / 2))
         N = kwargs.get('N', 128)
-        coeffs = efd.elliptic_fourier_descriptors(self.xy, order=order)
-        locus = efd.calculate_dc_coefficients(self.xy)
-        x, y = efd.reconstruct_contour(coeffs, locus=locus, num_points=N, num_coeffs=smooth)
+        coeffs = pyefd.elliptic_fourier_descriptors(self.xy.T, order=order)
+        locus = pyefd.calculate_dc_coefficients(self.xy.T)
+        x, y = pyefd.reconstruct_contour(coeffs, locus=locus, num_points=N).T
         holes = []
         for hole in self.interiors:
             order = kwargs.get('order', hole.shape[1])
-            smooth = kwargs.get('smooth', int(order / 2))
-            coeffs = efd.elliptic_fourier_descriptors(hole, order=order)
-            locus = efd.calculate_dc_coefficients(hole)
-            xh, yh = efd.reconstruct_contour(coeffs, locus=locus, num_points=N, num_coeffs=smooth)
+            coeffs = pyefd.elliptic_fourier_descriptors(hole.T, order=order)
+            locus = pyefd.calculate_dc_coefficients(hole.T)
+            xh, yh = pyefd.reconstruct_contour(coeffs, locus=locus, num_points=N).T
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
@@ -929,16 +933,15 @@ class Grain(PolyShape):
         self._shape_method = 'maee'
 
     def fourier_ellipse(self):
-        """`shape_method`: cov
+        """`shape_method`: fourier_ellipse
 
-        Short and long axes are calculated from eigenvalue analysis
-        of coordinate covariance matrix.
-        Center coordinates are set to centroid of exterior.
+        Short and long axes are calculated from first-order approximation
+        of contour with a Fourier series.
 
         """
-        coeffs = efd.elliptic_fourier_descriptors(self.xy, order=1)
-        coeffs, psi = efd.normalize_efd(coeffs, size_invariant=False)
-        self.xc, self.yc = efd.calculate_dc_coefficients(self.xy)
+        coeffs = pyefd.elliptic_fourier_descriptors(self.xy.T, order=1)
+        coeffs, psi = pyefd.normalize_efd(coeffs, size_invariant=False)
+        self.xc, self.yc = pyefd.calculate_dc_coefficients(self.xy.T)
         self.sa, self.la = 2 * coeffs[0, [3, 0]]
         self.sao, self.lao = np.degrees(np.pi - psi) % 180, np.degrees(np.pi / 2 - psi) % 180
         self._shape_method = 'fourier_ellipse'
@@ -2347,64 +2350,68 @@ class Grains(PolySet):
           name: value used for grain name when namefield is None
 
         """
-        import fiona
+        if fiona_OK:
 
-        namefield = kwargs.pop('namefield', 'PHASE')
-        name = kwargs.pop('name', 'None')
+            namefield = kwargs.pop('namefield', 'PHASE')
+            name = kwargs.pop('name', 'None')
 
-        with fiona.open(filename, **kwargs) as src:
-            schema = src.schema
-            assert schema['geometry'] == 'Polygon', 'The file must contains polygons!'
-            fieldnames = list(schema['properties'].keys())
-            if namefield is not None:
-                if namefield not in fieldnames:
-                    raise Exception("There is no field '{}'. Available fields are: {}".format(namefield, fieldnames))
-            shapes = []
-            for feature in src:
-                geom = shape(feature['geometry'])
-                # remove duplicate and subsequent colinear vertexes
-                # geom = geom.simplify(0)
-                # try  to "clean" self-touching or self-crossing polygons
-                if not geom.is_valid:
-                    print('Cleaning FID={}...'.format(feature['id']))
-                    geom = geom.buffer(0)
-                if geom.is_valid:
-                    if not geom.is_empty:
-                        if namefield is None:
-                            ph = name
-                        else:
-                            ph = feature['properties'][namefield]
-                        if geom.geom_type == 'MultiPolygon':
-                            for g in geom:
-                                go = orient(g)
+            with fiona.open(filename, **kwargs) as src:
+                schema = src.schema
+                assert schema['geometry'] == 'Polygon', 'The file must contains polygons!'
+                fieldnames = list(schema['properties'].keys())
+                if namefield is not None:
+                    if namefield not in fieldnames:
+                        raise Exception("There is no field '{}'. Available fields are: {}".format(namefield, fieldnames))
+                shapes = []
+                for feature in src:
+                    geom = shape(feature['geometry'])
+                    # remove duplicate and subsequent colinear vertexes
+                    # geom = geom.simplify(0)
+                    # try  to "clean" self-touching or self-crossing polygons
+                    if not geom.is_valid:
+                        print('Cleaning FID={}...'.format(feature['id']))
+                        geom = geom.buffer(0)
+                    if geom.is_valid:
+                        if not geom.is_empty:
+                            if namefield is None:
+                                ph = name
+                            else:
+                                ph = feature['properties'][namefield]
+                            if geom.geom_type == 'MultiPolygon':
+                                for g in geom:
+                                    go = orient(g)
+                                    if not any(go.equals(gr.shape) for gr in shapes):
+                                        shapes.append(Grain(go, ph, len(shapes)))
+                                    else:
+                                        print('Duplicate polygon (FID={}) skipped.'.format(feature['id']))
+                                print('Multipolygon (FID={}) exploded.'.format(feature['id']))
+                            elif geom.geom_type == 'Polygon':
+                                go = orient(geom)
                                 if not any(go.equals(gr.shape) for gr in shapes):
                                     shapes.append(Grain(go, ph, len(shapes)))
                                 else:
                                     print('Duplicate polygon (FID={}) skipped.'.format(feature['id']))
-                            print('Multipolygon (FID={}) exploded.'.format(feature['id']))
-                        elif geom.geom_type == 'Polygon':
-                            go = orient(geom)
-                            if not any(go.equals(gr.shape) for gr in shapes):
-                                shapes.append(Grain(go, ph, len(shapes)))
                             else:
-                                print('Duplicate polygon (FID={}) skipped.'.format(feature['id']))
+                                raise Exception('Unexpected geometry type (FID={})!'.format(feature['id']))
                         else:
-                            raise Exception('Unexpected geometry type (FID={})!'.format(feature['id']))
+                            print('Empty geometry (FID={}) skipped.'.format(feature['id']))
                     else:
-                        print('Empty geometry (FID={}) skipped.'.format(feature['id']))
-                else:
-                    print('Invalid geometry (FID={}) skipped.'.format(feature['id']))
-            return cls(shapes)
+                        print('Invalid geometry (FID={}) skipped.'.format(feature['id']))
+                return cls(shapes)
+        else:
+            print('Fiona package is not installed.')
 
     def to_file(self, filename='grains.gpkg', driver='GPKG'):
         """
         driver: 'ESRI Shapefile', 'GeoJSON', 'GPKG' or 'GML'. Default 'GPKG'
 
         """
-        import fiona
-        _schema = {'geometry': 'Polygon', 'properties': OrderedDict([('id', 'int'), ('name', 'str')])}
-        with fiona.open(filename, 'w', layer='grains', driver=driver, schema=_schema, crs={}) as dst:
-            dst.writerecords(self.features)
+        if fiona_OK:
+            _schema = {'geometry': 'Polygon', 'properties': OrderedDict([('id', 'int'), ('name', 'str')])}
+            with fiona.open(filename, 'w', layer='grains', driver=driver, schema=_schema, crs={}) as dst:
+                dst.writerecords(self.features)
+        else:
+            print('Fiona package is not installed.')
 
     def _plot(self, ax, **kwargs):
         alpha = kwargs.get('alpha', 0.8)

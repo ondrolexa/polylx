@@ -25,7 +25,7 @@ setup(
     package_data={'polylx': ['example/*.*']},
     include_package_data=True,
     install_requires=['numpy', 'matplotlib', 'pandas', 'seaborn',
-        'networkx', 'scipy', 'shapely', 'pyshp'],
+                      'networkx', 'scipy', 'shapely', 'pyshp', 'pyefd'],
     extras_require={
         'docs': ['sphinx'],
         'test': ['pytest'],
