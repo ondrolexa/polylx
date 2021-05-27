@@ -1,5 +1,6 @@
 name: polylx
 dependencies:
+  - pip
   - numpy
   - matplotlib
   - scipy
