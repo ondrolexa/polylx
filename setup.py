@@ -12,12 +12,6 @@ with open(path.join(CURRENT_PATH, 'README.md')) as f:
 with open(path.join(CURRENT_PATH, 'HISTORY.md')) as f:
     history = f.read()
 
-requirements = 
-
-test_requirements = [
-    # TODO: put package test requirements here
-]
-
 setup(
     name='polylx',
     version='0.5.0',
