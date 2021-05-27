@@ -12,16 +12,7 @@ with open(path.join(CURRENT_PATH, 'README.md')) as f:
 with open(path.join(CURRENT_PATH, 'HISTORY.md')) as f:
     history = f.read()
 
-requirements = [
-    'numpy',
-    'matplotlib',
-    'pandas',
-    'seaborn',
-    'networkx',
-    'scipy',
-    'shapely',
-    'pyshp'
-]
+requirements = 
 
 test_requirements = [
     # TODO: put package test requirements here
@@ -39,7 +30,14 @@ setup(
     packages=find_packages(),
     package_data={'polylx': ['example/*.*']},
     include_package_data=True,
-    install_requires=requirements,
+    install_requires=['numpy', 'matplotlib', 'pandas', 'seaborn',
+        'networkx', 'scipy', 'shapely', 'pyshp'],
+    extras_require={
+        'docs': ['sphinx'],
+        'test': ['pytest'],
+        'lint': ['black', 'flake8'],
+        'jupyter': ['jupyterlab'],
+    },
     entry_points="""
     [console_scripts]
     ipolylx=polylx.shell:main
@@ -47,6 +45,7 @@ setup(
     license="MIT",
     zip_safe=False,
     keywords='polylx',
+    python_requires=">=3.6",
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Science/Research',
@@ -55,6 +54,9 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
     ],
-    test_suite='tests',
-    tests_require=test_requirements
+    project_urls={
+        'Documentation': 'https://polylx.readthedocs.io/',
+        'Source Code': 'https://github.com/ondrolexa/polylx/',
+        'Bug Tracker': 'https://github.com/ondrolexa/polylx/issues/',
+    },
 )

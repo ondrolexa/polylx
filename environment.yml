@@ -1,0 +1,10 @@
+name: polylx
+dependencies:
+  - numpy
+  - matplotlib
+  - scipy
+  - pandas
+  - seaborn
+  - networkx
+  - shapely
+  - pyshp
