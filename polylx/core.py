@@ -103,7 +103,7 @@ class PolyShape(object):
 
     @property
     def ar(self):
-        """Returns axial ratio
+        """Returns axial ratio (eccentricity)
 
         Note that axial ratio is calculated from long and short axes
         calculated by actual ``shape method``.
@@ -503,10 +503,10 @@ class Grain(PolyShape):
     @property
     def circularity(self):
         """Return circularity (also called compactness) of the object.
-        circ = length**2/area
+        circ = length**2/ (4 * pi * area)
 
         """
-        return self.length**2 / self.area
+        return self.length**2 / (4 * np.pi * self.area)
 
     @property
     def haralick(self):
