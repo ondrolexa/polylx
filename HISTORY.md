@@ -1,12 +1,12 @@
 # Changes
 
-### 0.5.1 (XX YYY 2020)
+### 0.5.1 (27 May 2021)
 
  * fourier_ellipse shape method for Grains added
  * eliptic fourier smoothing for Grains added
  * added grainsize plot
  * added accumulate method to Grains and Boundaries
- * simple fiona reader implemented
+ * simple fiona reader implemented (fiona must be installed)
  * added kde plot
 
 ## 0.5 (29 Jan 2019)
