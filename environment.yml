@@ -8,3 +8,5 @@ dependencies:
   - networkx
   - shapely
   - pyshp
+  - pip:
+    - pyefd
