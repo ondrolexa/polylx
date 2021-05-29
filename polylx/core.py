@@ -940,7 +940,8 @@ class Grain(PolyShape):
 
         """
         coeffs = pyefd.elliptic_fourier_descriptors(self.xy.T, order=1)
-        coeffs, psi = pyefd.normalize_efd(coeffs, size_invariant=False)
+        psi = np.arctan2(coeffs[0, 2], coeffs[0, 0])
+        coeffs = pyefd.normalize_efd(coeffs, size_invariant=False)
         self.xc, self.yc = pyefd.calculate_dc_coefficients(self.xy.T)
         self.sa, self.la = 2 * coeffs[0, [3, 0]]
         self.sao, self.lao = np.degrees(np.pi - psi) % 180, np.degrees(np.pi / 2 - psi) % 180
