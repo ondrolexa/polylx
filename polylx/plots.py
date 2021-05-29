@@ -211,9 +211,12 @@ def plot_kde(g, **kwargs):
     ead = g.ead
     logead = np.log10(ead)
     weights = g.area
+    loc, scale = weighted_avg_and_std(logead, weights)
+    xmin = kwargs.get('left', loc - 3.5 * scale)
+    xmax = kwargs.get('right', loc + 3.5 * scale)
     ed = np.histogram_bin_edges(logead, bins=bins)
-    xmin = 2*ed[0] - ed[1]
-    xmax = 2*ed[-1] - ed[-2]
+    #xmin = 2*ed[0] - ed[1]
+    #xmax = 2*ed[-1] - ed[-2]
     x = np.logspace(xmin, xmax, 250)
     cntrs = 10**((ed[:-1] + ed[1:]) / 2)
     # ax.hist(logead, ed, histtype='bar', alpha=.2, normed=True, color='k', weights=weights, rwidth=0.8)
@@ -247,8 +250,11 @@ def plot_kde(g, **kwargs):
     else:
         ax.plot(x, y, label='KDE', color='k', lw=1, ls='--')
     ax.set_xscale('log')
-    ax.legend(loc=1)
-    loc, scale = weighted_avg_and_std(logead, weights)
+    # Put a legend to the right of the current axis
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    
     rms = np.sqrt(np.mean(ead**2))
     if bootstrap:
         bcnt, bmu, brms = [], [], []
@@ -269,6 +275,8 @@ def plot_kde(g, **kwargs):
     else:
         ax.text(0.02, 0.85, 'AW mean EAD: {:.2f}\nRMS EAD: {:.2f}'.format(10**loc, rms),
                 horizontalalignment='left', verticalalignment='center', transform=ax.transAxes)
+    # default left right values
+    ax.set_xlim(left=10**xmin, right=10**xmax)
     if show:
         if title is not None and show:
             f.suptitle(title)
