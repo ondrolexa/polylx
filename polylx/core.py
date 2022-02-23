@@ -12,7 +12,6 @@ Examples:
 """
 import os
 import itertools
-from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import PathPatch
@@ -23,7 +22,7 @@ from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 from shapely.geometry import shape, Polygon, LinearRing, LineString
 from shapely.geometry.polygon import orient
 from shapely import affinity
-from shapely.ops import cascaded_union
+from shapely.ops import cascaded_union, unary_union
 import networkx as nx
 import pandas as pd
 import seaborn as sns
@@ -2341,28 +2340,36 @@ class Grains(PolySet):
             raise Exception('Shapefile must contains polygons!')
 
     @classmethod
-    def from_file(cls, filename=os.path.join(respath, 'sg2.shp'), **kwargs):
-        """Create Grains from geospatial file.
+    def from_file(cls, filename=os.path.join(respath, 'sg2.gpkg'), **kwargs):
+        """Create Boundaries from geospatial file.
 
         Args:
-          filename: filename of shapefile. Default sg2.shp from examples
-          namefield: name of attribute in shapefile that
-            holds names of grains or None. Default "phase".
+          filename: filename of geospatial file. Default sg2.gpkg from examples
+          namefield: name of attribute that holds names of grains or None.
+                     Default "name".
           name: value used for grain name when namefield is None
 
         """
         if fiona_OK:
 
-            namefield = kwargs.pop('namefield', 'PHASE')
+            namefield = kwargs.pop('namefield', 'name')
             name = kwargs.pop('name', 'None')
+
+            layers = fiona.listlayers(filename)
+            if len(layers) > 1 and 'layer' not in kwargs:
+                if 'grains' in layers:
+                    kwargs['layer'] = 'grains'
+                else:
+                    print('There is {} layers in file: {}. To choose other than first one, provide layer kwarg.'.format(len(layers), layers))
 
             with fiona.open(filename, **kwargs) as src:
                 schema = src.schema
-                assert schema['geometry'] == 'Polygon', 'The file must contains polygons!'
+                assert schema['geometry'] == 'Polygon', 'The file geometry must be Polygon, not {}!'.format(schema['geometry'])
                 fieldnames = list(schema['properties'].keys())
                 if namefield is not None:
                     if namefield not in fieldnames:
-                        raise Exception("There is no field '{}'. Available fields are: {}".format(namefield, fieldnames))
+                        print("There is no field '{}'.\nProvide namefield kwarg with value from available fields:\n{}".format(namefield, fieldnames))
+                        return
                 shapes = []
                 for feature in src:
                     geom = shape(feature['geometry'])
@@ -2393,7 +2400,7 @@ class Grains(PolySet):
                                 else:
                                     print('Duplicate polygon (FID={}) skipped.'.format(feature['id']))
                             else:
-                                raise Exception('Unexpected geometry type (FID={})!'.format(feature['id']))
+                                print('Unexpected geometry type {} (FID={}) skipped '.format(geom.geom_type, feature['id']))
                         else:
                             print('Empty geometry (FID={}) skipped.'.format(feature['id']))
                     else:
@@ -2402,14 +2409,16 @@ class Grains(PolySet):
         else:
             print('Fiona package is not installed.')
 
-    def to_file(self, filename='grains.gpkg', driver='GPKG'):
+    def to_file(self, filename='grains.gpkg', **kwargs):
         """
         driver: 'ESRI Shapefile', 'GeoJSON', 'GPKG' or 'GML'. Default 'GPKG'
 
         """
         if fiona_OK:
-            _schema = {'geometry': 'Polygon', 'properties': OrderedDict([('id', 'int'), ('name', 'str')])}
-            with fiona.open(filename, 'w', layer='grains', driver=driver, schema=_schema, crs={}) as dst:
+            if 'layer' not in kwargs:
+                kwargs['layer'] = 'grains'
+            kwargs['schema'] = {'geometry': 'Polygon', 'properties': {'id':'int', 'name':'str'}}
+            with fiona.open(filename, 'w', **kwargs) as dst:
                 dst.writerecords(self.features)
         else:
             print('Fiona package is not installed.')
@@ -2597,28 +2606,36 @@ class Boundaries(PolySet):
             raise Exception('Shapefile must contains polylines!')
 
     @classmethod
-    def from_file(cls, filename=os.path.join(respath, 'sg2.shp'), **kwargs):
-        """Create Grains from geospatial file.
+    def from_file(cls, filename=os.path.join(respath, 'sg2.gpkg'), **kwargs):
+        """Create Boudaries from geospatial file.
 
         Args:
-          filename: filename of shapefile. Default sg2.shp from examples
-          namefield: name of attribute in shapefile that
-            holds names of grains or None. Default "phase".
-          name: value used for grain name when namefield is None
+          filename: filename of geospatial file. Default sg2.gpkg from examples
+          namefield: name of attribute that holds names of boundaries or None.
+                     Default "name".
+          name: value used for boundary name when namefield is None
 
         """
         if fiona_OK:
 
-            namefield = kwargs.pop('namefield', 'PHASE')
+            namefield = kwargs.pop('namefield', 'name')
             name = kwargs.pop('name', 'None')
+
+            layers = fiona.listlayers(filename)
+            if len(layers) > 1 and 'layer' not in kwargs:
+                if 'boundaries' in layers:
+                    kwargs['layer'] = 'boundaries'
+                else:
+                    print('There is {} layers in file: {}. To choose other than first one, provide layer kwarg.'.format(len(layers), layers))
 
             with fiona.open(filename, **kwargs) as src:
                 schema = src.schema
-                assert schema['geometry'] == 'LineString', 'The file must contains lines!'
+                assert schema['geometry'] == 'LineString', 'The file geometry must be LineString, not {}!'.format(schema['geometry'])
                 fieldnames = list(schema['properties'].keys())
                 if namefield is not None:
                     if namefield not in fieldnames:
-                        raise Exception("There is no field '{}'. Available fields are: {}".format(namefield, fieldnames))
+                        print("There is no field '{}'.\nProvide namefield kwarg with value from available fields:\n{}".format(namefield, fieldnames))
+                        return
                 shapes = []
                 for feature in src:
                     geom = shape(feature['geometry'])
@@ -2643,7 +2660,7 @@ class Boundaries(PolySet):
                                 else:
                                     print('Duplicate line (FID={}) skipped.'.format(feature['id']))
                             else:
-                                raise Exception('Unexpected geometry type (FID={})!'.format(feature['id']))
+                                print('Unexpected geometry type {} (FID={}) skipped.'.format(geom.geom_type, feature['id']))
                         else:
                             print('Empty geometry (FID={}) skipped.'.format(feature['id']))
                     else:
@@ -2652,15 +2669,19 @@ class Boundaries(PolySet):
         else:
             print('Fiona package is not installed.')
 
-    def to_file(self, filename='boundaries.gpkg', driver='GPKG'):
+    def to_file(self, filename='boundaries.gpkg', **kwargs):
         """
         driver: 'ESRI Shapefile', 'GeoJSON', 'GPKG' or 'GML'. Default 'GPKG'
 
         """
-        import fiona
-        _schema = {'geometry': 'LineString', 'properties': OrderedDict([('id', 'int'), ('name', 'str')])}
-        with fiona.open(filename, 'w', layer='boundaries', driver=driver, schema=_schema, crs={}) as dst:
-            dst.writerecords(self.features)
+        if fiona_OK:
+            if 'layer' not in kwargs:
+                kwargs['layer'] = 'boundaries'
+            kwargs['schema'] = {'geometry': 'LineString', 'properties': {'id':'int', 'name':'str'}}
+            with fiona.open(filename, 'w', **kwargs) as dst:
+                dst.writerecords(self.features)
+        else:
+            print('Fiona package is not installed.')
 
     def _plot(self, ax, **kwargs):
         alpha = kwargs.get('alpha', 0.8)
@@ -2698,7 +2719,7 @@ class Sample(object):
     Properties:
       g: Grains object
       b: Boundaries.objects
-      T. ``networkx.Graph`` storing grain topology
+      T: ``networkx.Graph`` storing grain topology
 
     """
     def __init__(self, name=''):
@@ -2886,3 +2907,121 @@ class Sample(object):
         """
         self.plot(**kwargs)
         plt.show()
+
+
+class Fractnet(object):
+    """Class to store topological fracture networks
+
+    Properties:
+      G: ``networkx.Graph`` storing fracture network topology
+      coords: coordinate arrays
+      
+
+    """
+    def __init__(self, G, coords):
+        assert G.number_of_nodes() == coords.shape[0], \
+            'Number of nodes {} do not correspond to number of coordinates {}'.format(G.number_of_nodes(), coords.shape[0])
+        self.G = G
+        self.coords = coords
+
+    def __repr__(self):
+        return 'Fracture network with {} nodes and {} branches.'.format(self.G.number_of_nodes(), self.G.number_of_edges())
+
+    @classmethod
+    def from_boundaries(cls, b):
+        # create noded lines
+        bn = unary_union(b.shape)
+        coords_set = set()
+        for l in bn:
+            coords_set = coords_set.union(l.coords)
+        # lookup dict
+        coords_dict = {coord:fid for fid, coord in enumerate(coords_set)}
+        # Create nx.Graph
+        G = nx.Graph()
+        for fid, l in enumerate(bn):
+            nodes = [coords_dict[coord] for coord in l.coords]
+            G.add_nodes_from(nodes)
+            G.add_edges_from(zip(nodes[:-1], nodes[1:]), fid=fid)
+
+        return cls(G, np.asarray(list(coords_set)))
+
+    @classmethod
+    def from_file(cls, filename=os.path.join(respath, 'fracs.gpkg'), **kwargs):
+        """Create Fractnet from geospatial file.
+
+        Args:
+          filename: filename of geospatial file. Default fracs.gpkg from examples
+
+        """
+        if fiona_OK:
+            layers = fiona.listlayers(filename)
+            if len(layers) > 1 and 'layer' not in kwargs:
+                if 'fractnet' in layers:
+                    kwargs['layer'] = 'fractnet'
+                else:
+                    print('There is {} layers in file: {}. To choose other than first one, provide layer kwarg.'.format(len(layers), layers))
+
+            G = nx.Graph()
+            coords = []
+            with fiona.open(filename, **kwargs) as src:
+                schema = src.schema
+                assert schema['geometry'] == 'LineString', 'The file geometry must be LineString, not {}!'.format(schema['geometry'])
+                shapes = []
+                for feature in src:
+                    geom = shape(feature['geometry'])
+                    # remove duplicate and subsequent colinear vertexes
+                    geom = geom.simplify(0)
+                    if geom.is_valid:
+                        if not geom.is_empty:
+                            if geom.geom_type == 'MultiLineString':
+                                for g in geom:
+                                    if not any(g.equals(gr.shape) for gr in shapes):
+                                        shapes.append(Boundary(g, 'none', len(shapes)))
+                                    else:
+                                        print('Duplicate line (FID={}) skipped.'.format(feature['id']))
+                                print('Multiline (FID={}) exploded.'.format(feature['id']))
+                            elif geom.geom_type == 'LineString':
+                                if not any(geom.equals(gr.shape) for gr in shapes):
+                                    shapes.append(Boundary(geom, 'none', len(shapes)))
+                                else:
+                                    print('Duplicate line (FID={}) skipped.'.format(feature['id']))
+                            else:
+                                print('Unexpected geometry type {} (FID={}) skipped.'.format(geom.geom_type, feature['id']))
+                        else:
+                            print('Empty geometry (FID={}) skipped.'.format(feature['id']))
+                    else:
+                        print('Invalid geometry (FID={}) skipped.'.format(feature['id']))
+                return cls.from_boundaries(Boundaries(shapes))
+        else:
+            print('Fiona package is not installed.')
+
+    def reduce(self):
+        # Create adjancency matrix with only 0, 1
+        B = nx.adjacency_matrix(self.G).tolil()
+        # prepare
+        dg = (B>0).sum(axis=0).A1
+        todel = np.flatnonzero(dg == 2)
+        keep = np.setdiff1d(np.arange(B.shape[0]), todel)
+        coords = self.coords.copy()
+        while len(todel) > 0:
+            for idx in todel:
+                if B[idx].nnz > 1:
+                    n1, n2 = B[idx].rows[0]  # get neighbours of idx
+                    # delete existing connections
+                    B[idx, n1] = 0
+                    B[n1, idx] = 0
+                    B[idx, n2] = 0
+                    B[n2, idx] = 0
+                    # add new connection
+                    B[n1, n2] = 1
+                    B[n2, n1] = 1
+                else:
+                    n1 = B[idx].rows[0][0]
+                    B[idx, n1] = 0
+                    B[n1, idx] = 0
+            B = B[keep,:][:, keep]
+            coords = coords[keep]
+            dg = (B>0).sum(axis=0).A1
+            todel = np.flatnonzero(dg == 2)
+            keep = np.setdiff1d(np.arange(B.shape[0]), todel)
+        return Fractnet(nx.from_scipy_sparse_matrix(B), coords)
