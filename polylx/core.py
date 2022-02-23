@@ -2914,18 +2914,28 @@ class Fractnet(object):
 
     Properties:
       G: ``networkx.Graph`` storing fracture network topology
-      coords: coordinate arrays
+      pos: a dictionary with nodes as keys and positions as values
       
 
     """
     def __init__(self, G, coords):
-        assert G.number_of_nodes() == coords.shape[0], \
-            'Number of nodes {} do not correspond to number of coordinates {}'.format(G.number_of_nodes(), coords.shape[0])
+        assert G.number_of_nodes() == len(coords), \
+            'Number of nodes {} do not correspond to number of coordinates {}'.format(G.number_of_nodes(), len(coords))
         self.G = G
-        self.coords = coords
+        self.pos = {node:pos for node, pos in enumerate(coords)}
 
     def __repr__(self):
         return 'Fracture network with {} nodes and {} branches.'.format(self.G.number_of_nodes(), self.G.number_of_edges())
+
+    def show(self, **kwargs):
+        if 'with_labels' not in kwargs:
+            kwargs['with_labels'] = False
+        if 'node_size' not in kwargs:
+            kwargs['node_size'] = 4
+        if 'pos' not in kwargs:
+            kwargs['pos'] = self.pos
+        nx.draw(self.G, **kwargs)
+        plt.show()
 
     @classmethod
     def from_boundaries(cls, b):
@@ -2996,13 +3006,16 @@ class Fractnet(object):
             print('Fiona package is not installed.')
 
     def reduce(self):
+        """Remove 2 degree nodes. Usefull for connectivity calculation Zhang et al., 1992
+
+        """
         # Create adjancency matrix with only 0, 1
         B = nx.adjacency_matrix(self.G).tolil()
         # prepare
         dg = (B>0).sum(axis=0).A1
         todel = np.flatnonzero(dg == 2)
         keep = np.setdiff1d(np.arange(B.shape[0]), todel)
-        coords = self.coords.copy()
+        coords = np.asarray([self.pos[node] for node in self.G.nodes()])
         while len(todel) > 0:
             for idx in todel:
                 if B[idx].nnz > 1:
