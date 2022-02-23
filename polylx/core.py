@@ -2596,6 +2596,62 @@ class Boundaries(PolySet):
             sf.dbf.close()
             raise Exception('Shapefile must contains polylines!')
 
+    @classmethod
+    def from_file(cls, filename=os.path.join(respath, 'sg2.shp'), **kwargs):
+        """Create Grains from geospatial file.
+
+        Args:
+          filename: filename of shapefile. Default sg2.shp from examples
+          namefield: name of attribute in shapefile that
+            holds names of grains or None. Default "phase".
+          name: value used for grain name when namefield is None
+
+        """
+        if fiona_OK:
+
+            namefield = kwargs.pop('namefield', 'PHASE')
+            name = kwargs.pop('name', 'None')
+
+            with fiona.open(filename, **kwargs) as src:
+                schema = src.schema
+                assert schema['geometry'] == 'LineString', 'The file must contains lines!'
+                fieldnames = list(schema['properties'].keys())
+                if namefield is not None:
+                    if namefield not in fieldnames:
+                        raise Exception("There is no field '{}'. Available fields are: {}".format(namefield, fieldnames))
+                shapes = []
+                for feature in src:
+                    geom = shape(feature['geometry'])
+                    # remove duplicate and subsequent colinear vertexes
+                    geom = geom.simplify(0)
+                    if geom.is_valid:
+                        if not geom.is_empty:
+                            if namefield is None:
+                                ph = name
+                            else:
+                                ph = feature['properties'][namefield]
+                            if geom.geom_type == 'MultiLineString':
+                                for g in geom:
+                                    if not any(g.equals(gr.shape) for gr in shapes):
+                                        shapes.append(Boundary(g, ph, len(shapes)))
+                                    else:
+                                        print('Duplicate line (FID={}) skipped.'.format(feature['id']))
+                                print('Multiline (FID={}) exploded.'.format(feature['id']))
+                            elif geom.geom_type == 'LineString':
+                                if not any(geom.equals(gr.shape) for gr in shapes):
+                                    shapes.append(Boundary(geom, ph, len(shapes)))
+                                else:
+                                    print('Duplicate line (FID={}) skipped.'.format(feature['id']))
+                            else:
+                                raise Exception('Unexpected geometry type (FID={})!'.format(feature['id']))
+                        else:
+                            print('Empty geometry (FID={}) skipped.'.format(feature['id']))
+                    else:
+                        print('Invalid geometry (FID={}) skipped.'.format(feature['id']))
+                return cls(shapes)
+        else:
+            print('Fiona package is not installed.')
+
     def to_file(self, filename='boundaries.gpkg', driver='GPKG'):
         """
         driver: 'ESRI Shapefile', 'GeoJSON', 'GPKG' or 'GML'. Default 'GPKG'
