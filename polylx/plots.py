@@ -10,28 +10,68 @@ from .utils import weighted_avg_and_std
 ##########################
 
 
-def surfor_plot(ob, averaged=True):
+def surfor_plot(ob, **kwargs):
     assert isinstance(ob, PolySet), ('First argument must be Grains or Boundaries instance.')
-    for key, g in ob.class_iter():
+    # parse args
+    averaged = kwargs.get('averaged', True)
+    classified = kwargs.get('classified', True)
+    label = kwargs.get('label', 'default')
+    legend = kwargs.get('surfor', True)
+    if 'ax' in kwargs:
+        ax = kwargs['ax']
+    else:
+        fig = plt.figure(figsize=kwargs.get('figsize', plt.rcParams.get('figure.figsize')))
+        ax = fig.add_subplot(111)
+    # plot
+    if classified:
+        for key, g in ob.class_iter():
+            if averaged:
+                res = g.surfor().mean(axis=0)
+            else:
+                res = g.surfor().sum(axis=0)
+            ax.plot(res, color=ob.classes.color(key), label=key)
+    else:
         if averaged:
-            res = g.surfor().mean(axis=0)
+            res = ob.surfor().mean(axis=0)
         else:
-            res = g.surfor().sum(axis=0)
-        plt.plot(res, color=ob.classes.color(key), label=key)
-    plt.legend()
-    plt.show()
+            res = ob.surfor().sum(axis=0)
+        ax.plot(res, label=label)
+    if legend:
+        ax.legend()
+    if 'ax' not in kwargs:
+        plt.show()
 
 
-def paror_plot(ob, averaged=True):
+def paror_plot(ob, **kwargs):
     assert isinstance(ob, PolySet), ('First argument must be Grains or Boundaries instance.')
-    for key, g in ob.class_iter():
+    # parse args
+    averaged = kwargs.get('averaged', True)
+    classified = kwargs.get('classified', True)
+    label = kwargs.get('label', 'paror')
+    legend = kwargs.get('legend', True)
+    if 'ax' in kwargs:
+        ax = kwargs['ax']
+    else:
+        fig = plt.figure(figsize=kwargs.get('figsize', plt.rcParams.get('figure.figsize')))
+        ax = fig.add_subplot(111)
+    # plot
+    if classified:
+        for key, g in ob.class_iter():
+            if averaged:
+                res = g.paror().mean(axis=0)
+            else:
+                res = g.paror().sum(axis=0)
+            ax.plot(res, color=ob.classes.color(key), label=key)
+    else:
         if averaged:
-            res = g.paror().mean(axis=0)
+            res = ob.paror().mean(axis=0)
         else:
-            res = g.paror().sum(axis=0)
-        plt.plot(res, color=ob.classes.color(key), label=key)
-    plt.legend()
-    plt.show()
+            res = ob.paror().sum(axis=0)
+        ax.plot(res, label=label)
+    if legend:
+        ax.legend()
+    if 'ax' not in kwargs:
+        plt.show()
 
 #############
 # Other plots
@@ -63,7 +103,7 @@ def normdist_plot(d, **kwargs):
 
 def rose_plot(ang, **kwargs):
     if 'ax' in kwargs:
-        ax = kwargs.pop('ax')
+        ax = kwargs['ax']
     else:
         fig = plt.figure(figsize=kwargs.get('figsize', plt.rcParams.get('figure.figsize')))
         ax = fig.add_subplot(111, polar=True)
@@ -77,10 +117,18 @@ def rose_plot(ang, **kwargs):
         theta = np.linspace(-np.pi, np.pi, 1801)
         radii = np.zeros_like(theta)
         kappa = kwargs.get('kappa', 250)
-        for a in ang:
-            radii += vonmises.pdf(theta, kappa, loc=np.radians(a))
-            radii += vonmises.pdf(theta, kappa, loc=np.radians(a + 180))
-        radii /= len(ang)
+        if 'weights' in kwargs:
+            for a, w in zip(ang, kwargs.get('weights')):
+                radii += w * vonmises.pdf(theta, kappa, loc=np.radians(a))
+                radii += w * vonmises.pdf(theta, kappa, loc=np.radians(a + 180))
+            radii /= sum(kwargs.get('weights'))
+        else:
+            for a in ang:
+                radii += vonmises.pdf(theta, kappa, loc=np.radians(a))
+                radii += vonmises.pdf(theta, kappa, loc=np.radians(a + 180))
+            radii /= len(ang)
+        # not clear, but seems to fit with bars
+        radii /= 100
     else:
         bins = kwargs.get('bins', 36)
         width = 360 / bins
@@ -109,9 +157,9 @@ def rose_plot(ang, **kwargs):
         radii = np.sqrt(radii)
     ax.fill(theta, radii, **kwargs.get('fill_kwg', {}))
     ax.set_axisbelow(True)
-    if kwargs.get('show', True):
+    if 'ax' not in kwargs:
         plt.show()
-    return ax
+    # return ax
 
 
 def grainsize_plot(d, **kwargs):

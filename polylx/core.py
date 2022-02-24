@@ -12,6 +12,7 @@ Examples:
 """
 import os
 import itertools
+from collections import defaultdict
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import PathPatch
@@ -20,10 +21,10 @@ import matplotlib.colors as mcolors
 import matplotlib.cbook as mcb
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
-from shapely.geometry import shape, Polygon, LinearRing, LineString
+from shapely.geometry import shape, Point, Polygon, LinearRing, LineString, MultiPoint
 from shapely.geometry.polygon import orient
 from shapely import affinity
-from shapely.ops import cascaded_union, unary_union
+from shapely.ops import cascaded_union, unary_union, linemerge
 import networkx as nx
 import pandas as pd
 import seaborn as sns
@@ -1793,8 +1794,10 @@ class PolySet(object):
             h, lbls = ax.get_legend_handles_labels()
             if h:
                 divider = make_axes_locatable(ax)
-                cax = divider.append_axes('top',
-                                          size=0.25 + 0.25 * np.ceil(len(h) / ncol))
+                #cax = divider.append_axes('top',
+                #                          size=0.25 + 0.25 * np.ceil(len(h) / ncol))
+                cax = divider.append_axes('top', pad='5%',
+                                          size='{:.0f}%'.format(4 + 4*np.ceil(len(h) / ncol)))
                 cax.set_axis_off()
                 cax.legend(h, lbls, loc=9, borderaxespad=0.,
                            ncol=ncol, bbox_to_anchor=[0.5, 1.1])
@@ -1803,7 +1806,9 @@ class PolySet(object):
             h, lbls = ax.get_legend_handles_labels()
             if h:
                 divider = make_axes_locatable(ax)
-                cax = divider.append_axes("right", size=0.2 + 1.6 * ncol)
+                #cax = divider.append_axes("right", size=0.2 + 1.6 * ncol)
+                cax = divider.append_axes("right", pad='5%',
+                                          size='{:.0f}%'.format(5 + 10*ncol))
                 cax.set_axis_off()
                 cax.legend(h, lbls, loc=7, borderaxespad=0.,
                            bbox_to_anchor=[1.04, 0.5])
@@ -2928,11 +2933,72 @@ class Fractnet(object):
             nx.set_node_attributes(self.G, attrs, name='pos')
 
     def __repr__(self):
-        return 'Fracture network with {} nodes and {} branches.'.format(self.G.number_of_nodes(), self.G.number_of_edges())
+        return 'Fracture network with {} nodes and {} edges.'.format(self.n_nodes(), self.n_edges())
+
+    @property
+    def degree(self):
+        return np.asarray(list(self.G.degree))[:, 1]
+
+    @property
+    def n_edges(self):
+        return self.G.number_of_edges()
+
+    @property
+    def n_nodes(self):
+        return self.G.number_of_nodes()
+
+    @property
+    def node_positions(self):
+        return nx.get_node_attributes(self.G, 'pos')
+
+    @property
+    def Ni(self):
+        """Number of isolated tips I-nodes"""
+        return np.count_nonzero(self.degree == 1)
+
+    @property
+    def Ny(self):
+        """Number of fracture abutments Y-nodes"""
+        return np.count_nonzero((self.degree > 2) & (self.degree % 2 == 1))
+
+    @property
+    def Nx(self):
+        """Number of crossing fractures X-nodes"""
+        return np.count_nonzero((self.degree > 2) & (self.degree % 2 == 0))
+
+    @property
+    def Nl(self):
+        """Robust number of lines"""
+        return (self.Ni + self.Ny)//2
+
+    @property
+    def Nl(self):
+        """Robust number of branches"""
+        return (self.Ni + self.Ny) // 2
+
+    @property
+    def Nb(self):
+        """Robust number of branches"""
+        return sum([d*n for d, n in zip(*np.unique(self.degree, return_counts=True)) if d != 2]) // 2
+
+    @property
+    def Cl(self):
+        """Average number of connections per line"""
+        return 4*(self.Nx + self.Ny) / (self.Ni + self.Ny)
+
+    @property
+    def Cb(self):
+        """Average number of connections per branch"""
+        return sum([d*n for d, n in zip(*np.unique(self.degree, return_counts=True)) if d > 2]) / self.Nb
+
+    @property
+    def area(self):
+        """Return minimum bounding rectangle area"""
+        return MultiPoint(np.asarray(list(self.node_positions.values()))).minimum_rotated_rectangle.area
 
     def show(self, **kwargs):
         if 'pos' not in kwargs:
-            kwargs['pos'] = nx.get_node_attributes(self.G, 'pos')
+            kwargs['pos'] = self.node_positions
         nx.draw_networkx_edges(self.G, **kwargs)
         plt.axis('equal')
         plt.show()
@@ -2941,7 +3007,7 @@ class Fractnet(object):
         if 'node_size' not in kwargs:
             kwargs['node_size'] = 6
         if 'pos' not in kwargs:
-            kwargs['pos'] = nx.get_node_attributes(self.G, 'pos')
+            kwargs['pos'] = self.node_positions
         nx.draw_networkx_nodes(self.G, **kwargs)
         plt.axis('equal')
         plt.show()
@@ -3035,7 +3101,7 @@ class Fractnet(object):
         dg = (B>0).sum(axis=0).A1
         todel = np.flatnonzero(dg == 2)
         keep = np.setdiff1d(np.arange(B.shape[0]), todel)
-        pos = nx.get_node_attributes(self.G, 'pos')
+        pos = self.node_positions
         coords = np.asarray([pos[node] for node in self.G.nodes()])
         while len(todel) > 0:
             for idx in todel:
@@ -3059,3 +3125,46 @@ class Fractnet(object):
             todel = np.flatnonzero(dg == 2)
             keep = np.setdiff1d(np.arange(B.shape[0]), todel)
         return Fractnet(nx.from_scipy_sparse_matrix(B), coords)
+
+    def edges_boundaries(self):
+        pos = self.node_positions
+        shapes = []
+        for n1, n2 in self.G.edges():
+            shapes.append(Boundary(LineString([Point(pos[n1]), Point(pos[n2])]), name='edge'))
+        return Boundaries(shapes)
+
+    def branches_boundaries(self):
+        ed = nx.get_edge_attributes(self.G, 'fid')
+        br = defaultdict(list)
+        for key, value in ed.items():
+            br[value].append(key)
+
+        pos = self.node_positions
+        shapes = []
+        for fid, edges in br.items():
+            segs = []
+            for n1, n2 in edges:
+                segs.append(LineString([Point(pos[n1]), Point(pos[n2])]))
+            l = linemerge(segs)
+            if l.geom_type == 'LineString':
+                shapes.append(Boundary(l, name='branch', fid=fid))
+            else:
+                print('Edges with FID:{} do not form branch but {}'.format(fid, l.geom_type))
+        return Boundaries(shapes)
+
+    def components(self):
+        for nodes in nx.connected_components(self.G):
+            yield Fractnet(self.G.subgraph(nodes).copy())
+
+    def k_order_connectivity(self):
+        """Calculation of connectivity according to Zhang et al., 1992
+        """
+        B = defaultdict(int)
+        for c in self.reduce().components():
+            k = np.count_nonzero(c.degree > 2)
+            B[k] += c.n_edges
+        Bc = sum([B[k] for k in B if k !=0])
+        Ck = {k:B[k]/(B[0] + Bc) for k in B if k !=0}
+        Cs = B[max(B.keys())]/(B[0] + Bc)
+        C = sum(Ck.values())
+        return C, Cs, Ck
