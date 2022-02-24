@@ -16,6 +16,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import PathPatch
 from matplotlib.path import Path
+import matplotlib.colors as mcolors
 import matplotlib.cbook as mcb
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
@@ -2918,23 +2919,41 @@ class Fractnet(object):
       
 
     """
-    def __init__(self, G, coords):
-        assert G.number_of_nodes() == len(coords), \
-            'Number of nodes {} do not correspond to number of coordinates {}'.format(G.number_of_nodes(), len(coords))
+    def __init__(self, G, coords=None):
         self.G = G
-        self.pos = {node:pos for node, pos in enumerate(coords)}
+        if coords is not None:
+            assert G.number_of_nodes() == len(coords), \
+                'Number of nodes {} do not correspond to number of coordinates {}'.format(G.number_of_nodes(), len(coords))
+            attrs = {node:pos for node, pos in enumerate(coords)}
+            nx.set_node_attributes(self.G, attrs, name='pos')
 
     def __repr__(self):
         return 'Fracture network with {} nodes and {} branches.'.format(self.G.number_of_nodes(), self.G.number_of_edges())
 
     def show(self, **kwargs):
-        if 'with_labels' not in kwargs:
-            kwargs['with_labels'] = False
-        if 'node_size' not in kwargs:
-            kwargs['node_size'] = 4
         if 'pos' not in kwargs:
-            kwargs['pos'] = self.pos
-        nx.draw(self.G, **kwargs)
+            kwargs['pos'] = nx.get_node_attributes(self.G, 'pos')
+        nx.draw_networkx_edges(self.G, **kwargs)
+        plt.axis('equal')
+        plt.show()
+
+    def show_nodes(self, **kwargs):
+        if 'node_size' not in kwargs:
+            kwargs['node_size'] = 6
+        if 'pos' not in kwargs:
+            kwargs['pos'] = nx.get_node_attributes(self.G, 'pos')
+        nx.draw_networkx_nodes(self.G, **kwargs)
+        plt.axis('equal')
+        plt.show()
+
+    def show_components(self, **kwargs):
+        comps = list(nx.connected_components(self.G))
+        colors = np.random.choice(list(mcolors.CSS4_COLORS.keys()), len(comps))
+        for color, c in zip(colors, comps):
+            S = self.G.subgraph(c)
+            kwargs['edge_color'] = color
+            nx.draw_networkx_edges(S, nx.get_node_attributes(S, 'pos'), **kwargs)
+        plt.axis('equal')
         plt.show()
 
     @classmethod
@@ -2949,11 +2968,12 @@ class Fractnet(object):
         # Create nx.Graph
         G = nx.Graph()
         for fid, l in enumerate(bn):
-            nodes = [coords_dict[coord] for coord in l.coords]
+            nodes = [(coords_dict[coord], {'pos':coord}) for coord in l.coords]
             G.add_nodes_from(nodes)
-            G.add_edges_from(zip(nodes[:-1], nodes[1:]), fid=fid)
+            nodes_id = [node[0] for node in nodes]
+            G.add_edges_from(zip(nodes_id[:-1], nodes_id[1:]), fid=fid)
 
-        return cls(G, np.asarray(list(coords_set)))
+        return cls(G)
 
     @classmethod
     def from_file(cls, filename=os.path.join(respath, 'fracs.gpkg'), **kwargs):
@@ -3015,7 +3035,8 @@ class Fractnet(object):
         dg = (B>0).sum(axis=0).A1
         todel = np.flatnonzero(dg == 2)
         keep = np.setdiff1d(np.arange(B.shape[0]), todel)
-        coords = np.asarray([self.pos[node] for node in self.G.nodes()])
+        pos = nx.get_node_attributes(self.G, 'pos')
+        coords = np.asarray([pos[node] for node in self.G.nodes()])
         while len(todel) > 0:
             for idx in todel:
                 if B[idx].nnz > 1:
