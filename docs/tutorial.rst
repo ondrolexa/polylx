@@ -25,11 +25,11 @@ convinience, we will import polylx into actual namespace::
 
     >>> from polylx import *
 
-To read example data, we can use ``Grains.from_shp`` method without
-arguments. Note that we create new ``Grains`` object, which store all
+To read example data, we can use ``Grains.example`` method. Note that we
+create new ``Grains`` object, which store all
 imported features (polygons) from shapefile::
 
-    >>> g = Grains.from_shp()
+    >>> g = Grains.example()
 
 To visualize grain objects from shape file, we can use ``show`` method
 of Grains object::

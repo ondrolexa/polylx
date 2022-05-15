@@ -11,7 +11,7 @@ Example:
   from polylx import *
   from polylx.reports import Report
 
-  g = Grains.from_shp()
+  g = Grains.example()
 
   fig, ax = plt.subplots()
   x = np.linspace(-8,8,200)
