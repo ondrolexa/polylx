@@ -12,7 +12,7 @@ import numpy as np
 from polylx import *
 import unittest
 
-sample = Sample.from_shp()
+sample = Sample.example()
 
 
 class TestPolylx(unittest.TestCase):

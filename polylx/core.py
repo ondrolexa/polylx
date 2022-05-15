@@ -6,7 +6,7 @@ Python module to visualize and analyze digitized 2D microstructures.
 
 Examples:
   >>> from polylx import *
-  >>> g = Grains.from_shp()
+  >>> g = Grains.example()
   >>> b = g.boundaries()
 
 """
@@ -207,7 +207,7 @@ class PolyShape(object):
         """Create Boundaries from object boundary segments.
 
         Example:
-          >>> g = Grains.from_shp()
+          >>> g = Grains.example()
           >>> b = g.boundaries()
           >>> bs1 = g[10].boundary_segments()
           >>> bs2 = b[10].boundary_segments()
@@ -1766,7 +1766,7 @@ class PolySet(object):
         """Create Boundaries from object boundary segments.
 
         Example:
-          >>> g = Grains.from_shp()
+          >>> g = Grains.example()
           >>> b = g.boundary_segments()
 
         """
@@ -2143,7 +2143,7 @@ class Grains(PolySet):
         """Create Boundaries from Grains. Faster but not always safe implementation
 
         Example:
-          >>> g = Grains.from_shp()
+          >>> g = Grains.example()
           >>> b = g.boundaries_fast()
 
         """
@@ -2218,7 +2218,7 @@ class Grains(PolySet):
         """Create Boundaries from Grains.
 
         Example:
-          >>> g = Grains.from_shp()
+          >>> g = Grains.example()
           >>> b = g.boundaries()
 
         """
@@ -2274,12 +2274,20 @@ class Grains(PolySet):
             return Boundaries(boundaries)
 
     @classmethod
-    def from_shp(cls, filename=os.path.join(respath, 'sg2.shp'),
-                 namefield='phase', name='None'):
+    def example(cls):
+        """Return example grains
+
+        """
+        return cls.from_file(os.path.join(respath, 'sg2.gpkg'))
+
+
+    @classmethod
+    def from_shp(cls, filename, namefield='phase', name='None'):
         """Create Grains from ESRI shapefile.
 
         Args:
-          filename: filename of shapefile. Default sg2.shp from examples
+          filename: filename of shapefile.
+        Kwargs:
           namefield: name of attribute in shapefile that
             holds names of grains or None. Default "phase".
           name: value used for grain name when namefield is None
@@ -2346,11 +2354,12 @@ class Grains(PolySet):
             raise Exception('Shapefile must contains polygons!')
 
     @classmethod
-    def from_file(cls, filename=os.path.join(respath, 'sg2.gpkg'), **kwargs):
+    def from_file(cls, filename, **kwargs):
         """Create Boundaries from geospatial file.
 
         Args:
           filename: filename of geospatial file. Default sg2.gpkg from examples
+        Kwargs:
           namefield: name of attribute that holds names of grains or None.
                      Default "name".
           name: value used for grain name when namefield is None
@@ -2415,9 +2424,14 @@ class Grains(PolySet):
         else:
             print('Fiona package is not installed.')
 
-    def to_file(self, filename='grains.gpkg', **kwargs):
+    def to_file(self, filename, **kwargs):
         """
-        driver: 'ESRI Shapefile', 'GeoJSON', 'GPKG' or 'GML'. Default 'GPKG'
+        Save Boundaries to geospatial file
+
+        Args:
+          filename: filename of geospatial file
+        Kwargs:
+          driver: 'ESRI Shapefile', 'GeoJSON', 'GPKG' or 'GML'. Default 'GPKG'
 
         """
         if fiona_OK:
@@ -2555,11 +2569,12 @@ class Boundaries(PolySet):
         return Boundaries(self.polys + other.polys)
 
     @classmethod
-    def from_shp(cls, filename=None, namefield='phase', name='None'):
+    def from_shp(cls, filename, namefield='phase', name='None'):
         """Create Boundaries from ESRI shapefile.
 
         Args:
           filename: filename of shapefile.
+        Kwargs:
           namefield: name of attribute in shapefile that
             holds names of boundairies or None. Default "phase".
           name: value used for grain name when namefield is None
@@ -2612,11 +2627,12 @@ class Boundaries(PolySet):
             raise Exception('Shapefile must contains polylines!')
 
     @classmethod
-    def from_file(cls, filename=os.path.join(respath, 'sg2.gpkg'), **kwargs):
-        """Create Boudaries from geospatial file.
+    def from_file(cls, filename, **kwargs):
+        """Create Boudaries from geospatial file using fiona.
 
         Args:
-          filename: filename of geospatial file. Default sg2.gpkg from examples
+          filename: filename of geospatial file.
+        Kwargs:
           namefield: name of attribute that holds names of boundaries or None.
                      Default "name".
           name: value used for boundary name when namefield is None
@@ -2675,9 +2691,14 @@ class Boundaries(PolySet):
         else:
             print('Fiona package is not installed.')
 
-    def to_file(self, filename='boundaries.gpkg', **kwargs):
+    def to_file(self, filename, **kwargs):
         """
-        driver: 'ESRI Shapefile', 'GeoJSON', 'GPKG' or 'GML'. Default 'GPKG'
+        Save boundaries to geospatial file
+
+        Args:
+          filename: filename
+        Kwargs:
+          driver: 'ESRI Shapefile', 'GeoJSON', 'GPKG' or 'GML'. Default 'GPKG'
 
         """
         if fiona_OK:
@@ -2739,9 +2760,11 @@ class Sample(object):
                                                              len(self.b.polys))
 
     @classmethod
-    def from_shp(cls, filename=os.path.join(respath, 'sg2.shp'),
-                 namefield='phase', name=''):
-        return cls.from_grains(Grains.from_shp(filename, namefield), name=name)
+    def example(cls):
+        """Returns example Sample
+
+        """
+        return cls.from_grains(Grains.example())
 
     @classmethod
     def from_grains(cls, grains, name=''):
