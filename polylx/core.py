@@ -30,7 +30,7 @@ import pandas as pd
 import seaborn as sns
 import warnings
 import pyefd
-from shapefile import Reader
+import shapefile
 
 try:
     import fiona
@@ -436,7 +436,7 @@ class Grain(PolyShape):
 
     Properties:
       shape: ``shapely.geometry.polygon.Polygon`` object
-      name: string with phase name. Default "None"
+      name: string with grain name. Default "None"
       fid: feature id. Default 0
       shape_method: Method to calculate axes and orientation
 
@@ -2278,91 +2278,83 @@ class Grains(PolySet):
         """Return example grains
 
         """
-        return cls.from_file(os.path.join(respath, 'sg2.gpkg'))
+        return cls.from_shp(os.path.join(respath, 'sg2.shp'))
 
 
     @classmethod
-    def from_shp(cls, filename, namefield='phase', name='None'):
+    def from_shp(cls, filename, namefield='name', name='None'):
         """Create Grains from ESRI shapefile.
 
         Args:
           filename: filename of shapefile.
         Kwargs:
           namefield: name of attribute in shapefile that
-            holds names of grains or None. Default "phase".
+            holds names of grains or None. Default "name".
           name: value used for grain name when namefield is None
 
         """
-        sf = Reader(filename)
-        if sf.shapeType == 5:
-            fieldnames = [field[0].lower() for field in sf.fields[1:]]
-            if namefield is not None:
-                if namefield in fieldnames:
-                    name_pos = fieldnames.index(namefield)
-                else:
-                    raise Exception("There is no field '{}'. Available fields are: {}".format(namefield, fieldnames))
-            shapeRecs = sf.shapeRecords()
-            # until pyshp 2 will be released
-            sf.shp.close()
-            sf.shx.close()
-            sf.dbf.close()
-            shapes = []
-            for pos, rec in enumerate(shapeRecs):
-                # A valid polygon must have at least 4 coordinate tuples
-                if len(rec.shape.points) > 3:
-                    geom = shape(rec.shape.__geo_interface__)
-                    # remove duplicate and subsequent colinear vertexes
-                    # geom = geom.simplify(0)
-                    # try  to "clean" self-touching or self-crossing polygons
-                    if not geom.is_valid:
-                        print('Cleaning FID={}...'.format(pos))
-                        geom = geom.buffer(0)
-                    if geom.is_valid:
-                        if not geom.is_empty:
-                            if namefield is None:
-                                ph = name
-                            else:
-                                ph = rec.record[name_pos]
-                            if geom.geom_type == 'MultiPolygon':
-                                for g in geom:
-                                    go = orient(g)
+        with shapefile.Reader(filename) as sf:
+            if sf.shapeType == 5:
+                fieldnames = [field[0].lower() for field in sf.fields[1:]]
+                if namefield is not None:
+                    if namefield in fieldnames:
+                        name_pos = fieldnames.index(namefield)
+                    else:
+                        raise Exception("There is no field '{}'. Available fields are: {}".format(namefield, fieldnames))
+                shapes = []
+                for pos, rec in enumerate(sf.shapeRecords()):
+                    # A valid polygon must have at least 4 coordinate tuples
+                    if len(rec.shape.points) > 3:
+                        geom = shape(rec.shape.__geo_interface__)
+                        # remove duplicate and subsequent colinear vertexes
+                        # geom = geom.simplify(0)
+                        # try  to "clean" self-touching or self-crossing polygons
+                        if not geom.is_valid:
+                            print('Cleaning FID={}...'.format(pos))
+                            geom = geom.buffer(0)
+                        if geom.is_valid:
+                            if not geom.is_empty:
+                                if namefield is None:
+                                    ph = name
+                                else:
+                                    ph = rec.record[name_pos]
+                                if geom.geom_type == 'MultiPolygon':
+                                    for g in geom:
+                                        go = orient(g)
+                                        if not any(go.equals(gr.shape) for gr in shapes):
+                                            shapes.append(Grain(go, ph, len(shapes)))
+                                        else:
+                                            print('Duplicate polygon (FID={}) skipped.'.format(pos))
+                                    print('Multipolygon (FID={}) exploded.'.format(pos))
+                                elif geom.geom_type == 'Polygon':
+                                    go = orient(geom)
                                     if not any(go.equals(gr.shape) for gr in shapes):
                                         shapes.append(Grain(go, ph, len(shapes)))
                                     else:
                                         print('Duplicate polygon (FID={}) skipped.'.format(pos))
-                                print('Multipolygon (FID={}) exploded.'.format(pos))
-                            elif geom.geom_type == 'Polygon':
-                                go = orient(geom)
-                                if not any(go.equals(gr.shape) for gr in shapes):
-                                    shapes.append(Grain(go, ph, len(shapes)))
                                 else:
-                                    print('Duplicate polygon (FID={}) skipped.'.format(pos))
+                                    raise Exception('Unexpected geometry type (FID={})!'.format(pos))
                             else:
-                                raise Exception('Unexpected geometry type (FID={})!'.format(pos))
+                                print('Empty geometry (FID={}) skipped.'.format(pos))
                         else:
-                            print('Empty geometry (FID={}) skipped.'.format(pos))
+                            print('Invalid geometry (FID={}) skipped.'.format(pos))
                     else:
                         print('Invalid geometry (FID={}) skipped.'.format(pos))
-                else:
-                    print('Invalid geometry (FID={}) skipped.'.format(pos))
-            return cls(shapes)
-        else:
-            # until pyshp 2 will be released
-            sf.shp.close()
-            sf.shx.close()
-            sf.dbf.close()
-            raise Exception('Shapefile must contains polygons!')
+                return cls(shapes)
+            else:
+                raise Exception('Shapefile must contains polygons!')
 
     @classmethod
     def from_file(cls, filename, **kwargs):
-        """Create Boundaries from geospatial file.
+        """Create Grains from geospatial file.
 
         Args:
-          filename: filename of geospatial file. Default sg2.gpkg from examples
+          filename: filename of geospatial file.
         Kwargs:
           namefield: name of attribute that holds names of grains or None.
                      Default "name".
           name: value used for grain name when namefield is None
+          layer: name of layer in files which support it e.g. 'GPKG'. Default grains
 
         """
         if fiona_OK:
@@ -2432,6 +2424,7 @@ class Grains(PolySet):
           filename: filename of geospatial file
         Kwargs:
           driver: 'ESRI Shapefile', 'GeoJSON', 'GPKG' or 'GML'. Default 'GPKG'
+          layer: name of layer in files which support it e.g. 'GPKG'. Default grains
 
         """
         if fiona_OK:
@@ -2569,62 +2562,53 @@ class Boundaries(PolySet):
         return Boundaries(self.polys + other.polys)
 
     @classmethod
-    def from_shp(cls, filename, namefield='phase', name='None'):
+    def from_shp(cls, filename, namefield='name', name='None'):
         """Create Boundaries from ESRI shapefile.
 
         Args:
           filename: filename of shapefile.
         Kwargs:
           namefield: name of attribute in shapefile that
-            holds names of boundairies or None. Default "phase".
+            holds names of boundairies or None. Default "name".
           name: value used for grain name when namefield is None
 
         """
-        sf = Reader(filename)
-        if sf.shapeType == 3:
-            fieldnames = [field[0].lower() for field in sf.fields[1:]]
-            if namefield is not None:
-                if namefield in fieldnames:
-                    name_pos = fieldnames.index(namefield)
-                else:
-                    raise Exception("There is no field '%s'. Available fields are: %s" % (namefield, fieldnames))
-            shapeRecs = sf.shapeRecords()
-            # until pyshp 2 will be released
-            sf.shp.close()
-            sf.shx.close()
-            sf.dbf.close()
-            shapes = []
-            for pos, rec in enumerate(shapeRecs):
-                # A valid polyline must have at least 2 coordinate tuples
-                if len(rec.shape.points) > 1:
-                    geom = shape(rec.shape.__geo_interface__)
-                    if geom.is_valid:
-                        if not geom.is_empty:
-                            if namefield is None:
-                                ph = name
+        with shapefile.Reader(filename) as sf:
+            if sf.shapeType == 3:
+                fieldnames = [field[0].lower() for field in sf.fields[1:]]
+                if namefield is not None:
+                    if namefield in fieldnames:
+                        name_pos = fieldnames.index(namefield)
+                    else:
+                        raise Exception("There is no field '%s'. Available fields are: %s" % (namefield, fieldnames))
+                shapes = []
+                for pos, rec in enumerate(sf.shapeRecords()):
+                    # A valid polyline must have at least 2 coordinate tuples
+                    if len(rec.shape.points) > 1:
+                        geom = shape(rec.shape.__geo_interface__)
+                        if geom.is_valid:
+                            if not geom.is_empty:
+                                if namefield is None:
+                                    ph = name
+                                else:
+                                    ph = rec.record[name_pos]
+                                if geom.geom_type == 'MultiLineString':
+                                    for g in geom:
+                                        shapes.append(Boundary(g, ph, len(shapes)))
+                                    print('Multiline (FID={}) exploded.'.format(pos))
+                                elif geom.geom_type == 'LineString':
+                                    shapes.append(Boundary(geom, ph, len(shapes)))
+                                else:
+                                    raise Exception('Unexpected geometry type (FID={})!'.format(pos))
                             else:
-                                ph = rec.record[name_pos]
-                            if geom.geom_type == 'MultiLineString':
-                                for g in geom:
-                                    shapes.append(Boundary(g, ph, len(shapes)))
-                                print('Multiline (FID={}) exploded.'.format(pos))
-                            elif geom.geom_type == 'LineString':
-                                shapes.append(Boundary(geom, ph, len(shapes)))
-                            else:
-                                raise Exception('Unexpected geometry type (FID={})!'.format(pos))
+                                print('Empty geometry (FID={}) skipped.'.format(pos))
                         else:
-                            print('Empty geometry (FID={}) skipped.'.format(pos))
+                            print('Invalid geometry (FID={}) skipped.'.format(pos))
                     else:
                         print('Invalid geometry (FID={}) skipped.'.format(pos))
-                else:
-                    print('Invalid geometry (FID={}) skipped.'.format(pos))
-            return cls(shapes)
-        else:
-            # until pyshp 2 will be released
-            sf.shp.close()
-            sf.shx.close()
-            sf.dbf.close()
-            raise Exception('Shapefile must contains polylines!')
+                return cls(shapes)
+            else:
+                raise Exception('Shapefile must contains polylines!')
 
     @classmethod
     def from_file(cls, filename, **kwargs):
@@ -2636,6 +2620,7 @@ class Boundaries(PolySet):
           namefield: name of attribute that holds names of boundaries or None.
                      Default "name".
           name: value used for boundary name when namefield is None
+          layer: name of layer in files which support it e.g. 'GPKG'. Default boundaries
 
         """
         if fiona_OK:
@@ -2699,6 +2684,7 @@ class Boundaries(PolySet):
           filename: filename
         Kwargs:
           driver: 'ESRI Shapefile', 'GeoJSON', 'GPKG' or 'GML'. Default 'GPKG'
+          layer: name of layer in files which support it e.g. 'GPKG'. Default boundaries
 
         """
         if fiona_OK:
@@ -2956,7 +2942,7 @@ class Fractnet(object):
             nx.set_node_attributes(self.G, attrs, name='pos')
 
     def __repr__(self):
-        return 'Fracture network with {} nodes and {} edges.'.format(self.n_nodes(), self.n_edges())
+        return 'Fracture network with {} nodes and {} edges.'.format(self.n_nodes, self.n_edges)
 
     @property
     def degree(self):
@@ -3065,11 +3051,15 @@ class Fractnet(object):
         return cls(G)
 
     @classmethod
-    def from_file(cls, filename=os.path.join(respath, 'fracs.gpkg'), **kwargs):
+    def example(cls):
+        return cls.from_boundaries(Boundaries.from_shp(os.path.join(respath, 'fracs.shp')))
+
+    @classmethod
+    def from_file(cls, filename, **kwargs):
         """Create Fractnet from geospatial file.
 
         Args:
-          filename: filename of geospatial file. Default fracs.gpkg from examples
+          filename: filename of geospatial file.
 
         """
         if fiona_OK:
