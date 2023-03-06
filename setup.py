@@ -39,7 +39,7 @@ setup(
     license="MIT",
     zip_safe=False,
     keywords='polylx',
-    python_requires=">=3.8",
+    python_requires=">=3.9",
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Science/Research',
