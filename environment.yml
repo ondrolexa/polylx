@@ -1,5 +1,10 @@
+# run: conda env create --file environment.yml
 name: polylx
+channels:
+  - conda-forge
+  - nodefaults
 dependencies:
+  - python>=3.8
   - pip
   - numpy
   - matplotlib
@@ -7,7 +12,7 @@ dependencies:
   - pandas
   - seaborn
   - networkx
-  - shapely
+  - shapely>=2
   - pyshp
   - fiona
   - pip:

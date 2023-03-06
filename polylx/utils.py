@@ -266,22 +266,6 @@ class Classify(object):
         return self._colors_dict.get(key, (0, 0, 0))
 
 
-def PolygonPath(polygon):
-    """Constructs a compound matplotlib path from a Shapely object
-       modified from descartes https://pypi.python.org/pypi/descartes
-    """
-    from matplotlib.path import Path
-
-    def coding(ob):
-        vals = np.ones(len(ob.coords), dtype=Path.code_type) * Path.LINETO
-        vals[0] = Path.MOVETO
-        return vals
-
-    vertices = np.concatenate([np.asarray(polygon.exterior)] + [np.asarray(r) for r in polygon.interiors])
-    codes = np.concatenate([coding(polygon.exterior)] + [coding(r) for r in polygon.interiors])
-    return Path(vertices, codes)
-
-
 def optimize_colormap(name):
     # optimize lightness to the desired value
     import matplotlib.cm as cm

@@ -14,17 +14,18 @@ import os
 import itertools
 from collections import defaultdict
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.patches import PathPatch
 from matplotlib.path import Path
 import matplotlib.colors as mcolors
-import matplotlib.cbook as mcb
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 from shapely.geometry import shape, Point, Polygon, LinearRing, LineString, MultiPoint
 from shapely.geometry.polygon import orient
 from shapely import affinity
 from shapely.ops import cascaded_union, unary_union, linemerge
+from shapely.plotting import patch_from_polygon, _path_from_polygon
 import networkx as nx
 import pandas as pd
 import seaborn as sns
@@ -38,17 +39,17 @@ try:
 except ImportError:
     fiona_OK = False
 
-from .utils import fixratio, fixzero, deg, Classify, PolygonPath
+from .utils import fixratio, fixzero, deg, Classify
 from .utils import find_ellipse, densify, inertia_moments
 from .utils import _chaikin, _visvalingam_whyatt
 from .utils import _spline_ring
 from .utils import weighted_avg_and_std
 
-from pkg_resources import resource_filename
+from importlib import resources
 
-respath = resource_filename(__name__, 'example')
+respath = resources.files('polylx') / 'example'
 # ignore matplotlib deprecation warnings
-warnings.filterwarnings('ignore', category=mcb.mplDeprecation)
+warnings.filterwarnings('ignore', category=matplotlib.MatplotlibDeprecationWarning)
 
 
 class PolyShape(object):
@@ -581,7 +582,7 @@ class Grain(PolyShape):
             ax = fig.add_subplot(111, aspect='equal')
         hull = self.hull
         ax.plot(*hull, ls='--', c='green')
-        ax.add_patch(PathPatch(PolygonPath(self.shape),
+        ax.add_patch(patch_from_polygon(self.shape,
                      fc='blue', ec='#000000', alpha=0.5, zorder=2))
         if vertices:
             ax.plot(*self.xy, marker='.', c='blue')
@@ -2227,10 +2228,10 @@ class Grains(PolySet):
         def add_shared(gid, grain, oid, other, boundaries, T):
             shared = grain.intersection(other)
             if shared.geom_type in ['MultiLineString', 'GeometryCollection']:
-                shared = linemerge([part for part in list(shared) if part.geom_type == 'LineString'])
+                shared = linemerge([part for part in shared.geoms if part.geom_type == 'LineString'])
             if shared.geom_type in ['MultiLineString', 'LineString']:
                 if shared.geom_type == 'MultiLineString':
-                    shared = list(shared)
+                    shared = list(shared.geoms)
                 else:
                     shared = [shared]
                 bids = []
@@ -2447,7 +2448,7 @@ class Grains(PolySet):
             if key in keys:
                 group = groups.get_group(key)
                 for g in group['shape']:
-                    paths.append(PolygonPath(g))
+                    paths.append(_path_from_polygon(g))
                 if legend:
                     patch = PathPatch(Path.make_compound_path(*paths),
                                       fc=self.classes.color(key),

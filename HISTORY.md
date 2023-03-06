@@ -1,5 +1,10 @@
 # Changes
 
+### 0.5.2 (06 Mar 2023)
+
+ * bug fix release and shapely 2.0 update
+ * topological analyses added to Fracnet
+
 ### 0.5.1 (27 May 2021)
 
  * fourier_ellipse shape method for Grains added
