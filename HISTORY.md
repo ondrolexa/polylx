@@ -1,8 +1,12 @@
 # Changes
 
 ### 0.5.2 (06 Mar 2023)
+ * upstream fix for networkX 3
+ * Fracnet.from_boundaries bug fixed
 
- * bug fix release and shapely 2.0 update
+### 0.5.2 (06 Mar 2023)
+
+ * upstream fix for shapely 3
  * topological analyses added to Fracnet
 
 ### 0.5.1 (27 May 2021)

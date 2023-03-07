@@ -337,15 +337,16 @@ class PolyShape(object):
         The angle of rotation can be specified in either degrees (default)
         or radians by setting use_radians=True. Positive angles are
         counter-clockwise and negative are clockwise rotations.
-        The point of origin can be a keyword 'center' for the object bounding
-        box center (default), 'centroid' for the geometry’s centroid,
-        or coordinate tuple (x0, y0) for fixed point.
 
         Args:
-            angle
-        Kwargs:
-            origin='center'
-            use_radians=False
+            angle(float): angle of rotation
+
+        Keyword Args:
+            origin: The point of origin can be a keyword ‘center’ for
+                the object bounding box center (default), ‘centroid’
+                for the geometry’s centroid, or coordinate tuple (x0, y0)
+                for fixed point.
+            use_radians(bool): defaut False
 
         """
         return type(self)(affinity.rotate(self.shape, angle, **kwargs),
@@ -358,10 +359,15 @@ class PolyShape(object):
         centroid, or coordinate tuple (x0, y0) for fixed point.
         Negative scale factors will mirror or reflect coordinates.
 
-        Kwargs:
-            xfact=1.0
-            yfact=1.0
-            origin='center'
+        Keyword Args:
+            xfact(float): Default 1.0
+            yfact(float): Default 1.0
+            origin: The point of origin can be a keyword ‘center’ for
+                the object bounding box center (default), ‘centroid’
+                for the geometry’s centroid, or coordinate tuple (x0, y0)
+                for fixed point.
+
+        Negative scale factors will mirror or reflect coordinates.
 
         """
         return type(self)(affinity.scale(self.shape, **kwargs),
@@ -375,11 +381,14 @@ class PolyShape(object):
         box center (default), 'centroid' for the geometry’s centroid,
         or a coordinate tuple (x0, y0) for fixed point.
 
-        Kwrags:
-            xs=0.0
-            ys=0.0
-            origin='center'
-            use_radians=False
+        Keyword Args:
+            xs(float): Default 0.0
+            ys(float): Default 0.0
+            origin: The point of origin can be a keyword ‘center’ for
+                the object bounding box center (default), ‘centroid’
+                for the geometry’s centroid, or coordinate tuple (x0, y0)
+                for fixed point.
+            use_radians(bool): defaut False
 
         """
         return type(self)(affinity.skew(self.shape, **kwargs),
@@ -389,9 +398,9 @@ class PolyShape(object):
         """Returns a translated geometry shifted by offsets 'xoff' along x
         and 'yoff' along y direction.
 
-        Kwargs:
-            xoff=0.0
-            yoff=0.0
+        Keyword Args:
+            xoff(float): Default 1.0
+            yoff(float): Default 1.0
 
         """
         return type(self)(affinity.translate(self.shape, **kwargs),
@@ -404,9 +413,9 @@ class PolyShape(object):
     def dp(self, **kwargs):
         """Douglas–Peucker simplification.
 
-        Keywords:
-          tolerance: All points in the simplified object will be within the
-          tolerance distance of the original geometry. Default Auto
+        Keyword Args:
+          tolerance(float): All points in the simplified object will be within the
+              tolerance distance of the original geometry. Default Auto
 
         """
         x, y = self.xy
@@ -549,8 +558,8 @@ class Grain(PolyShape):
         i.e., |FD0|. Since centroid distance is a real value function, only half
         of the FDs are needed to index the shape.
 
-        Keywords:
-          N: number of vertices to regularize outline. Default 128
+        Keyword Args:
+          N(int): number of vertices to regularize outline. Default 128
              Note that number returned FDs is half of N.
 
         """
@@ -616,8 +625,8 @@ class Grain(PolyShape):
     def spline(self, **kwargs):
         """Spline based smoothing of grains.
 
-        Keywords:
-          densify: factor for geometry densification. Default 5
+        Keyword Args:
+          densify(int): factor for geometry densification. Default 5
 
         """
         x, y = _spline_ring(*self.xy, densify=kwargs.get('densify', 5))
@@ -637,8 +646,8 @@ class Grain(PolyShape):
     def chaikin(self, **kwargs):
         """Chaikin corner-cutting smoothing algorithm.
 
-        Keywords:
-          repeat: Number of repetitions. Default 2
+        Keyword Args:
+          repeat(int): Number of repetitions. Default 2
 
         """
         repeat = kwargs.get('repeat', 2)
@@ -662,8 +671,8 @@ class Grain(PolyShape):
         effective area. A points effective area is defined as the change
         in total area of the polygon by adding or removing that point.
 
-        Keywords:
-          threshold: Allowed total boundary length change in percents. Default 1
+        Keyword Args:
+          threshold(float): Allowed total boundary length change in percents. Default 1
 
         """
         threshold = kwargs.get('threshold', 1)
@@ -686,9 +695,9 @@ class Grain(PolyShape):
         Returns ``Grain`` object defined by vertices regularly distributed
         along boundaries of original ``Grain``.
 
-        Keywords:
-          N: Number of vertices. Default 128.
-          length: approx. length of segments. Default None
+        Keyword Args:
+          N(int): Number of vertices. Default 128.
+          length(float): approx. length of segments. Default None
 
         """
         N = kwargs.get('N', 128)
@@ -713,9 +722,9 @@ class Grain(PolyShape):
         Returns reconstructed ``Grain`` object using Fourier coefficients
         for characterizing closed contours.
 
-        Keywords:
-          order: The order of FDC to calculate. Default 12.
-          N: number of vertices for reconstructed grain. Default 128.
+        Keyword Args:
+          order(int): The order of FDC to calculate. Default 12.
+          N(int): number of vertices for reconstructed grain. Default 128.
 
         """
         order = kwargs.get('order', self.xy.shape[1])
@@ -900,7 +909,9 @@ class Grain(PolyShape):
         ellipse. The solver is based on Khachiyan Algorithm, and the final
         solution is different from the optimal value by the pre-specified
         amount of tolerance of EAD/100.
+
         Center coordinates are set to centre of fitted ellipse.
+
         """
         P = self.hull[:, :-1]
         d, N = P.shape
@@ -1047,8 +1058,8 @@ class Boundary(PolyShape):
     def chaikin(self, **kwargs):
         """Chaikin corner-cutting smoothing algorithm.
 
-        Keywords:
-          repeat: Number of repetitions. Default 2
+        Keyword Args:
+          repeat(int): Number of repetitions. Default 2
 
         """
         repeat = kwargs.get('repeat', 2)
@@ -1068,8 +1079,8 @@ class Boundary(PolyShape):
         effective area. A points effective area is defined as the change
         in total area of the polygon by adding or removing that point.
 
-        Keywords:
-          threshold: Allowed total boundary length change in percents. Default 1
+        Keyword Args:
+          threshold(float): Allowed total boundary length change in percents. Default 1
 
         """
         threshold = kwargs.get('threshold', 1)
@@ -1083,9 +1094,9 @@ class Boundary(PolyShape):
         Returns ``Boundary`` object defined by vertices regularly distributed
         along original ``Boundary``.
 
-        Keywords:
-          N: Number of vertices. Default 128.
-          length: approx. length of segments. Default None
+        Keyword Args:
+          N(int): Number of vertices. Default 128.
+          length(float): approx. length of segments. Default None
 
         """
         N = kwargs.get('N', 128)
@@ -1264,21 +1275,35 @@ class PolySet(object):
 
     def rotate(self, angle, **kwargs):
         """Returns a rotated geometry on a 2D plane.
+        
         The angle of rotation can be specified in either degrees (default)
         or radians by setting use_radians=True. Positive angles are
         counter-clockwise and negative are clockwise rotations.
-        The point of origin can be a keyword ‘center’ for the object bounding
-        box center (default), ‘centroid’ for the geometry’s centroid,
-        or coordinate tuple (x0, y0) for fixed point.
+
+        Args:
+            angle(float): angle of rotation
+
+        Keyword Args:
+            origin: The point of origin can be a keyword ‘center’ for
+                the object bounding box center (default), ‘centroid’
+                for the geometry’s centroid, or coordinate tuple (x0, y0)
+                for fixed point.
+            use_radians(bool): defaut False
 
         """
         return type(self)([e.rotate(angle, **kwargs) for e in self])
 
     def scale(self, **kwargs):
         """Returns a scaled geometry, scaled by factors along each dimension.
-        The point of origin can be a keyword ‘center’ for the object bounding
-        box center (default), ‘centroid’ for the geometry’s centroid,
-        or coordinate tuple (x0, y0) for fixed point.
+        
+        Keyword Args:
+            xfact(float): Default 1.0
+            yfact(float): Default 1.0
+            origin: The point of origin can be a keyword ‘center’ for
+                the object bounding box center (default), ‘centroid’
+                for the geometry’s centroid, or coordinate tuple (x0, y0)
+                for fixed point.
+
         Negative scale factors will mirror or reflect coordinates.
 
         """
@@ -1288,9 +1313,15 @@ class PolySet(object):
         """Returns a skewed geometry, sheared by angles ‘xs’ along x and
         ‘ys’ along y direction. The shear angle can be specified in either
         degrees (default) or radians by setting use_radians=True.
-        The point of origin can be a keyword ‘center’ for the object bounding
-        box center (default), ‘centroid’ for the geometry’s centroid,
-        or a coordinate tuple (x0, y0) for fixed point.
+
+        Keyword Args:
+            xs(float): Default 0.0
+            ys(float): Default 0.0
+            origin: The point of origin can be a keyword ‘center’ for
+                the object bounding box center (default), ‘centroid’
+                for the geometry’s centroid, or coordinate tuple (x0, y0)
+                for fixed point.
+            use_radians(bool): defaut False
 
         """
         return type(self)([e.skew(**kwargs) for e in self])
@@ -1298,6 +1329,10 @@ class PolySet(object):
     def translate(self, **kwargs):
         """Returns a translated geometry shifted by offsets ‘xoff’ along x
         and ‘yoff’ along y direction.
+
+        Keyword Args:
+            xoff(float): Default 1.0
+            yoff(float): Default 1.0
 
         """
         return type(self)([e.translate(**kwargs) for e in self])
@@ -1553,16 +1588,17 @@ class PolySet(object):
     def feret(self, angle=0):
         """Returns array of feret diameters for given angle.
 
-        Args:
-            angle: Caliper angle. Default 0
+        Keyword Args:
+            angle(float): Caliper angle. Default 0
 
         """
         return np.array([p.feret(angle) for p in self])
 
     def proj(self, angle=0):
         """Returns array of cumulative projection of object for given angle.
-        Args:
-          angle: angle of projection line
+
+        Keyword Args:
+          angle(float): angle of projection line. Default 0
 
         """
         return np.array([p.proj(angle) for p in self])
@@ -1571,9 +1607,9 @@ class PolySet(object):
         """Returns surfor function values. When normalized maximum value
         is 1 and correspond to max feret.
 
-        Args:
-          angles: iterable angle values. Defaut range(180)
-          normalized: whether to normalize values. Defaut True
+        Keyword Args:
+          angles: iterable of angle values. Defaut range(180)
+          normalized(bool): whether to normalize values. Default True
 
         """
         return np.array([p.surfor(angles, normalized) for p in self])
@@ -1582,9 +1618,9 @@ class PolySet(object):
         """Returns paror function values. When normalized maximum value
         is 1 and correspond to max feret.
 
-        Args:
-          angles: iterable angle values. Defaut range(180)
-          normalized: whether to normalize values. Defaut True
+        Keyword Args:
+          angles: iterable of angle values. Defaut range(180)
+          normalized(bool): whether to normalize values. Default True
 
         """
         return np.array([p.paror(angles, normalized) for p in self])
@@ -1598,7 +1634,8 @@ class PolySet(object):
         Args:
           vals: name of attribute (str) used for classification
                 or array of values
-        Keywords:
+
+        Keyword Args:
           label: used as classification label when vals is array
           k: number of classes for continuous values
           rule: type of classification
@@ -1818,7 +1855,7 @@ class PolySet(object):
     def plot(self, **kwargs):
         """Plot set of ``Grains`` or ``Boundaries`` objects.
 
-        Keywords:
+        Keyword Args:
           alpha: transparency. Default 0.8
           pos: legend position "top", "right" or "none". Defalt "auto"
           ncol: number of columns for legend.
@@ -1870,7 +1907,7 @@ class PolySet(object):
     def savefig(self, **kwargs):
         """Save grains or boudaries plot to file.
 
-        Args:
+        Keyword Args:
           filename: file to save figure. Default "figure.png"
           dpi: DPI of image. Default 150
           See `plot` for other kwargs
@@ -1894,7 +1931,7 @@ class PolySet(object):
     def rose(self, **kwargs):
         """Plot polar histogram of ``Grains`` or ``Boundaries`` orientations
 
-        Keywords:
+        Keyword Args:
           show: If True matplotlib show is called. Default True
           attr: property used for orientation. Default 'lao'
           bins: number of bins
@@ -1968,7 +2005,11 @@ class PolySet(object):
     def _seaborn_plot(self, sns_plot_fun, val, **kwargs):
         """Plot seaborn categorical plots.
 
-        Keywords:
+        Args:
+            sns_plot_fun: sns_plotting function
+            val: array of values
+
+        Keyword Args:
           show: If True matplotlib show is called. Default True
           attr: property used for plotting.
           hue: When True attr is used for hue and names for x.
@@ -2126,7 +2167,7 @@ class Grains(PolySet):
     def shape_vector(self, **kwargs):
         """Returns array of shape (feature) vectors.
 
-        Keywords:
+        Keyword Args:
           N: number of points to regularize shape. Default 128
              Routine return N/2 of FDs
 
@@ -2288,7 +2329,8 @@ class Grains(PolySet):
 
         Args:
           filename: filename of shapefile.
-        Kwargs:
+
+        Keyword Args:
           namefield: name of attribute in shapefile that
             holds names of grains or None. Default "name".
           name: value used for grain name when namefield is None
@@ -2351,7 +2393,8 @@ class Grains(PolySet):
 
         Args:
           filename: filename of geospatial file.
-        Kwargs:
+
+        Keyword Args:
           namefield: name of attribute that holds names of grains or None.
                      Default "name".
           name: value used for grain name when namefield is None
@@ -2423,7 +2466,8 @@ class Grains(PolySet):
 
         Args:
           filename: filename of geospatial file
-        Kwargs:
+
+        Keyword Args:
           driver: 'ESRI Shapefile', 'GeoJSON', 'GPKG' or 'GML'. Default 'GPKG'
           layer: name of layer in files which support it e.g. 'GPKG'. Default grains
 
@@ -2568,7 +2612,8 @@ class Boundaries(PolySet):
 
         Args:
           filename: filename of shapefile.
-        Kwargs:
+
+        Keyword Args:
           namefield: name of attribute in shapefile that
             holds names of boundairies or None. Default "name".
           name: value used for grain name when namefield is None
@@ -2617,7 +2662,8 @@ class Boundaries(PolySet):
 
         Args:
           filename: filename of geospatial file.
-        Kwargs:
+
+        Keyword Args:
           namefield: name of attribute that holds names of boundaries or None.
                      Default "name".
           name: value used for boundary name when namefield is None
@@ -2683,7 +2729,8 @@ class Boundaries(PolySet):
 
         Args:
           filename: filename
-        Kwargs:
+
+        Keyword Args:
           driver: 'ESRI Shapefile', 'GeoJSON', 'GPKG' or 'GML'. Default 'GPKG'
           layer: name of layer in files which support it e.g. 'GPKG'. Default boundaries
 
@@ -2892,7 +2939,7 @@ class Sample(object):
     def plot(self, **kwargs):
         """Plot overlay of ``Grains`` and ``Boundaries`` of ``Sample`` object.
 
-        Args:
+        Keyword Args:
           alpha: Grains transparency. Default 0.8
           pos: legend position "top" or "right". Defalt Auto
           ncol: number of columns for legend.
@@ -3037,13 +3084,13 @@ class Fractnet(object):
         # create noded lines
         bn = unary_union(b.shape)
         coords_set = set()
-        for l in bn:
+        for l in bn.geoms:
             coords_set = coords_set.union(l.coords)
         # lookup dict
         coords_dict = {coord:fid for fid, coord in enumerate(coords_set)}
         # Create nx.Graph
         G = nx.Graph()
-        for fid, l in enumerate(bn):
+        for fid, l in enumerate(bn.geoms):
             nodes = [(coords_dict[coord], {'pos':coord}) for coord in l.coords]
             G.add_nodes_from(nodes)
             nodes_id = [node[0] for node in nodes]
@@ -3061,6 +3108,8 @@ class Fractnet(object):
 
         Args:
           filename: filename of geospatial file.
+
+        Keyword Args are passed to fiona.open()
 
         """
         if fiona_OK:
@@ -3112,15 +3161,15 @@ class Fractnet(object):
         # Create adjancency matrix with only 0, 1
         B = nx.adjacency_matrix(self.G).tolil()
         # prepare
-        dg = (B>0).sum(axis=0).A1
+        dg = (B>0).sum(axis=0).ravel()
         todel = np.flatnonzero(dg == 2)
         keep = np.setdiff1d(np.arange(B.shape[0]), todel)
         pos = self.node_positions
         coords = np.asarray([pos[node] for node in self.G.nodes()])
         while len(todel) > 0:
             for idx in todel:
-                if B[idx].nnz > 1:
-                    n1, n2 = B[idx].rows[0]  # get neighbours of idx
+                if B[[idx], :].nnz > 1:
+                    n1, n2 = B[[idx], :].rows[0]  # get neighbours of idx
                     # delete existing connections
                     B[idx, n1] = 0
                     B[n1, idx] = 0
@@ -3130,15 +3179,15 @@ class Fractnet(object):
                     B[n1, n2] = 1
                     B[n2, n1] = 1
                 else:
-                    n1 = B[idx].rows[0][0]
+                    n1 = B[[idx], :].rows[0][0]
                     B[idx, n1] = 0
                     B[n1, idx] = 0
-            B = B[keep,:][:, keep]
+            B = B[keep, :][:, keep]
             coords = coords[keep]
-            dg = (B>0).sum(axis=0).A1
+            dg = (B>0).sum(axis=0).ravel()
             todel = np.flatnonzero(dg == 2)
             keep = np.setdiff1d(np.arange(B.shape[0]), todel)
-        return Fractnet(nx.from_scipy_sparse_matrix(B), coords)
+        return Fractnet(nx.from_scipy_sparse_array(B), coords)
 
     def edges_boundaries(self):
         pos = self.node_positions
@@ -3172,6 +3221,7 @@ class Fractnet(object):
 
     def k_order_connectivity(self):
         """Calculation of connectivity according to Zhang et al., 1992
+
         """
         B = defaultdict(int)
         for c in self.reduce().components():
