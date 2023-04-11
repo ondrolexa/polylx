@@ -470,7 +470,7 @@ def _chaikin(x, y, repeat=2, is_ring=False):
 
 
 def _spline_ring(x, y, densify=5, pad=5):
-    from scipy.interpolate import spline
+    from scipy.interpolate import CubicSpline
     num = len(x)
     # padding
     x = np.concatenate((x[-pad:-1], x, x[1:pad]))
@@ -481,9 +481,11 @@ def _spline_ring(x, y, densify=5, pad=5):
     t = np.cumsum(t)
     t -= t[pad - 1]
     t /= t[-pad]
-    nt = np.linspace(0, 1, num * densify)
-    x = spline(t, x, nt)
-    y = spline(t, y, nt)
+    nt = np.linspace(0, 1, int(num * densify))
+    xspl = CubicSpline(t, x)
+    yspl = CubicSpline(t, y)
+    x = xspl(nt)
+    y = yspl(nt)
     x[-1] = x[0]
     y[-1] = y[0]
     return x, y
