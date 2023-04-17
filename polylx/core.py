@@ -2362,7 +2362,7 @@ class Grains(PolySet):
                                 else:
                                     ph = rec.record[name_pos]
                                 if geom.geom_type == 'MultiPolygon':
-                                    for g in geom:
+                                    for g in geom.geoms:
                                         go = orient(g)
                                         if not any(go.equals(gr.shape) for gr in shapes):
                                             shapes.append(Grain(go, ph, len(shapes)))
@@ -2437,7 +2437,7 @@ class Grains(PolySet):
                             else:
                                 ph = feature['properties'][namefield]
                             if geom.geom_type == 'MultiPolygon':
-                                for g in geom:
+                                for g in geom.geoms:
                                     go = orient(g)
                                     if not any(go.equals(gr.shape) for gr in shapes):
                                         shapes.append(Grain(go, ph, len(shapes)))
