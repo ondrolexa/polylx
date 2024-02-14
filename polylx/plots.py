@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
 import seaborn as sns
-from .core import PolySet
+from .core import PolySet, Boundary, Boundaries, Grain, Grains
 from .utils import weighted_avg_and_std
 
 ##########################
@@ -11,6 +11,10 @@ from .utils import weighted_avg_and_std
 
 
 def surfor_plot(ob, **kwargs):
+    if isinstance(ob, Boundary):
+        ob = Boundaries([ob])
+    if isinstance(ob, Grain):
+        ob = Grains([ob])
     assert isinstance(
         ob, PolySet
     ), "First argument must be Grains or Boundaries instance."
@@ -35,7 +39,7 @@ def surfor_plot(ob, **kwargs):
                 res = g.surfor(angles=angles, normalized=normalized).mean(axis=0)
             else:
                 res = g.surfor(angles=angles, normalized=normalized).sum(axis=0)
-            ax.plot(res, color=ob.classes.color(key), label=key)
+            ax.plot(angles, res, color=ob.classes.color(key), label=key)
     else:
         if averaged:
             res = ob.surfor(angles=angles, normalized=normalized).mean(axis=0)
@@ -49,6 +53,10 @@ def surfor_plot(ob, **kwargs):
 
 
 def paror_plot(ob, **kwargs):
+    if isinstance(ob, Boundary):
+        ob = Boundaries([ob])
+    if isinstance(ob, Grain):
+        ob = Grains([ob])
     assert isinstance(
         ob, PolySet
     ), "First argument must be Grains or Boundaries instance."
@@ -73,7 +81,7 @@ def paror_plot(ob, **kwargs):
                 res = g.paror(angles=angles, normalized=normalized).mean(axis=0)
             else:
                 res = g.paror(angles=angles, normalized=normalized).sum(axis=0)
-            ax.plot(res, color=ob.classes.color(key), label=key)
+            ax.plot(angles, res, color=ob.classes.color(key), label=key)
     else:
         if averaged:
             res = ob.paror(angles=angles, normalized=normalized).mean(axis=0)
