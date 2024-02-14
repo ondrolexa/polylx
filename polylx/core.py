@@ -169,10 +169,6 @@ class PolyShape(object):
         """
         res = self.feret(angles)
         if normalized:
-            # xy = self.hull.T
-            # pa = np.array(list(itertools.combinations(range(len(xy)), 2)))
-            # d2 = np.sum((xy[pa[:, 0]] - xy[pa[:, 1]])**2, axis=1)
-            # res = res / np.sqrt(np.max(d2))
             res = res / res.max()
         return res
 
@@ -394,9 +390,12 @@ class PolyShape(object):
                     - y[i2] * x[i1]
                 ) / np.sqrt((y[i2] - y[i1]) ** 2 + (x[i2] - x[i1]) ** 2)
                 tolerance = d.mean()
-            shape = self.shape.simplify(kwargs.get("tolerance", tolerance), False)
+                print(f'Using tolerance {tolerance:g}')
+            else:
+                tolerance = kwargs.get("tolerance")
+            shape = self.shape.simplify(tolerance, False)
             if shape.is_empty:
-                shape = self.shape.simplify(kwargs.get("tolerance", tolerance), True)
+                shape = self.shape.simplify(tolerance, True)
             if shape.is_empty:
                 shape = self.shape
                 print(
