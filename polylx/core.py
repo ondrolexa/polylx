@@ -32,6 +32,7 @@ import seaborn as sns
 import warnings
 import pyefd
 import shapefile
+import shapelysmooth
 
 try:
     import fiona
@@ -407,6 +408,80 @@ class PolyShape(object):
             shape = self.shape
         return type(self)(shape, self.name, self.fid)
 
+    def tabuin(self, **kwargs):
+        """Taubin smoothing
+
+        Keyword Args:
+          factor(float): How far each node is moved toward the average position of its neighbours
+            during every second iteration. 0 < factor < 1 Default value 0.5
+          mu (float): How far each node is moved opposite the direction of the average position
+            of its neighbours during every second iteration. 0 < -mu < 1. Default value -0.5
+          steps(int): Number of smoothing steps. Default value 5
+
+        """
+        factor = kwargs.get("factor", 0.5)
+        mu = kwargs.get("mu", -0.5)
+        steps = kwargs.get("steps", 5)
+        shape = shapelysmooth.taubin_smooth(self.shape, factor, mu, steps)
+        if shape.is_valid:
+            res = type(self)(shape, self.name, self.fid)
+        else:
+            res = self
+            print(
+                "Invalid shape produced during smoothing of feature FID={}".format(
+                    self.fid
+                )
+            )
+        return res
+
+    def chaikin(self, **kwargs):
+        """Chaikin's Corner Cutting algorithm
+
+        Keyword Args:
+          iters(int): Number of iterations. Default value 5
+
+        Note: algorithm (roughly) doubles the amount of nodes at each iteration, therefore care should be
+        taken when selecting the number of iterations. Instead of the original iterative algorithm by Chaikin,
+        this implementation makes use of the equivalent multi-step algorithm introduced by Wu et al.
+        doi: 10.1007/978-3-540-30497-5_188
+
+        """
+        iters = kwargs.get("iters", 5)
+        shape = shapelysmooth.chaikin_smooth(self.shape, iters)
+        if shape.is_valid:
+            res = type(self)(shape, self.name, self.fid)
+        else:
+            res = self
+            print(
+                "Invalid shape produced during smoothing of feature FID={}".format(
+                    self.fid
+                )
+            )
+        return res
+
+    def catmull(self, **kwargs):
+        """Smoothing using Catmull-Rom splines
+
+        Keyword Args:
+          alpha(float): Tension parameter 0 <= alpha <= 1 For uniform Catmull-Rom splines, alpha=0
+            for centripetal Catmull-Rom splines, alpha=0.5, for chordal Catmull-Rom splines, alpha=1
+            Default value 0.5
+          subdivs(int): Number of subdivisions of each polyline segment. Default value 10
+
+        """
+        alpha = kwargs.get("alpha", 0.5)
+        subdivs = kwargs.get("subdivs", 10)
+        shape = shapelysmooth.catmull_rom_smooth(self.shape, alpha, subdivs)
+        if shape.is_valid:
+            res = type(self)(shape, self.name, self.fid)
+        else:
+            res = self
+            print(
+                "Invalid shape produced during smoothing of feature FID={}".format(
+                    self.fid
+                )
+            )
+        return res
 
 class Grain(PolyShape):
     """Grain class to store polygonal grain geometry
@@ -607,18 +682,18 @@ class Grain(PolyShape):
             )
         return res
 
-    def chaikin(self, **kwargs):
+    def chaikin2(self, **kwargs):
         """Chaikin corner-cutting smoothing algorithm.
 
         Keyword Args:
-          repeat(int): Number of repetitions. Default 2
+          iters(int): Number of iterations. Default value 5
 
         """
-        repeat = kwargs.get("repeat", 2)
-        x, y = _chaikin(*self.xy, repeat=repeat, is_ring=True)
+        iters = kwargs.get("iters", 5)
+        x, y = _chaikin(*self.xy, repeat=iters, is_ring=True)
         holes = []
         for hole in self.interiors:
-            xh, yh = _chaikin(*hole, repeat=repeat, is_ring=True)
+            xh, yh = _chaikin(*hole, repeat=iters, is_ring=True)
             holes.append(LinearRing(coordinates=np.c_[xh, yh]))
         shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
         if shape.is_valid:
@@ -1030,36 +1105,15 @@ class Boundary(PolyShape):
     ########################################################################
     # Boundary smooth and simplify methods (should return Boundary object) #
     ########################################################################
-    # def spline(self, **kwargs):
-    #     """Spline based smoothing of grains.
-
-    #     Keywords:
-    #       densify: factor for geometry densification. Default 5
-
-    #     """
-    #     x, y = _spline_ring(*self.xy, densify=kwargs.get('densify', 5))
-    #     holes = []
-    #     for hole in self.interiors:
-    #         xh, yh = _spline_ring(*hole,
-    #                               densify=kwargs.get('densify', 5))
-    #         holes.append(LinearRing(coordinates=np.c_[xh, yh]))
-    #     shape = Polygon(shell=LinearRing(coordinates=np.c_[x, y]), holes=holes)
-    #     if shape.is_valid:
-    #         res = Grain(shape, self.name, self.fid)
-    #     else:
-    #         res = self
-    #         print('Invalid shape produced during smoothing of grain FID={}'.format(self.fid))
-    #     return res
-
-    def chaikin(self, **kwargs):
+    def chaikin2(self, **kwargs):
         """Chaikin corner-cutting smoothing algorithm.
 
         Keyword Args:
-          repeat(int): Number of repetitions. Default 2
+          iters(int): Number of iterations. Default value 5
 
         """
-        repeat = kwargs.get("repeat", 2)
-        x, y = _chaikin(*self.xy, repeat=repeat, is_ring=self.shape.is_ring)
+        iters = kwargs.get("iters", 5)
+        x, y = _chaikin(*self.xy, repeat=iters, is_ring=self.shape.is_ring)
         shape = LineString(coordinates=np.c_[x, y])
         if shape.is_valid:
             res = Boundary(shape, self.name, self.fid)

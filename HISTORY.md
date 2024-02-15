@@ -1,6 +1,10 @@
 # Changes
 
-### 0.5.2 (06 Mar 2023)
+### master (15 Feb 2024)
+ * shapelysmooth methods added for smoothing
+ * shapely and scipy upstream fixes
+
+### 0.5.3 (06 Mar 2023)
  * upstream fix for networkX 3
  * Fracnet.from_boundaries bug fixed
 
