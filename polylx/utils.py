@@ -17,6 +17,7 @@ from copy import deepcopy
 import numpy as np
 import matplotlib.cm as cm
 import seaborn as sns
+import jenkspy
 
 
 def fixzero(x):
@@ -161,7 +162,7 @@ class Classify(object):
 
     """
     def __init__(self, vals, **kwargs):
-        rule = kwargs.get('rule', 'natural')
+        rule = kwargs.get('rule', 'quantile')
         k = kwargs.get('k', 5)
         label = kwargs.get('label', 'Default')
         cmap = kwargs.get('cmap', 'viridis')
@@ -170,23 +171,20 @@ class Classify(object):
         self.label = label
         if rule == 'equal' or rule == 'user':
             counts, bins = np.histogram(vals, k)
-            index = np.digitize(vals, bins) - 1
-            # if upper limit is maximum value, digitize it to last bin
-            edge = len(bins) - 1
-            index[np.flatnonzero(index == edge)] = edge - 1
-            prec = int(max(-np.floor(np.log10(np.diff(bins).min())) + 1, 0))
-            self.index = ['{:.{prec}f}-{:.{prec}f}'.format(bins[i], bins[i + 1], prec=prec) for i in range(len(counts))]
-            self.names = np.array([self.index[i] for i in index])
-        elif rule == 'natural':
-            index, bins = natural_breaks(vals, k=k)
-            counts = np.bincount(index)
+            index = np.digitize(vals, bins[:-1]) - 1
             prec = int(max(-np.floor(np.log10(np.diff(bins).min())) + 1, 0))
             self.index = ['{:.{prec}f}-{:.{prec}f}'.format(bins[i], bins[i + 1], prec=prec) for i in range(len(counts))]
             self.names = np.array([self.index[i] for i in index])
         elif rule == 'jenks':
-            bins = fisher_jenks(vals, k=k)
-            index = np.digitize(vals, bins) - 1
-            index[np.flatnonzero(index == k)] = k - 1
+            bins = jenkspy.jenks_breaks(vals, n_classes=k)
+            index = np.digitize(vals, bins[:-1]) - 1
+            counts = np.bincount(index)
+            prec = int(max(-np.floor(np.log10(np.diff(bins).min())) + 1, 0))
+            self.index = ['{:.{prec}f}-{:.{prec}f}'.format(bins[i], bins[i + 1], prec=prec) for i in range(len(counts))]
+            self.names = np.array([self.index[i] for i in index])
+        elif rule == 'quantile':
+            bins = quantiles_bins(vals, k=k)
+            index = np.digitize(vals, bins[:-1]) - 1
             counts = np.bincount(index)
             prec = int(max(-np.floor(np.log10(np.diff(bins).min())) + 1, 0))
             self.index = ['{:.{prec}f}-{:.{prec}f}'.format(bins[i], bins[i + 1], prec=prec) for i in range(len(counts))]
@@ -293,113 +291,22 @@ def optimize_colormap(name):
     return cmap
 
 
-def natural_breaks(values, k=5, itmax=1000):
+def quantiles_bins(values, k=5):
     """
-    natural breaks helper function
-    Sergio J. Rey Copyright (c) 2009-10 Sergio J. Rey
+    Quantile classification bins
     """
-    values = np.array(values)
-    uv = np.unique(values)
-    uvk = len(uv)
-    if uvk < k:
-        print('Warning: Not enough unique values in array to form k classes')
-        print('Warning: setting k to %d' % uvk)
-        k = uvk
-    sids = np.random.permutation(range(len(uv)))[0:k]
-    seeds = uv[sids]
-    seeds.sort()
-    diffs = abs(np.matrix([values - seed for seed in seeds]))
-    c0 = diffs.argmin(axis=0)
-    c0 = np.array(c0)[0]
-    solving = True
-#    solved = False
-    rk = range(k)
-    it = 0
-    while solving:
-        # get centroids of clusters
-        seeds = [np.median(values[c0 == c]) for c in rk]
-        seeds.sort()
-        # for each value find closest centroid
-        diffs = abs(np.matrix([values - seed for seed in seeds]))
-        # assign value to that centroid
-        c1 = diffs.argmin(axis=0)
-        c1 = np.array(c1)[0]
-        # compare new classids to previous
-        d = abs(c1 - c0)
-        if d.sum() == 0:
-            solving = False
-#            solved = True
-        else:
-            c0 = c1
-        it += 1
-        if it == itmax:
-            solving = False
-    cuts = [min(values)] + [max(values[c1 == c]) for c in rk]
-    return c1, cuts
-
-
-def fisher_jenks(values, k=5):
-    """
-    Our own version of Jenks Optimal (Natural Breaks) algorithm
-    implemented in Python. The implementation follows the original
-    procedure described in the book, which is a two-phased approach.
-    First phase aims at calculating the variance matrix between the
-    ith and jth element in the data array;
-    Second phase runs iteratively to construct the optimal K-partition
-    from results of K-1 - partitions.
-    Sergio J. Rey Copyright (c) 2009-10 Sergio J. Rey
-    """
-
-    values = np.sort(values)
-    numVal = len(values)
-
-    varMat = (numVal + 1) * [0]
-    for i in range(numVal + 1):
-        varMat[i] = (numVal + 1) * [0]
-
-    errorMat = (numVal + 1) * [0]
-    for i in range(numVal + 1):
-        errorMat[i] = (k + 1) * [float('inf')]
-
-    pivotMat = (numVal + 1) * [0]
-    for i in range(numVal + 1):
-        pivotMat[i] = (k + 1) * [0]
-
-    # building up the initial variance matrix
-    for i in range(1, numVal + 1):
-        sumVals = 0
-        sqVals = 0
-        numVals = 0
-        for j in range(i, numVal + 1):
-            val = float(values[j - 1])
-            sumVals += val
-            sqVals += val * val
-            numVals += 1.0
-            varMat[i][j] = sqVals - sumVals * sumVals / numVals
-            if i == 1:
-                errorMat[j][1] = varMat[i][j]
-
-    for cIdx in range(2, k + 1):
-        for vl in range(cIdx - 1, numVal):
-            preError = errorMat[vl][cIdx - 1]
-            for vIdx in range(vl + 1, numVal + 1):
-                curError = preError + varMat[vl + 1][vIdx]
-                if errorMat[vIdx][cIdx] > curError:
-                    errorMat[vIdx][cIdx] = curError
-                    pivotMat[vIdx][cIdx] = vl
-
-    pivots = (k + 1) * [0]
-    pivots[k] = values[numVal - 1]
-    pivots[0] = values[0]
-    lastPivot = pivotMat[numVal][k]
-
-    pNum = k - 1
-    while pNum > 0:
-        pivots[pNum] = values[lastPivot - 1]
-        lastPivot = pivotMat[lastPivot][pNum]
-        pNum -= 1
-
-    return pivots
+    if values.size <= k:
+        return np.sort(values)
+    q = np.linspace(0, 1, k + 1)
+    bins = np.quantile(values, q)
+    uniq, counts = np.unique(bins, return_counts=True)
+    dup = uniq[counts > 1]
+    if len(dup):
+        new = values[values != dup[0]]
+        return np.sort(
+            np.hstack((dup[0], quantiles_bins(new, k - 1)))
+        )
+    return bins
 
 
 def find_ellipse(x, y):

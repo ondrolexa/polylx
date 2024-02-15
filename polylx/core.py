@@ -408,7 +408,7 @@ class PolyShape(object):
             shape = self.shape
         return type(self)(shape, self.name, self.fid)
 
-    def tabuin(self, **kwargs):
+    def taubin(self, **kwargs):
         """Taubin smoothing
 
         Keyword Args:

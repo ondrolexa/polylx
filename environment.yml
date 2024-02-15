@@ -16,6 +16,7 @@ dependencies:
   - fiona
   - jupyterlab
   - pyefd
+  - jenkspy
   - pip
   - pip:
     - shapelysmooth

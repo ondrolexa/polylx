@@ -15,6 +15,7 @@ dependencies:
   - flake8
   - pytest
   - pyefd
+  - jenkspy
   - pip
   - pip:
     - shapelysmooth
