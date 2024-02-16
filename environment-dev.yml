@@ -1,0 +1,28 @@
+# run: conda env create --file environment.yml
+name: polylx
+channels:
+  - conda-forge
+  - nodefaults
+dependencies:
+  - python>=3.9
+  - numpy
+  - matplotlib
+  - scipy
+  - pandas
+  - pyarrow
+  - seaborn
+  - networkx
+  - shapely>=2
+  - pyshp
+  - fiona
+  - jupyterlab
+  - pyefd
+  - jenkspy
+  - shapelysmooth
+  # dev tools
+  - pytest
+  - isort
+  - black
+  - pip
+  - pip:
+    - -e . # install the local polylx package

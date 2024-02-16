@@ -7,6 +7,4 @@ PolyLX provides following modules:
    :maxdepth: 3
 
    polylx.core
-   polylx.reports
-
-
+   polylx.plots

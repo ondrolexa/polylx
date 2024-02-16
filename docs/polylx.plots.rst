@@ -1,9 +1,10 @@
-reports module
-==============
+plots module
+============
 
-.. automodule:: polylx.reports
+.. automodule:: polylx.plots
     :members:
     :undoc-members:
     :show-inheritance:
+    :inherited-members:
     :special-members: __init__
 

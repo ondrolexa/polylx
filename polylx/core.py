@@ -591,9 +591,9 @@ class Grain(PolyShape):
 
         Shape (feature) vector is calculated from Fourier descriptors (FD)
         to index the shape. To achieve rotation invariance, phase information
-        of the FDs are ignored and only the magnitudes |FDn| are used. Scale
+        of the FDs are ignored and only the magnitudes FDn are used. Scale
         invariance is achieved by dividing the magnitudes by the DC component,
-        i.e., |FD0|. Since centroid distance is a real value function, only half
+        i.e., FD0. Since centroid distance is a real value function, only half
         of the FDs are needed to index the shape.
 
         Keyword Args:
@@ -1721,18 +1721,16 @@ class PolySet(object):
 
         Args:
           vals: name of attribute (str) used for classification
-                or array of values
+          or array of values
 
         Keyword Args:
           label: used as classification label when vals is array
           k: number of classes for continuous values
-          rule: type of classification
-            'unique': unique value mapping (for discrete values)
-            'equal': k equaly spaced bins (for continuos values)
-            'user': bins edges defined by array k (for continuos values)
-            'natural': natural breaks. Default rule.
-                       (beware not always unique solution)
-            'jenks': fischer jenks scheme
+          rule: type of classification, `'unique'` for unique value mapping (for
+            discrete values), `'equal'` for k equaly spaced bins (for continuos values),
+            `'user'` for bins edges defined by array k (for continuous values),
+            `'jenks'` for k fischer-jenks bins and `'quantile'` for k quantile based
+            bins.
           cmap: matplotlib colormap. Default 'viridis'
 
         Examples:

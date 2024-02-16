@@ -36,11 +36,6 @@ conda activate polylx
 pip install polylx
 ```
 
-## Getting started
-
-Documentation is in progress, but you can see PolyLX in action in accompanied Jupyter notebook
-[https://nbviewer.ipython.org/github/ondrolexa/polylx/blob/master/polylx_tutorial.ipynb](https://nbviewer.ipython.org/github/ondrolexa/polylx/blob/master/polylx_tutorial.ipynb)
-
 ## Documentation
 
 Explore the full features of PolyLX. You can find detailed documentation [here](https://polylx.readthedocs.org).

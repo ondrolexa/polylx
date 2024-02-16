@@ -4,19 +4,15 @@
    contain the root `toctree` directive.
 
 Welcome to PolyLX's documentation!
-======================================
+==================================
 
 Contents:
 
 .. toctree::
    :maxdepth: 2
 
-   automodules
+   intro
    tutorial
-   installation
-   usage
-   contributing
-   authors
+   automodules
 
-
-.. include:: ../HISTORY.rst
+.. mdinclude:: ../HISTORY.md
