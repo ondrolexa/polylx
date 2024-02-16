@@ -1,14 +1,14 @@
-name: Tests
+name: Python tests
 
 on:
   # We run CI on pushes to the main branch
   push:
     branches:
-      - main
+      - master
   # and on all pull requests to the main branch
   pull_request:
     branches:
-      - main
+      - master
   # as well as upon manual triggers through the 'Actions' tab of the Github UI
   workflow_dispatch:
 
@@ -19,7 +19,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
     - name: Checkout repository
