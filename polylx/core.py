@@ -2134,11 +2134,11 @@ class PolySet(object):
 
         Args:
             sns_plot_fun: sns_plotting function
-            val: array of values
+            attr: object attribute to be used. See .df method
 
         Keyword Args:
           show: If True matplotlib show is called. Default True
-          attr: property used for plotting.
+          ax: None or matplotlib axes to be used
           hue: When True attr is used for hue and names for x.
 
         When show=False, returns matplotlib axes object.
@@ -2166,6 +2166,7 @@ class PolySet(object):
                 x="class",
                 y=val,
                 data=self.df("class", val),
+                hue="class",
                 order=self.classes.index,
                 palette=self.classes._colors_dict,
             )
@@ -2211,6 +2212,7 @@ class PolySet(object):
             sns.countplot(
                 x="class",
                 data=self.df("class"),
+                hue="class",
                 order=self.classes.index,
                 palette=self.classes._colors_dict,
             )
