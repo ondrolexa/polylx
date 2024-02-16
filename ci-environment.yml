@@ -16,6 +16,4 @@ dependencies:
   - pytest
   - pyefd
   - jenkspy
-  - pip
-  - pip:
-    - shapelysmooth
+  - shapelysmooth

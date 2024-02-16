@@ -17,6 +17,4 @@ dependencies:
   - jupyterlab
   - pyefd
   - jenkspy
-  - pip
-  - pip:
-    - shapelysmooth
+  - shapelysmooth

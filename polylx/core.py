@@ -367,7 +367,7 @@ class PolyShape(object):
         )
 
     ###################################################################
-    # Shapely affinity methods                                        #
+    # Common smooth and simplify methods (should return Grain object) #
     ###################################################################
 
     def dp(self, **kwargs):
@@ -391,7 +391,7 @@ class PolyShape(object):
                     - y[i2] * x[i1]
                 ) / np.sqrt((y[i2] - y[i1]) ** 2 + (x[i2] - x[i1]) ** 2)
                 tolerance = d.mean()
-                print(f'Using tolerance {tolerance:g}')
+                print(f"Using tolerance {tolerance:g}")
             else:
                 tolerance = kwargs.get("tolerance")
             shape = self.shape.simplify(tolerance, False)
@@ -482,6 +482,7 @@ class PolyShape(object):
                 )
             )
         return res
+
 
 class Grain(PolyShape):
     """Grain class to store polygonal grain geometry
@@ -884,13 +885,13 @@ class Grain(PolyShape):
 
         Short and long axes are calculated from area moments of inertia.
         Center coordinates are set to centroid. If moment fitting failed
-        silently fallback to maxferet.
+        calculation fallback to maxferet.
         Center coordinates are set to centroid.
 
         """
         if not np.isclose(self.shape.area, 0):
             x, y = self.xy
-            self.xc, self.yc = self.shape.centroid.coords[0]
+            self.xc, self.yc = self.shape.exterior.centroid.coords[0]
             M = inertia_moments(x, y, self.xc, self.yc)
             for x, y in self.interiors:
                 M -= inertia_moments(x, y, self.xc, self.yc)
@@ -903,7 +904,6 @@ class Grain(PolyShape):
             evecs = evecs[:, idx]
             self.la, self.sa = 2 / np.sqrt(evals)
             self.lao, self.sao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
-            self.xc, self.yc = self.shape.centroid.coords[0]
             self._shape_method = "moment"
         else:
             print(
@@ -974,6 +974,24 @@ class Grain(PolyShape):
         self.sa, self.la = np.sqrt(8) * np.sqrt(evals)
         self.sao, self.lao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
         self._shape_method = "cov"
+
+    def bcov(self):
+        """`shape_method`: bcov
+
+        Short and long axes are calculated from eigenvalue analysis
+        of geometry segments covariance matrix.
+
+        """
+        x, y = self.xy
+        s = np.cov(np.diff(x), np.diff(y))
+        evals, evecs = np.linalg.eig(s)
+        idx = evals.argsort()
+        evals = evals[idx]
+        evecs = evecs[:, idx]
+        self.sa, self.la = np.sqrt(8) * np.sqrt(evals)
+        self.sao, self.lao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
+        self.xc, self.yc = self.shape.exterior.centroid.coords[0]
+        self._shape_method = "bcov"
 
     def maee(self):
         """`shape_method`: maee
@@ -1093,6 +1111,17 @@ class Boundary(PolyShape):
         d2 = np.sum((hull.T[pa[:, 0]] - hull.T[pa[:, 1]]) ** 2, axis=1)
         ix = d2.argmax()
         ax.plot(*hull.T[pa[ix]].T, ls=":", lw=2, c="r")
+        ax.plot(*self.representative_point, color="coral", marker="o")
+        ax.plot(*self.centroid, color="red", marker="o")
+        ax.plot(self.xc, self.yc, color="green", marker="o")
+        R = np.linspace(0, 360, 361)
+        cr, sr = deg.cos(R), deg.sin(R)
+        cl, sl = deg.cos(self.lao), deg.sin(self.lao)
+        xx = self.xc + self.la * cr * sl / 2 + self.sa * sr * cl / 2
+        yy = self.yc + self.la * cr * cl / 2 - self.sa * sr * sl / 2
+        ax.plot(xx, yy, color="green")
+        ax.plot(xx[[0, 180]], yy[[0, 180]], color="green")
+        ax.plot(xx[[90, 270]], yy[[90, 270]], color="green")
         ax.autoscale_view(None, True, True)
         ax.set_title("LAO:{b.lao:g} AR:{b.ar} ({b.shape_method})".format(b=self))
         return ax
@@ -1198,18 +1227,34 @@ class Boundary(PolyShape):
 
         """
         x, y = self.xy
-        x = x - x.mean()
-        y = y - y.mean()
-        s = np.cov(x, y)
+        s = np.cov(x - x.mean(), y - y.mean())
         evals, evecs = np.linalg.eig(s)
         idx = evals.argsort()
         evals = evals[idx]
         evecs = evecs[:, idx]
-        self.sa, self.la = np.sqrt(2) * np.sqrt(evals)
+        self.sa, self.la = np.sqrt(8) * np.sqrt(evals)
         self.sa = fixzero(self.sa)
         self.sao, self.lao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
         self.xc, self.yc = self.shape.centroid.coords[0]
         self._shape_method = "cov"
+
+    def bcov(self):
+        """`shape_method`: bcov
+
+        Short and long axes are calculated from eigenvalue analysis
+        of geometry segments covariance matrix.
+
+        """
+        x, y = self.xy
+        s = np.cov(np.diff(x), np.diff(y))
+        evals, evecs = np.linalg.eig(s)
+        idx = evals.argsort()
+        evals = evals[idx]
+        evecs = evecs[:, idx]
+        self.sa, self.la = np.sqrt(8) * np.sqrt(evals)
+        self.sao, self.lao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
+        self.xc, self.yc = self.shape.centroid.coords[0]
+        self._shape_method = "bcov"
 
 
 class PolySet(object):
@@ -2176,10 +2221,7 @@ class PolySet(object):
         else:
             return ax
 
-    def smooth(self, method="chaikin", **kwargs):
-        return type(self)([getattr(s, method)(**kwargs) for s in self])
-
-    def simplify(self, method="vw", **kwargs):
+    def generalize(self, method="taubin", **kwargs):
         return type(self)([getattr(s, method)(**kwargs) for s in self])
 
     def regularize(self, **kwargs):
