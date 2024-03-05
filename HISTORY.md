@@ -1,8 +1,10 @@
 # Changes
 
-### master (15 Feb 2024)
+### 0.5.4 (05 Mar 2024)
  * shapelysmooth methods added for smoothing
  * shapely and scipy upstream fixes
+ * jenks and quantile rules fix
+ * bcov shape_method added for eigenanalysis of decomposed geometry
 
 ### 0.5.3 (06 Mar 2023)
  * upstream fix for networkX 3
