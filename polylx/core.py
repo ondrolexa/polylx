@@ -1716,6 +1716,8 @@ class PolySet(object):
         """Returns surfor function values. When normalized maximum value
         is 1 and correspond to max feret.
 
+        Note: It calculates `feret()` values for given angles
+
         Keyword Args:
           angles: iterable of angle values. Defaut range(180)
           normalized(bool): whether to normalize values. Default True
@@ -1726,6 +1728,8 @@ class PolySet(object):
     def paror(self, angles=range(180), normalized=True):
         """Returns paror function values. When normalized maximum value
         is 1 and correspond to max feret.
+
+        Note: It calculates `proj()` values for given angles
 
         Keyword Args:
           angles: iterable of angle values. Defaut range(180)
