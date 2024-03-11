@@ -8,7 +8,7 @@
 # -- Project information -----------------------------------------------------
 
 project = "polylx"
-copyright = "2023, Ondrej Lexa"
+copyright = "2024, Ondrej Lexa"
 author = "Ondrej Lexa"
 
 # -- General configuration ---------------------------------------------------

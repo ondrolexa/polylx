@@ -163,6 +163,8 @@ class PolyShape(object):
         """Returns surfor function values. When normalized maximum value
         is 1 and correspond to max feret.
 
+        Note: It calculates `feret()` values for given angles
+
         Args:
           angles: iterable angle values. Defaut range(180)
           normalized: whether to normalize values. Defaut True
@@ -176,6 +178,8 @@ class PolyShape(object):
     def paror(self, angles=range(180), normalized=True):
         """Returns paror function values. When normalized maximum value
         is 1 and correspond to max feret.
+
+        Note: It calculates `proj()` values for given angles
 
         Args:
           angles: iterable angle values. Defaut range(180)
@@ -1076,6 +1080,23 @@ class Boundary(PolyShape):
 
     def copy(self):
         return Boundary(self.shape, self.name, self.fid)
+
+    @classmethod
+    def from_coords(self, x, y, name="None", fid=0):
+        """Create ``Boundary`` from coordinate arrays
+
+        Example:
+          >>> g=Boundary.from_coords([0,0,2,2],[0,1,1,0])
+          >>> g.xy
+          array([[ 0.,  0.,  2.,  2.],
+                 [ 0.,  1.,  1.,  0.]])
+
+        """
+        geom = LineString([(xx, yy) for xx, yy in zip(x, y)])
+        if geom.is_valid and geom.geom_type == "LineString":
+            return self(geom, name, fid)
+        else:
+            print("Invalid geometry.")
 
     @property
     def xy(self):

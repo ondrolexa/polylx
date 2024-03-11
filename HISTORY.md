@@ -1,5 +1,8 @@
 # Changes
 
+### 0.5.5 (master)
+ * from_coords method added to Boundary
+
 ### 0.5.4 (05 Mar 2024)
  * shapelysmooth methods added for smoothing
  * shapely and scipy upstream fixes

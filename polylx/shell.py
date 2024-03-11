@@ -1,21 +1,30 @@
 #!/usr/bin/python
 
-import pkg_resources
+from importlib.metadata import version
 import code
+
 try:
     import readline
 except ImportError:
     pass
-from pylab import *
+import numpay as np
+import matplotlib.pyplot as pyplot
+import pandas as pd
 from polylx import *
+
+try:
+    ver = version("polylx")
+except ImportError:
+    ver = None
 
 
 def main():
-    banner = '+----------------------------------------------------------+\n'
-    banner += '    PolyLX toolbox '
-    banner += pkg_resources.require('polylx')[0].version
-    banner += ' - https://polylx.readthedocs.io\n'
-    banner += '+----------------------------------------------------------+'
+    banner = "+----------------------------------------------------------+\n"
+    banner += "    PolyLX toolbox"
+    if ver is not None:
+        banner += f" {ver}"
+    banner += " - https://polylx.readthedocs.io\n"
+    banner += "+----------------------------------------------------------+"
     vars = globals().copy()
     vars.update(locals())
     shell = code.InteractiveConsole(vars)
