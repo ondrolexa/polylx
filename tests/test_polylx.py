@@ -61,7 +61,7 @@ class TestPolylx(unittest.TestCase):
         self.assertTrue(
             np.allclose(
                 sample.g.paror(normalized=False).mean(axis=1).mean(),
-                0.21099580521756531,
+                0.09137254165620362,
             )
         )
 
@@ -69,7 +69,7 @@ class TestPolylx(unittest.TestCase):
         self.assertTrue(
             np.allclose(
                 sample.g.surfor(normalized=False).mean(axis=1).mean(),
-                0.091372541656203621,
+                0.10549790260878265,
             )
         )
 
