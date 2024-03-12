@@ -93,11 +93,6 @@ class PolyShape(object):
         return self.shape.bounds
 
     @property
-    def area(self):
-        """Area of the shape. For boundary returns 0."""
-        return self.shape.area
-
-    @property
     def length(self):
         """Unitless length of the geometry (float)"""
         return self.shape.length
@@ -158,38 +153,6 @@ class PolyShape(object):
         """
         pp = np.dot(self.xy.T, np.array([deg.sin(angle), deg.cos(angle)]))
         return abs(np.diff(pp, axis=0)).sum(axis=0)
-
-    def surfor(self, angles=range(180), normalized=True):
-        """Returns surfor function values. When normalized maximum value
-        is 1 and correspond to max feret.
-
-        Note: It calculates `feret()` values for given angles
-
-        Args:
-          angles: iterable angle values. Defaut range(180)
-          normalized: whether to normalize values. Defaut True
-
-        """
-        res = self.feret(angles)
-        if normalized:
-            res = res / res.max()
-        return res
-
-    def paror(self, angles=range(180), normalized=True):
-        """Returns paror function values. When normalized maximum value
-        is 1 and correspond to max feret.
-
-        Note: It calculates `proj()` values for given angles
-
-        Args:
-          angles: iterable angle values. Defaut range(180)
-          normalized: whether to normalize values. Defaut True
-
-        """
-        res = self.proj(angles)
-        if normalized:
-            res = res / res.max()
-        return res
 
     def boundary_segments(self):
         """Create Boundaries from object boundary segments.
@@ -554,6 +517,11 @@ class Grain(PolyShape):
         return [np.array(hole.xy) for hole in self.shape.interiors]
 
     @property
+    def area(self):
+        """Returns area of the grain."""
+        return self.shape.area
+
+    @property
     def hull(self):
         """Returns array of vertices on convex hull of grain geometry."""
         return np.array(self.shape.convex_hull.exterior.xy)
@@ -562,6 +530,16 @@ class Grain(PolyShape):
     def ead(self):
         """Returns equal area diameter of grain"""
         return 2 * np.sqrt(self.area / np.pi)
+
+    @property
+    def eap(self):
+        """Returns equal area perimeter of grain"""
+        return 2 * np.sqrt(np.pi * self.area)
+
+    @property
+    def epa(self):
+        """Returns equal perimeter area of grain"""
+        return self.length**2 / (4 * np.pi)
 
     @property
     def circularity(self):
@@ -589,6 +567,38 @@ class Grain(PolyShape):
     def cdir(self):
         """Returns centroid-vertex directions of grain exterior"""
         return np.arctan2(*(self.xy.T - self.centroid).T)
+
+    def surfor(self, angles=range(180), normalized=True):
+        """Returns surfor function values. When normalized surface projections
+        are normalized by maximum projection.
+
+        Note: For polygons, the calculates `proj()` values are divided by factor 2
+
+        Args:
+          angles: iterable angle values. Defaut range(180)
+          normalized: whether to normalize values. Defaut True
+
+        """
+        res = self.proj(angles) / 2
+        if normalized:
+            res = res / res.max()
+        return res
+
+    def paror(self, angles=range(180), normalized=True):
+        """Returns paror function values. When normalized particle projections
+        are normalized by maximum feret.
+
+        Note: It calculates `feret()` values for given angles
+
+        Args:
+          angles: iterable angle values. Defaut range(180)
+          normalized: whether to normalize values. Defaut True
+
+        """
+        res = self.feret(angles)
+        if normalized:
+            res = res / res.max()
+        return res
 
     def shape_vector(self, **kwargs):
         """Returns shape (feature) vector.
@@ -1111,6 +1121,38 @@ class Boundary(PolyShape):
             return np.array(h.xy)[:, [0, 1, 0]]
         else:
             return np.array(h.exterior.xy)
+
+    def surfor(self, angles=range(180), normalized=True):
+        """Returns surfor function values. When normalized surface projections
+        are normalized by maximum projection.
+
+        Note: It calculates `proj()` values for given angles
+
+        Args:
+          angles: iterable angle values. Defaut range(180)
+          normalized: whether to normalize values. Defaut True
+
+        """
+        res = self.proj(angles)
+        if normalized:
+            res = res / res.max()
+        return res
+
+    def paror(self, angles=range(180), normalized=True):
+        """Returns paror function values. When normalized particle projections
+        are normalized by maximum feret.
+
+        Note: It calculates `feret()` values for given angles
+
+        Args:
+          angles: iterable angle values. Defaut range(180)
+          normalized: whether to normalize values. Defaut True
+
+        """
+        res = self.feret(angles)
+        if normalized:
+            res = res / res.max()
+        return res
 
     def plot(self, **kwargs):
         """View ``Boundary`` geometry on figure."""
@@ -1713,8 +1755,8 @@ class PolySet(object):
         return np.array([p.proj(angle) for p in self])
 
     def surfor(self, angles=range(180), normalized=True):
-        """Returns surfor function values. When normalized maximum value
-        is 1 and correspond to max feret.
+        """Returns surfor function values. When normalized surface projections
+        are normalized by maximum projection.
 
         Note: It calculates `feret()` values for given angles
 
@@ -1726,8 +1768,8 @@ class PolySet(object):
         return np.array([p.surfor(angles, normalized) for p in self])
 
     def paror(self, angles=range(180), normalized=True):
-        """Returns paror function values. When normalized maximum value
-        is 1 and correspond to max feret.
+        """Returns paror function values. When normalized particle projections
+        are normalized by maximum feret.
 
         Note: It calculates `proj()` values for given angles
 
@@ -2276,6 +2318,16 @@ class Grains(PolySet):
     def ead(self):
         """Returns array of equal area diameters of grains"""
         return np.array([p.ead for p in self])
+
+    @property
+    def eap(self):
+        """Returns array of equal area perimeters of grains"""
+        return np.array([p.eap for p in self])
+
+    @property
+    def epa(self):
+        """Returns array of equal perimeter areas of grains"""
+        return np.array([p.epa for p in self])
 
     @property
     def circularity(self):
@@ -3308,11 +3360,6 @@ class Fractnet(object):
         return (self.Ni + self.Ny) // 2
 
     @property
-    def Nl(self):
-        """Robust number of branches"""
-        return (self.Ni + self.Ny) // 2
-
-    @property
     def Nb(self):
         """Robust number of branches"""
         return (
@@ -3383,14 +3430,14 @@ class Fractnet(object):
         # create noded lines
         bn = unary_union(b.shape)
         coords_set = set()
-        for l in bn.geoms:
-            coords_set = coords_set.union(l.coords)
+        for ln in bn.geoms:
+            coords_set = coords_set.union(ln.coords)
         # lookup dict
         coords_dict = {coord: fid for fid, coord in enumerate(coords_set)}
         # Create nx.Graph
         G = nx.Graph()
-        for fid, l in enumerate(bn.geoms):
-            nodes = [(coords_dict[coord], {"pos": coord}) for coord in l.coords]
+        for fid, ln in enumerate(bn.geoms):
+            nodes = [(coords_dict[coord], {"pos": coord}) for coord in ln.coords]
             G.add_nodes_from(nodes)
             nodes_id = [node[0] for node in nodes]
             G.add_edges_from(zip(nodes_id[:-1], nodes_id[1:]), fid=fid)
@@ -3425,8 +3472,6 @@ class Fractnet(object):
                         )
                     )
 
-            G = nx.Graph()
-            coords = []
             with fiona.open(filename, **kwargs) as src:
                 schema = src.schema
                 assert (
@@ -3535,13 +3580,13 @@ class Fractnet(object):
             segs = []
             for n1, n2 in edges:
                 segs.append(LineString([Point(pos[n1]), Point(pos[n2])]))
-            l = linemerge(segs)
-            if l.geom_type == "LineString":
-                shapes.append(Boundary(l, name="branch", fid=fid))
+            ln = linemerge(segs)
+            if ln.geom_type == "LineString":
+                shapes.append(Boundary(ln, name="branch", fid=fid))
             else:
                 print(
                     "Edges with FID:{} do not form branch but {}".format(
-                        fid, l.geom_type
+                        fid, ln.geom_type
                     )
                 )
         return Boundaries(shapes)

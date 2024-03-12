@@ -14,7 +14,7 @@ with open(path.join(CURRENT_PATH, "HISTORY.md")) as f:
 
 setup(
     name="polylx",
-    version="0.5.4",
+    version="0.5.5",
     description="A Python package to visualize and analyze microstructures.",
     long_description=readme + "\n\n" + history,
     long_description_content_type="text/markdown",
