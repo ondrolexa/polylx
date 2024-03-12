@@ -568,6 +568,20 @@ class Grain(PolyShape):
         """Returns centroid-vertex directions of grain exterior"""
         return np.arctan2(*(self.xy.T - self.centroid).T)
 
+    @property
+    def vertex_angles(self):
+        """Returns the array of vertex angles"""
+
+        x, y = self.xy
+        x, y = np.hstack((x, x[1])), np.hstack((y, y[1]))
+        dx, dy = np.diff(x), np.diff(y)
+        sgn = np.sign(dx[:-1] * dy[1:] - dy[:-1] * dx[1:])
+        ab = dx[:-1] * dx[1:] + dy[:-1] * dy[1:]
+        absa = np.sqrt(dx[:-1] ** 2 + dy[:-1] ** 2)
+        absb = np.sqrt(dx[1:] ** 2 + dy[1:] ** 2)
+        theta = np.arccos(ab / (absa * absb))
+        return sgn * np.degrees(theta)
+
     def surfor(self, angles=range(180), normalized=True):
         """Returns surfor function values. When normalized surface projections
         are normalized by maximum projection.
@@ -633,6 +647,9 @@ class Grain(PolyShape):
 
         """
         vertices = kwargs.get("vertices", False)
+        envelope = kwargs.get("envelope", True)
+        centres = kwargs.get("centres", True)
+        ellipse = kwargs.get("ellipse", True)
         if "ax" in kwargs:
             ax = kwargs["ax"]
             ax.set_aspect("equal")
@@ -641,26 +658,35 @@ class Grain(PolyShape):
                 figsize=kwargs.get("figsize", plt.rcParams.get("figure.figsize"))
             )
             ax = fig.add_subplot(111, aspect="equal")
-        hull = self.hull
-        ax.plot(*hull, ls="--", c="green")
         ax.add_patch(
             patch_from_polygon(self.shape, fc="blue", ec="#000000", alpha=0.5, zorder=2)
         )
+        if envelope:
+            hull = self.hull
+            ax.plot(*hull, ls="--", c="green")
+            pa = np.array(list(itertools.combinations(range(len(hull.T)), 2)))
+            d2 = np.sum((hull.T[pa[:, 0]] - hull.T[pa[:, 1]]) ** 2, axis=1)
+            ix = d2.argmax()
+            ax.plot(*hull.T[pa[ix]].T, ls=":", lw=2, c="r")
         if vertices:
             ax.plot(*self.xy, marker=".", c="blue")
+            for ix, (x, y) in enumerate(zip(*self.xy[:, :-1])):
+                ax.text(x, y, str(ix))
             for hole in self.interiors:
                 ax.plot(*hole, marker=".", c="blue")
-        ax.plot(*self.representative_point, color="coral", marker="o")
-        ax.plot(*self.centroid, color="red", marker="o")
-        ax.plot(self.xc, self.yc, color="green", marker="o")
-        R = np.linspace(0, 360, 361)
-        cr, sr = deg.cos(R), deg.sin(R)
-        cl, sl = deg.cos(self.lao), deg.sin(self.lao)
-        xx = self.xc + self.la * cr * sl / 2 + self.sa * sr * cl / 2
-        yy = self.yc + self.la * cr * cl / 2 - self.sa * sr * sl / 2
-        ax.plot(xx, yy, color="green")
-        ax.plot(xx[[0, 180]], yy[[0, 180]], color="green")
-        ax.plot(xx[[90, 270]], yy[[90, 270]], color="green")
+        if centres:
+            ax.plot(*self.representative_point, color="coral", marker="o")
+            ax.plot(*self.centroid, color="red", marker="o")
+            ax.plot(self.xc, self.yc, color="green", marker="o")
+        if ellipse:
+            R = np.linspace(0, 360, 361)
+            cr, sr = deg.cos(R), deg.sin(R)
+            cl, sl = deg.cos(self.lao), deg.sin(self.lao)
+            xx = self.xc + self.la * cr * sl / 2 + self.sa * sr * cl / 2
+            yy = self.yc + self.la * cr * cl / 2 - self.sa * sr * sl / 2
+            ax.plot(xx, yy, color="green")
+            ax.plot(xx[[0, 180]], yy[[0, 180]], color="green")
+            ax.plot(xx[[90, 270]], yy[[90, 270]], color="green")
         ax.autoscale_view(None, True, True)
         ax.set_title("LAO:{g.lao:g} AR:{g.ar} ({g.shape_method})".format(g=self))
         return ax
@@ -1122,6 +1148,19 @@ class Boundary(PolyShape):
         else:
             return np.array(h.exterior.xy)
 
+    @property
+    def vertex_angles(self):
+        """Returns the array of vertex angles"""
+
+        x, y = self.xy
+        dx, dy = np.diff(x), np.diff(y)
+        sgn = np.sign(dx[:-1] * dy[1:] - dy[:-1] * dx[1:])
+        ab = dx[:-1] * dx[1:] + dy[:-1] * dy[1:]
+        absa = np.sqrt(dx[:-1] ** 2 + dy[:-1] ** 2)
+        absb = np.sqrt(dx[1:] ** 2 + dy[1:] ** 2)
+        theta = np.arccos(ab / (absa * absb))
+        return sgn * np.degrees(theta)
+
     def surfor(self, angles=range(180), normalized=True):
         """Returns surfor function values. When normalized surface projections
         are normalized by maximum projection.
@@ -1157,6 +1196,9 @@ class Boundary(PolyShape):
     def plot(self, **kwargs):
         """View ``Boundary`` geometry on figure."""
         vertices = kwargs.get("vertices", False)
+        envelope = kwargs.get("envelope", True)
+        centres = kwargs.get("centres", True)
+        ellipse = kwargs.get("ellipse", True)
         if "ax" in kwargs:
             ax = kwargs.pop("ax")
             ax.set_aspect("equal")
@@ -1166,25 +1208,30 @@ class Boundary(PolyShape):
             )
             ax = fig.add_subplot(111, aspect="equal")
         ax.plot(*self.xy, c="blue")
+        if envelope:
+            hull = self.hull
+            ax.plot(*hull, ls="--", c="green")
+            pa = np.array(list(itertools.combinations(range(len(hull.T)), 2)))
+            d2 = np.sum((hull.T[pa[:, 0]] - hull.T[pa[:, 1]]) ** 2, axis=1)
+            ix = d2.argmax()
+            ax.plot(*hull.T[pa[ix]].T, ls=":", lw=2, c="r")
         if vertices:
             ax.plot(*self.xy, marker=".", c="blue")
-        hull = self.hull
-        ax.plot(*hull, ls="--", c="green")
-        pa = np.array(list(itertools.combinations(range(len(hull.T)), 2)))
-        d2 = np.sum((hull.T[pa[:, 0]] - hull.T[pa[:, 1]]) ** 2, axis=1)
-        ix = d2.argmax()
-        ax.plot(*hull.T[pa[ix]].T, ls=":", lw=2, c="r")
-        ax.plot(*self.representative_point, color="coral", marker="o")
-        ax.plot(*self.centroid, color="red", marker="o")
-        ax.plot(self.xc, self.yc, color="green", marker="o")
-        R = np.linspace(0, 360, 361)
-        cr, sr = deg.cos(R), deg.sin(R)
-        cl, sl = deg.cos(self.lao), deg.sin(self.lao)
-        xx = self.xc + self.la * cr * sl / 2 + self.sa * sr * cl / 2
-        yy = self.yc + self.la * cr * cl / 2 - self.sa * sr * sl / 2
-        ax.plot(xx, yy, color="green")
-        ax.plot(xx[[0, 180]], yy[[0, 180]], color="green")
-        ax.plot(xx[[90, 270]], yy[[90, 270]], color="green")
+            for ix, (x, y) in enumerate(zip(*self.xy)):
+                ax.text(x, y, str(ix))
+        if centres:
+            ax.plot(*self.representative_point, color="coral", marker="o")
+            ax.plot(*self.centroid, color="red", marker="o")
+            ax.plot(self.xc, self.yc, color="green", marker="o")
+        if ellipse:
+            R = np.linspace(0, 360, 361)
+            cr, sr = deg.cos(R), deg.sin(R)
+            cl, sl = deg.cos(self.lao), deg.sin(self.lao)
+            xx = self.xc + self.la * cr * sl / 2 + self.sa * sr * cl / 2
+            yy = self.yc + self.la * cr * cl / 2 - self.sa * sr * sl / 2
+            ax.plot(xx, yy, color="green")
+            ax.plot(xx[[0, 180]], yy[[0, 180]], color="green")
+            ax.plot(xx[[90, 270]], yy[[90, 270]], color="green")
         ax.autoscale_view(None, True, True)
         ax.set_title("LAO:{b.lao:g} AR:{b.ar} ({b.shape_method})".format(b=self))
         return ax

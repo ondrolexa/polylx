@@ -4,6 +4,7 @@
  * from_coords method added to Boundary
  * added eap and epa Grain methods
  * surfor for Grains normalized by factor 2
+ * vertex_angles property added
 
 ### 0.5.4 (05 Mar 2024)
  * shapelysmooth methods added for smoothing
