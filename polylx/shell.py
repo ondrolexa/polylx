@@ -7,8 +7,8 @@ try:
     import readline
 except ImportError:
     pass
-import numpay as np
-import matplotlib.pyplot as pyplot
+import numpy as np
+import matplotlib.pyplot as plt
 import pandas as pd
 from polylx import *
 

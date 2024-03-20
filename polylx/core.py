@@ -1884,6 +1884,8 @@ class PolySet(object):
     def df(self, *attrs):
         """Returns ``pandas.DataFrame`` of object attributes.
 
+        Note: Use 'class' for class names.
+
         Example:
           >>> g.df('ead', 'ar')
 
@@ -1912,26 +1914,38 @@ class PolySet(object):
         idx = pd.Index(self.fid, name="fid")
         return pd.Series(getattr(self, attr), index=idx, name=attr)
 
-    def agg(self, *pairs):
+    def agg(self, **kwargs):
         """Returns concatenated result of multiple aggregations (different
         aggregation function for different attributes) based on actual
         classification. For single aggregation function use directly
         pandas groups, e.g. g.groups('lao', 'sao').agg(circular.mean)
 
         Example:
-          >>> g.agg('area', np.sum, 'ead', np.mean, 'lao', circular.mean)
-                     area       ead        lao
+          >>> g.agg(
+                total_area=['area', 'sum'],
+                mean_ead =['ead', 'mean'],
+                mean_orientation=['lao', circular.mean]
+              )
+                 total_area  mean_ead  mean_orientation
           class
-          ksp    2.443733  0.089710  76.875488
-          pl     1.083516  0.060629  94.197847
-          qtz    1.166097  0.068071  74.320337
+          ksp      2.443733  0.089710         76.875488
+          pl       1.083516  0.060629         94.197847
+          qtz      1.166097  0.068071         74.320337
+
 
         """
+        assert len(kwargs) > 0, "No aggregation defined"
         pieces = []
-        for attr, aggfunc in zip(pairs[0::2], pairs[1::2]):
+        columns = []
+        for lbl, (attr, aggfunc) in kwargs.items():
+            columns.append(lbl)
             df = self.groups(attr).agg(aggfunc)
             pieces.append(df)
-        return pd.concat(pieces, axis=1).reindex(self.class_names)
+        return (
+            pd.concat(pieces, axis=1)
+            .reindex(self.class_names)
+            .set_axis(columns, axis=1)
+        )
 
     def accumulate(self, *methods):
         """Returns accumulated result of multiple Group methods based

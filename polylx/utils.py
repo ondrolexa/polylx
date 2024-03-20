@@ -31,47 +31,35 @@ def fixratio(x, y):
         return x / y
 
 
-class circular(object):
+class circular:
     @staticmethod
     def rho(x):
-        """Mean resultant vector as complex number
-
-        """
+        """Mean resultant vector as complex number"""
         return np.exp(2j * np.deg2rad(x)).mean()
 
     @staticmethod
     def R(x):
-        """Length of mean resultant vector
-
-        """
+        """Length of mean resultant vector"""
         return abs(circular.rho(x))
 
     @staticmethod
     def mean(x):
-        """Mean direction
-
-        """
+        """Mean direction"""
         return np.angle(circular.rho(x), deg=True) / 2 % 180
 
     @staticmethod
     def var(x):
-        """Circular variance
-
-        """
+        """Circular variance"""
         return 1 - circular.R(x)
 
     @staticmethod
     def csd(x):
-        """Circular standard deviation
-
-        """
+        """Circular standard deviation"""
         return np.sqrt(-2 * np.log(circular.R(x)))
 
     @staticmethod
     def angdev(x):
-        """Angular deviation
-
-        """
+        """Angular deviation"""
         return np.sqrt(2 * circular.var(x))
 
     @staticmethod
@@ -82,13 +70,14 @@ class circular(object):
 
         """
         from scipy.stats import gamma
+
         n = len(x)
         R = circular.R(x)
         r = R * n
         c2 = gamma.ppf(cl, 0.5, scale=2)
-        if R < .9 and R > np.sqrt(c2 / 2 / n):
+        if R < 0.9 and R > np.sqrt(c2 / 2 / n):
             t = np.sqrt((2 * n * (2 * r**2 - n * c2)) / (4 * n - c2))
-        elif R >= .9:
+        elif R >= 0.9:
             t = np.sqrt(n**2 - (n**2 - r**2) * np.exp(c2 / n))
         else:  # Resultant vector does not allow to specify confidence limits
             t = np.nan
@@ -96,38 +85,72 @@ class circular(object):
 
     @staticmethod
     def angskew(x):
-        """Angular skewness
-
-        """
+        """Angular skewness"""
         return np.mean(deg.sin(2 * circular.circdist(x, circular.mean(x))))
 
     @staticmethod
     def sas(x):
-        """Standardized angular skewness
-
-        """
+        """Standardized angular skewness"""
         rho_p, mu_p = circular.circmoment(x, 2)
         s = deg.sin(circular.circdist(mu_p, 2 * circular.mean(x)))
-        d = (1 - circular.var(x))**(2 / 3)
+        d = (1 - circular.var(x)) ** (2 / 3)
         return rho_p * s / d
 
     @staticmethod
     def circdist(x, y):
-        """Pairwise difference around the circle
-
-        """
+        """Pairwise difference around the circle"""
         return np.angle(np.exp(1j * x) / np.exp(1j * y), deg=True)
 
     @staticmethod
     def circmoment(x, p=1):
-        """Complex centered p-th moment
-
-        """
+        """Complex centered p-th moment"""
         mp = np.exp(2j * p * np.deg2rad(x)).mean()
         return np.abs(mp), np.angle(mp, deg=True)
 
 
-class deg(object):
+class ortensor:
+    @staticmethod
+    def ot(x):
+        v = np.array([np.cos(np.deg2rad(x)), np.sin(np.deg2rad(x))]).T
+        return np.dot(v.T, v) / len(v)
+
+    @staticmethod
+    def eigenvalues(x):
+        evals, evecs = np.linalg.eigh(ortensor.ot(x))
+        idx = evals.argsort()[::-1]
+        return evals[idx]
+
+    @staticmethod
+    def eigenvectors(x):
+        evals, evecs = np.linalg.eigh(ortensor.ot(x))
+        idx = evals.argsort()[::-1]
+        return evecs[:, idx]
+
+    @staticmethod
+    def ar(x):
+        evals = ortensor.eigenvalues(x)
+        return evals[0] / evals[1]
+
+    @staticmethod
+    def la(x):
+        return ortensor.eigenvalues(x)[0]
+
+    @staticmethod
+    def sa(x):
+        return ortensor.eigenvalues(x)[0]
+
+    @staticmethod
+    def lao(x):
+        evecs = ortensor.eigenvectors(x)
+        return np.rad2deg(np.arctan2(*evecs[:, 0][::-1])) % 180
+
+    @staticmethod
+    def sao(x):
+        evecs = ortensor.eigenvectors(x)
+        return np.rad2deg(np.arctan2(*evecs[:, 1][::-1])) % 180
+
+
+class deg:
     @staticmethod
     def sin(x):
         return np.sin(np.deg2rad(x))
@@ -157,43 +180,51 @@ class deg(object):
         return np.rad2deg(np.arctan2(x1, x2))
 
 
-class Classify(object):
-    """Class to store classification and colortable for legend
+class Classify:
+    """Class to store classification and colortable for legend"""
 
-    """
     def __init__(self, vals, **kwargs):
-        rule = kwargs.get('rule', 'quantile')
-        k = kwargs.get('k', 5)
-        label = kwargs.get('label', 'Default')
-        cmap = kwargs.get('cmap', 'viridis')
+        rule = kwargs.get("rule", "quantile")
+        k = kwargs.get("k", 5)
+        label = kwargs.get("label", "Default")
+        cmap = kwargs.get("cmap", "viridis")
         self.vals = vals
         self.rule = rule
         self.label = label
-        if rule == 'equal' or rule == 'user':
+        if rule == "equal" or rule == "user":
             counts, bins = np.histogram(vals, k)
             index = np.digitize(vals, bins[:-1]) - 1
             prec = int(max(-np.floor(np.log10(np.diff(bins).min())) + 1, 0))
-            self.index = ['{:.{prec}f}-{:.{prec}f}'.format(bins[i], bins[i + 1], prec=prec) for i in range(len(counts))]
+            self.index = [
+                "{:.{prec}f}-{:.{prec}f}".format(bins[i], bins[i + 1], prec=prec)
+                for i in range(len(counts))
+            ]
             self.names = np.array([self.index[i] for i in index])
-        elif rule == 'jenks':
+        elif rule == "jenks":
             bins = jenkspy.jenks_breaks(vals, n_classes=k)
             index = np.digitize(vals, bins[:-1]) - 1
             counts = np.bincount(index)
             prec = int(max(-np.floor(np.log10(np.diff(bins).min())) + 1, 0))
-            self.index = ['{:.{prec}f}-{:.{prec}f}'.format(bins[i], bins[i + 1], prec=prec) for i in range(len(counts))]
+            self.index = [
+                "{:.{prec}f}-{:.{prec}f}".format(bins[i], bins[i + 1], prec=prec)
+                for i in range(len(counts))
+            ]
             self.names = np.array([self.index[i] for i in index])
-        elif rule == 'quantile':
+        elif rule == "quantile":
             bins = quantiles_bins(vals, k=k)
             index = np.digitize(vals, bins[:-1]) - 1
             counts = np.bincount(index)
             prec = int(max(-np.floor(np.log10(np.diff(bins).min())) + 1, 0))
-            self.index = ['{:.{prec}f}-{:.{prec}f}'.format(bins[i], bins[i + 1], prec=prec) for i in range(len(counts))]
+            self.index = [
+                "{:.{prec}f}-{:.{prec}f}".format(bins[i], bins[i + 1], prec=prec)
+                for i in range(len(counts))
+            ]
             self.names = np.array([self.index[i] for i in index])
         else:  # unique
             self.index = list(np.unique(vals))
             self.names = np.asarray(vals)
             # other cmap for unique
-            cmap = kwargs.get('cmap', self.sns2cmap('muted'))
+            cmap = kwargs.get("cmap", self.sns2cmap("muted"))
         self.set_cmap(cmap)
 
     def __call__(self, num):
@@ -207,13 +238,13 @@ class Classify(object):
         return cl
 
     def __repr__(self):
-        tmpl = 'Classification %s of %s with %g classes.'
+        tmpl = "Classification %s of %s with %g classes."
         return tmpl % (self.rule, self.label, len(self.index))
 
     @property
     def labels(self):
         index, inverse = np.unique(self.names, return_inverse=True)
-        return ['%s (%d)' % p for p in zip(index, np.bincount(inverse))]
+        return ["%s (%d)" % p for p in zip(index, np.bincount(inverse))]
 
     def set_cmap(self, cmap):
         """Set colormap for actual classification.
@@ -239,6 +270,7 @@ class Classify(object):
 
         """
         from matplotlib.colors import ListedColormap
+
         if isinstance(palette, str):
             palette = sns.color_palette(palette, len(self.index))
         return ListedColormap(sns.color_palette(palette))
@@ -255,9 +287,7 @@ class Classify(object):
 
     @property
     def colortable(self):
-        """Get dictionary of colors used in actual classification.
-
-        """
+        """Get dictionary of colors used in actual classification."""
         return deepcopy(self._colors_dict)
 
     def color(self, key):
@@ -270,6 +300,7 @@ def optimize_colormap(name):
     from matplotlib.colors import LinearSegmentedColormap
     from colormath.color_objects import LabColor, sRGBColor
     from colormath.color_conversions import convert_color
+
     cmap = cm.get_cmap(name)
     values = cmap(np.linspace(0, 1, 256))[:, :3]
     lab_colors = []
@@ -283,11 +314,12 @@ def optimize_colormap(name):
     # Go back to rbg.
     rgb_colors = [convert_color(_i, target_cs=sRGBColor) for _i in lab_colors]
     # Clamp values as colorspace of LAB is larger then sRGB.
-    rgb_colors = [(_i.clamped_rgb_r,
-                   _i.clamped_rgb_g,
-                   _i.clamped_rgb_b) for _i in rgb_colors]
-    cmap = LinearSegmentedColormap.from_list(name=name + "_optimized",
-                                             colors=rgb_colors)
+    rgb_colors = [
+        (_i.clamped_rgb_r, _i.clamped_rgb_g, _i.clamped_rgb_b) for _i in rgb_colors
+    ]
+    cmap = LinearSegmentedColormap.from_list(
+        name=name + "_optimized", colors=rgb_colors
+    )
     return cmap
 
 
@@ -303,9 +335,7 @@ def quantiles_bins(values, k=5):
     dup = uniq[counts > 1]
     if len(dup):
         new = values[values != dup[0]]
-        return np.sort(
-            np.hstack((dup[0], quantiles_bins(new, k - 1)))
-        )
+        return np.sort(np.hstack((dup[0], quantiles_bins(new, k - 1))))
     return bins
 
 
@@ -347,9 +377,11 @@ def inertia_moments(x, y, xc, yc):
     A = np.sum(d) / 2
     ax = np.sum(d * (x[1:] + x[:-1])) / (6 * A)
     ay = np.sum(d * (y[1:] + y[:-1])) / (6 * A)
-    axx = np.sum(d * (x[1:]**2 + x[1:] * x[:-1] + x[:-1]**2)) / (12 * A)
-    ayy = np.sum(d * (y[1:]**2 + y[1:] * y[:-1] + y[:-1]**2)) / (12 * A)
-    axy = np.sum(d * (2 * x[1:] * y[1:] + x[1:] * y[:-1] + x[:-1] * y[1:] + 2 * x[:-1] * y[:-1])) / (24 * A)
+    axx = np.sum(d * (x[1:] ** 2 + x[1:] * x[:-1] + x[:-1] ** 2)) / (12 * A)
+    ayy = np.sum(d * (y[1:] ** 2 + y[1:] * y[:-1] + y[:-1] ** 2)) / (12 * A)
+    axy = np.sum(
+        d * (2 * x[1:] * y[1:] + x[1:] * y[:-1] + x[:-1] * y[1:] + 2 * x[:-1] * y[:-1])
+    ) / (24 * A)
     mxx = axx - ax**2
     myy = ayy - ay**2
     mxy = axy - ax * ay
@@ -378,13 +410,14 @@ def _chaikin(x, y, repeat=2, is_ring=False):
 
 def _spline_ring(x, y, densify=5, pad=5):
     from scipy.interpolate import CubicSpline
+
     num = len(x)
     # padding
     x = np.concatenate((x[-pad:-1], x, x[1:pad]))
     y = np.concatenate((y[-pad:-1], y, y[1:pad]))
     # distance parameter normalized on beginning and end
     t = np.zeros(x.shape)
-    t[1:] = np.sqrt((x[1:] - x[:-1])**2 + (y[1:] - y[:-1])**2)
+    t[1:] = np.sqrt((x[1:] - x[:-1]) ** 2 + (y[1:] - y[:-1]) ** 2)
     t = np.cumsum(t)
     t -= t[pad - 1]
     t /= t[-pad]
@@ -409,7 +442,11 @@ def _visvalingam_whyatt(x, y, threshold=1, is_ring=False):
             i0 = np.arange(len(xx) - 2)
             i1 = i0 + 1
             i2 = i0 + 2
-            a = (xx[i0] * (yy[i1] - yy[i2]) + xx[i1] * (yy[i2] - yy[i0]) + xx[i2] * (yy[i0] - yy[i1])) / 2
+            a = (
+                xx[i0] * (yy[i1] - yy[i2])
+                + xx[i1] * (yy[i2] - yy[i0])
+                + xx[i2] * (yy[i0] - yy[i1])
+            ) / 2
             ix = abs(a).argmin()
             if ix == 0 or ix == len(x) - 1:
                 xx = np.concatenate((x[1:-1], x[1:2]))
@@ -431,7 +468,11 @@ def _visvalingam_whyatt(x, y, threshold=1, is_ring=False):
             i0 = np.arange(len(x) - 2)
             i1 = i0 + 1
             i2 = i0 + 2
-            a = (x[i0] * (y[i1] - y[i2]) + x[i1] * (y[i2] - y[i0]) + x[i2] * (y[i0] - y[i1])) / 2
+            a = (
+                x[i0] * (y[i1] - y[i2])
+                + x[i1] * (y[i2] - y[i0])
+                + x[i2] * (y[i0] - y[i1])
+            ) / 2
             ix = abs(a).argmin()
             xx = np.delete(x, ix + 1)
             yy = np.delete(y, ix + 1)
@@ -454,7 +495,7 @@ def weighted_avg_and_std(values, weights):
     """
     average = np.average(values, weights=weights)
     # Fast and numerically precise:
-    variance = np.average((values-average)**2, weights=weights)
+    variance = np.average((values - average) ** 2, weights=weights)
     return (average, np.sqrt(variance))
 
 
@@ -463,20 +504,24 @@ def classify_shapes(g, **kwargs):
     from sklearn.preprocessing import StandardScaler
     from sklearn.cluster import KMeans
 
-    N = kwargs.get('N', 128)
+    N = kwargs.get("N", 128)
     X = StandardScaler().fit_transform(g.shape_vector(N=N))
     pca = PCA(n_components=N // 2)
     pcs = pca.fit_transform(X)
     # Y = StandardScaler().fit_transform(np.array([pcs.T[0], np.log10(g.ead)]).T)
-    Y = np.append(pcs[:, :kwargs.get('n_pcas', 1)], np.atleast_2d(np.log10(g.ead)).T, axis=1)
+    Y = np.append(
+        pcs[:, : kwargs.get("n_pcas", 1)], np.atleast_2d(np.log10(g.ead)).T, axis=1
+    )
     Z = StandardScaler().fit_transform(Y)
-    kmeans = KMeans(n_clusters=kwargs.get('n_clusters', 2),
-                    init=kwargs.get('init', 'k-means++'),
-                    max_iter=kwargs.get('max_iter', 300),
-                    n_init=kwargs.get('n_init', 10),
-                    random_state=kwargs.get('random_state', 0))
+    kmeans = KMeans(
+        n_clusters=kwargs.get("n_clusters", 2),
+        init=kwargs.get("init", "k-means++"),
+        max_iter=kwargs.get("max_iter", 300),
+        n_init=kwargs.get("n_init", 10),
+        random_state=kwargs.get("random_state", 0),
+    )
     classes = kmeans.fit_predict(Z)
-    g.classify(classes, rule='unique')
+    g.classify(classes, rule="unique")
 
 
 class gaussian_kde(object):
@@ -615,6 +660,7 @@ class gaussian_kde(object):
     >>> plt.show()
 
     """
+
     def __init__(self, dataset, bw_method=None, weights=None):
         self.dataset = np.atleast_2d(dataset)
         if not self.dataset.size > 1:
@@ -628,7 +674,7 @@ class gaussian_kde(object):
 
         # Compute the effective sample size
         # http://surveyanalysis.org/wiki/Design_Effects_and_Effective_Sample_Size#Kish.27s_approximate_formula_for_computing_effective_sample_size
-        self.neff = 1.0 / np.sum(self.weights ** 2)
+        self.neff = 1.0 / np.sum(self.weights**2)
 
         self.set_bandwidth(bw_method=bw_method)
 
@@ -667,19 +713,19 @@ class gaussian_kde(object):
                 raise ValueError(msg)
 
         # compute the normalised residuals
-        chi2 = cdist(points.T, self.dataset.T, 'mahalanobis', VI=self.inv_cov) ** 2
+        chi2 = cdist(points.T, self.dataset.T, "mahalanobis", VI=self.inv_cov) ** 2
         # compute the pdf
-        result = np.sum(np.exp(-.5 * chi2) * self.weights, axis=1) / self._norm_factor
+        result = np.sum(np.exp(-0.5 * chi2) * self.weights, axis=1) / self._norm_factor
 
         return result
 
     __call__ = evaluate
 
     def scotts_factor(self):
-        return np.power(self.neff, -1./(self.d+4))
+        return np.power(self.neff, -1.0 / (self.d + 4))
 
     def silverman_factor(self):
-        return np.power(self.neff*(self.d+2.0)/4.0, -1./(self.d+4))
+        return np.power(self.neff * (self.d + 2.0) / 4.0, -1.0 / (self.d + 4))
 
     #  Default method to calculate bandwidth, can be overwritten by subclass
     covariance_factor = scotts_factor
@@ -730,19 +776,20 @@ class gaussian_kde(object):
 
         if bw_method is None:
             pass
-        elif bw_method == 'scott':
+        elif bw_method == "scott":
             self.covariance_factor = self.scotts_factor
-        elif bw_method == 'silverman':
+        elif bw_method == "silverman":
             self.covariance_factor = self.silverman_factor
         elif np.isscalar(bw_method) and not isinstance(bw_method, string_types):
-            self._bw_method = 'use constant'
+            self._bw_method = "use constant"
             self.covariance_factor = lambda: bw_method
         elif callable(bw_method):
             self._bw_method = bw_method
             self.covariance_factor = lambda: self._bw_method(self)
         else:
-            msg = "`bw_method` should be 'scott', 'silverman', a scalar " \
-                  "or a callable."
+            msg = (
+                "`bw_method` should be 'scott', 'silverman', a scalar " "or a callable."
+            )
             raise ValueError(msg)
 
         self._compute_covariance()
@@ -753,16 +800,20 @@ class gaussian_kde(object):
         """
         self.factor = self.covariance_factor()
         # Cache covariance and inverse covariance of the data
-        if not hasattr(self, '_data_inv_cov'):
+        if not hasattr(self, "_data_inv_cov"):
             # Compute the mean and residuals
             _mean = np.sum(self.weights * self.dataset, axis=1)
-            _residual = (self.dataset - _mean[:, None])
+            _residual = self.dataset - _mean[:, None]
             # Compute the biased covariance
-            self._data_covariance = np.atleast_2d(np.dot(_residual * self.weights, _residual.T))
+            self._data_covariance = np.atleast_2d(
+                np.dot(_residual * self.weights, _residual.T)
+            )
             # Correct for bias (http://en.wikipedia.org/wiki/Weighted_arithmetic_mean#Weighted_sample_covariance)
-            self._data_covariance /= (1 - np.sum(self.weights ** 2))
+            self._data_covariance /= 1 - np.sum(self.weights**2)
             self._data_inv_cov = np.linalg.inv(self._data_covariance)
 
         self.covariance = self._data_covariance * self.factor**2
         self.inv_cov = self._data_inv_cov / self.factor**2
-        self._norm_factor = np.sqrt(np.linalg.det(2*np.pi*self.covariance))  # * self.n
+        self._norm_factor = np.sqrt(
+            np.linalg.det(2 * np.pi * self.covariance)
+        )  # * self.n

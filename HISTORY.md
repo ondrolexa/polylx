@@ -5,6 +5,8 @@
  * added eap and epa Grain methods
  * surfor for Grains normalized by factor 2
  * vertex_angles property added
+ * ortensor added to utils
+ * agg accepts kwargs allowing define names of aggregated columns
 
 ### 0.5.4 (05 Mar 2024)
  * shapelysmooth methods added for smoothing
