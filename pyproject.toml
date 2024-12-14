@@ -1,0 +1,68 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+
+[project]
+name = "polylx"
+dynamic = ["version"]
+description = "A Python package to visualize and analyze microstructures"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+keywords = ["geology", "microstructures"]
+authors = [{ name = "Ondrej Lexa", email = "lexa.ondrej@gmail.com" }]
+maintainers = [
+  { name = "Ondrej Lexa", email = "lexa.ondrej@gmail.com" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+]
+dependencies = [
+  "numpy",
+  "matplotlib",
+  "pandas",
+  "pyarrow",
+  "seaborn",
+  "networkx",
+  "scipy",
+  "shapely",
+  "pyshp",
+  "pyefd",
+  "jenkspy",
+  "shapelysmooth",
+]
+
+[project.optional-dependencies]
+docs = [
+    "sphinx",
+    "sphinx_mdinclude",
+    "sphinx_rtd_theme",
+    "ipykernel",
+    "nbsphinx",
+    "nbsphinx-link"
+]
+dev = [
+  "pytest",
+  "pytest-cov",
+  "nbval",
+  "black"
+]
+jupyter = ["jupyterlab"]
+
+[project.urls]
+Homepage = "https://github.com/ondrolexa/polylx"
+Documentation = "https://polylx.readthedocs.io/"
+Repository = "https://github.com/ondrolexa/polylx.git"
+Issues = "https://github.com/ondrolexa/polylx/issues"
+Changelog = "https://github.com/ondrolexa/polylx/blob/master/HISTORY.md"
+
+[project.scripts]
+ipolylx = "polylx.shell:main"
+
+[tool.hatch.version]
+path = "polylx/__init__.py"

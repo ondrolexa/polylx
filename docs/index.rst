@@ -15,4 +15,4 @@ Contents:
    tutorial
    automodules
 
-.. mdinclude:: ../HISTORY.md
+.. mdinclude:: ../CHANGELOG.md

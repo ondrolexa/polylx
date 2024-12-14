@@ -50,3 +50,6 @@ docs/_build
 
 #codium
 .vscode/
+
+#venv
+.venv/
