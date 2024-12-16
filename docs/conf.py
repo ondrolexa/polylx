@@ -3,13 +3,14 @@
 # This file only contains a selection of the most common options. For a full
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
-
+import importlib.metadata
 
 # -- Project information -----------------------------------------------------
 
 project = "polylx"
 copyright = "2024, Ondrej Lexa"
 author = "Ondrej Lexa"
+version = importlib.metadata.version("polylx")
 
 # -- General configuration ---------------------------------------------------
 

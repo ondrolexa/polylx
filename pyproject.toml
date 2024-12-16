@@ -38,7 +38,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-docs = [
+test = [
+  "pytest",
+  "pytest-cov",
+  "nbval",
+]
+dev = [
+    "black",
     "sphinx",
     "sphinx_mdinclude",
     "sphinx_rtd_theme",
@@ -46,13 +52,7 @@ docs = [
     "nbsphinx",
     "nbsphinx-link"
 ]
-dev = [
-  "pytest",
-  "pytest-cov",
-  "nbval",
-  "black"
-]
-jupyter = ["jupyterlab"]
+extra = ["jupyterlab"]
 
 [project.urls]
 Homepage = "https://github.com/ondrolexa/polylx"
@@ -66,3 +66,4 @@ ipolylx = "polylx.shell:main"
 
 [tool.hatch.version]
 path = "polylx/__init__.py"
+
