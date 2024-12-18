@@ -12,47 +12,53 @@ requires-python = ">=3.10"
 license = { file = "LICENSE" }
 keywords = ["geology", "microstructures"]
 authors = [{ name = "Ondrej Lexa", email = "lexa.ondrej@gmail.com" }]
-maintainers = [
-  { name = "Ondrej Lexa", email = "lexa.ondrej@gmail.com" },
-]
+maintainers = [{ name = "Ondrej Lexa", email = "lexa.ondrej@gmail.com" }]
 classifiers = [
-  "Development Status :: 4 - Beta",
-  "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: MIT License",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
 ]
 dependencies = [
-  "numpy",
-  "matplotlib",
-  "pandas",
-  "pyarrow",
-  "seaborn",
-  "networkx",
-  "scipy",
-  "shapely",
-  "pyshp",
-  "pyefd",
-  "jenkspy",
-  "shapelysmooth",
+    "numpy",
+    "matplotlib",
+    "pandas",
+    "pyarrow",
+    "seaborn",
+    "networkx",
+    "scipy",
+    "shapely",
+    "pyshp",
+    "pyefd",
+    "jenkspy",
+    "shapelysmooth",
 ]
 
 [project.optional-dependencies]
-test = [
-  "pytest",
-  "pytest-cov",
-  "nbval",
+extra = ["jupyterlab"]
+tests = ["pytest", "nbval"]
+docs = [
+    "sphinx",
+    "sphinx_mdinclude",
+    "sphinx_rtd_theme",
+    "ipykernel",
+    "nbsphinx",
+    "nbsphinx-link",
 ]
 dev = [
+    "jupyterlab",
+    "pytest",
+    "nbval",
     "black",
     "sphinx",
     "sphinx_mdinclude",
     "sphinx_rtd_theme",
     "ipykernel",
     "nbsphinx",
-    "nbsphinx-link"
+    "nbsphinx-link",
 ]
-extra = ["jupyterlab"]
+
 
 [project.urls]
 Homepage = "https://github.com/ondrolexa/polylx"
@@ -66,4 +72,3 @@ ipolylx = "polylx.shell:main"
 
 [tool.hatch.version]
 path = "polylx/__init__.py"
-
