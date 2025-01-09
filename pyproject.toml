@@ -29,6 +29,7 @@ dependencies = [
     "networkx",
     "scipy",
     "shapely",
+    "fiona",
     "pyshp",
     "pyefd",
     "jenkspy",
