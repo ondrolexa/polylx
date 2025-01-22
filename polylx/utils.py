@@ -18,6 +18,7 @@ import numpy as np
 import matplotlib.cm as cm
 from matplotlib.path import Path
 from matplotlib.widgets import LassoSelector
+from scipy.stats import gamma
 import seaborn as sns
 import jenkspy
 
@@ -33,36 +34,66 @@ def fixratio(x, y):
         return x / y
 
 
-class circular:
-    @staticmethod
-    def rho(x):
-        """Mean resultant vector as complex number"""
-        return np.exp(2j * np.deg2rad(x)).mean()
+class Ortensor:
+    def __init__(self, x):
+        if np.iscomplexobj(x):
+            v = np.array([np.real(x), np.imag(x)]).T
+        else:
+            v = np.array([np.cos(np.deg2rad(x)), np.sin(np.deg2rad(x))]).T
+        self.T = np.dot(v.T, v) / len(x)
+        evals, evecs = np.linalg.eigh(self.T)
+        idx = evals.argsort()[::-1]
+        self.eigenvalues = evals[idx]
+        self.eigenvectors = evecs[:, idx]
 
+
+class Circular:
+    def __init__(self, x):
+        self.angles = np.deg2rad(x)
+        self.rho = np.exp(2j * self.angles).mean()
+        self.R = abs(self.rho)
+        self.mean = np.angle(self.rho, deg=True) / 2 % 180
+
+    @property
+    def n(self):
+        return len(self.angles)
+
+    def circmoment(self, p=1):
+        """Complex centered p-th moment"""
+        mp = np.exp(2j * p * self.angles).mean()
+        return np.abs(mp), np.angle(mp, deg=True)
+
+    @staticmethod
+    def circdist(x, y):
+        """Pairwise difference around the circle"""
+        return np.angle(np.exp(1j * x) / np.exp(1j * y), deg=True)
+
+
+class circstat:
     @staticmethod
     def R(x):
         """Length of mean resultant vector"""
-        return abs(circular.rho(x))
+        return Circular(x).R
 
     @staticmethod
     def mean(x):
         """Mean direction"""
-        return np.angle(circular.rho(x), deg=True) / 2 % 180
+        return Circular(x).mean
 
     @staticmethod
     def var(x):
         """Circular variance"""
-        return 1 - circular.R(x)
+        return 1 - Circular(x).R
 
     @staticmethod
     def csd(x):
         """Circular standard deviation"""
-        return np.sqrt(-2 * np.log(circular.R(x)))
+        return np.sqrt(-2 * np.log(Circular(x).R))
 
     @staticmethod
     def angdev(x):
         """Angular deviation"""
-        return np.sqrt(2 * circular.var(x))
+        return np.sqrt(2 * (1 - Circular(x).R))
 
     @staticmethod
     def mean_conf(x, cl=0.95):
@@ -71,16 +102,13 @@ class circular:
         cl confidence on mean between mu-conf..mu+conf
 
         """
-        from scipy.stats import gamma
-
-        n = len(x)
-        R = circular.R(x)
-        r = R * n
+        cs = Circular(x)
+        r = cs.R * cs.n
         c2 = gamma.ppf(cl, 0.5, scale=2)
-        if R < 0.9 and R > np.sqrt(c2 / 2 / n):
-            t = np.sqrt((2 * n * (2 * r**2 - n * c2)) / (4 * n - c2))
-        elif R >= 0.9:
-            t = np.sqrt(n**2 - (n**2 - r**2) * np.exp(c2 / n))
+        if cs.R < 0.9 and cs.R > np.sqrt(c2 / 2 / n):
+            t = np.sqrt((2 * cs.n * (2 * r**2 - cs.n * c2)) / (4 * cs.n - c2))
+        elif cs.R >= 0.9:
+            t = np.sqrt(cs.n**2 - (cs.n**2 - r**2) * np.exp(c2 / cs.n))
         else:  # Resultant vector does not allow to specify confidence limits
             t = np.nan
         return deg.acos(t / r)
@@ -88,71 +116,39 @@ class circular:
     @staticmethod
     def angskew(x):
         """Angular skewness"""
-        return np.mean(deg.sin(2 * circular.circdist(x, circular.mean(x))))
+        return np.mean(deg.sin(2 * Circular.circdist(x, Circular(x).mean)))
 
     @staticmethod
     def sas(x):
         """Standardized angular skewness"""
-        rho_p, mu_p = circular.circmoment(x, 2)
-        s = deg.sin(circular.circdist(mu_p, 2 * circular.mean(x)))
-        d = (1 - circular.var(x)) ** (2 / 3)
+        cs = Circular(x)
+        rho_p, mu_p = cs.circmoment(p=2)
+        s = deg.sin(Circular.circdist(mu_p, 2 * cs.mean))
+        d = cs.R ** (2 / 3)
         return rho_p * s / d
 
     @staticmethod
-    def circdist(x, y):
-        """Pairwise difference around the circle"""
-        return np.angle(np.exp(1j * x) / np.exp(1j * y), deg=True)
+    def ot_ar(x):
+        ot = Ortensor(x)
+        return fixratio(ot.eigenvalues[0], ot.eigenvalues[1])
 
     @staticmethod
-    def circmoment(x, p=1):
-        """Complex centered p-th moment"""
-        mp = np.exp(2j * p * np.deg2rad(x)).mean()
-        return np.abs(mp), np.angle(mp, deg=True)
-
-
-class ortensor:
-    @staticmethod
-    def ot(x):
-        if np.iscomplexobj(x):
-            v = np.array([np.real(x), np.imag(x)]).T
-        else:
-            v = np.array([np.cos(np.deg2rad(x)), np.sin(np.deg2rad(x))]).T
-        return np.dot(v.T, v) / len(x)
+    def ot_la(x):
+        return Ortensor(x).eigenvalues[0]
 
     @staticmethod
-    def eigenvalues(x):
-        evals, evecs = np.linalg.eigh(ortensor.ot(x))
-        idx = evals.argsort()[::-1]
-        return evals[idx]
+    def ot_sa(x):
+        return Ortensor(x).eigenvalues[1]
 
     @staticmethod
-    def eigenvectors(x):
-        evals, evecs = np.linalg.eigh(ortensor.ot(x))
-        idx = evals.argsort()[::-1]
-        return evecs[:, idx]
+    def ot_lao(x):
+        ot = Ortensor(x)
+        return np.rad2deg(np.arctan2(*ot.eigenvectors[:, 0][::-1])) % 180
 
     @staticmethod
-    def ar(x):
-        evals = ortensor.eigenvalues(x)
-        return evals[0] / evals[1]
-
-    @staticmethod
-    def la(x):
-        return ortensor.eigenvalues(x)[0]
-
-    @staticmethod
-    def sa(x):
-        return ortensor.eigenvalues(x)[1]
-
-    @staticmethod
-    def lao(x):
-        evecs = ortensor.eigenvectors(x)
-        return np.rad2deg(np.arctan2(*evecs[:, 0][::-1])) % 180
-
-    @staticmethod
-    def sao(x):
-        evecs = ortensor.eigenvectors(x)
-        return np.rad2deg(np.arctan2(*evecs[:, 1][::-1])) % 180
+    def ot_sao(x):
+        ot = Ortensor(x)
+        return np.rad2deg(np.arctan2(*ot.eigenvectors[:, 1][::-1])) % 180
 
 
 class deg:

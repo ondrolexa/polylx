@@ -6,7 +6,7 @@ import pandas as pd
 import networkx as nx
 import seaborn as sns
 from .core import Grain, Boundary, Grains, Boundaries, Sample, Fractnet
-from .utils import deg, circular, ortensor
+from .utils import deg, circstat
 
 __version__ = "0.5.6"
 __author__ = "Ondrej Lexa"
@@ -25,6 +25,5 @@ __all__ = [
     "nx",
     "sns",
     "deg",
-    "circular",
-    "ortensor",
+    "circstat",
 ]

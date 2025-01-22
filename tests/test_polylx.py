@@ -9,7 +9,7 @@ Tests for `polylx` module.
 """
 
 import numpy as np
-from polylx import *
+from polylx import Sample, circstat
 import unittest
 
 sample = Sample.example()
@@ -54,7 +54,7 @@ class TestPolylx(unittest.TestCase):
 
     def test_circular_mean(self):
         self.assertTrue(
-            np.allclose(circular.mean(sample.g["pl"].lao), 94.19784708988459)
+            np.allclose(circstat.mean(sample.g["pl"].lao), 94.19784708988459)
         )
 
     def test_paror(self):
