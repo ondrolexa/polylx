@@ -8,7 +8,7 @@ import seaborn as sns
 from .core import Grain, Boundary, Grains, Boundaries, Sample, Fractnet
 from .utils import deg, circstat
 
-__version__ = "0.5.6"
+__version__ = "0.6.0"
 __author__ = "Ondrej Lexa"
 __email__ = "lexa.ondrej@gmail.com"
 

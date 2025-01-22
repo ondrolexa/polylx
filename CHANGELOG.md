@@ -1,6 +1,13 @@
 # Changes
 
-### 0.5.5 (master)
+### 0.6.0 (master)
+ * fiona added to dependencies
+ * csd_plot after Peterson 1996 added
+ * contact_frequency Grains method added
+ * utils.circstat provides most common circular statistics
+   suitable for pandas agg
+
+### 0.5.5 (14 Dec 2024)
  * from_coords method added to Boundary
  * added eap and epa Grain methods
  * surfor for Grains normalized by factor 2
@@ -120,4 +127,3 @@
 ## 0.1 (13 Feb 2015)
 
 * First release
-
