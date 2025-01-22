@@ -46,6 +46,7 @@ from .utils import find_ellipse, densify, inertia_moments
 from .utils import _chaikin, _visvalingam_whyatt
 from .utils import _spline_ring
 from .utils import weighted_avg_and_std
+from .utils import SelectFromCollection
 
 from importlib import resources
 
@@ -2954,6 +2955,80 @@ class Grains(PolySet):
             ax.set_ylabel("Area fraction [%]")
             plt.show()
 
+    def csd_plot(self, **kwargs):
+        """
+        Routine to plot CSD diagram after Peterson (1996)
+
+        Keyword Args:
+          tomm(float): Factor to convert actual units into mm. Default 1
+          scalefactor(float): Scale factor. Default 1.269
+          beta(float): Factor of degree of spatial orientation. Default 0.4286
+          gamma(float): Intercept factor. Default 0.833
+          area(float): Total area of measurements. Default total area of grains.
+
+        """
+        tomm = kwargs.get("tomm", 1)
+        scalefactor = kwargs.get("scalefactor", 1.269)
+        beta = kwargs.get("beta", 0.4286)
+        gamma = kwargs.get("gamma", 0.833)
+        area = kwargs.get("area", self.area.sum())
+
+        def accept(event):
+            if event.key == "enter":
+                selector.disconnect()
+                if len(selector.ind) > 1:
+                    x, y = l[selector.ind], np.log(n[selector.ind])
+                else:
+                    x, y = l, np.log(n)
+                pp = np.polyfit(x, y, deg=1)
+                ly = np.polyval(pp, l)
+                plt.plot(l, ly)
+                res["a"] = -1 / pp[0]
+                res["n0"] = np.exp(pp[1])
+                ax.set_title(f"CSD Plot [alfa={res['a']:g} mm  n0={res['n0']:g} mm-4]")
+                fig.canvas.draw()
+                fig.canvas.mpl_disconnect(cid)
+
+        f = self.la * tomm
+        f = f[f / np.exp(np.mean(np.log(f))) <= 7] * scalefactor
+
+        nb = int(np.ceil(1 + 7 * np.log10(len(f))))
+        dl = 2 * f.max() / (2 * (nb - 1) + 1)
+        bins = np.linspace(0, nb * dl, nb + 1)
+
+        cnt, bb = np.histogram(f, bins=bins)
+
+        n2d = np.cumsum(cnt[::-1])[::-1] / area
+        nnp = n2d[1:] / bins[1:-1]
+        pp = np.polyfit(bins[1:-1], np.log(nnp), deg=1)
+        alpha = -1 / pp[0]
+        dalpha = 1
+        cc = 0
+        while (dalpha > 1e-8) and (cc < 20):
+            ln3d = np.log(nnp) + np.log(gamma) - beta * alpha / bins[1:-1]
+            pp = np.polyfit(bins[1:-1], ln3d, deg=1)
+            nalpha = -1 / pp[0]
+            dalpha = abs(alpha - nalpha)
+            alpha = nalpha
+            cc += 1
+
+        if cc == 20:
+            print("Nonstable solution of alpha")
+        dn3d = np.diff(np.exp(ln3d))
+        n = -dn3d / dl
+        l = bins[1:-2] + dl / 2
+        res = {}
+
+        fig, ax = plt.subplots()
+        ax.set_xlabel("Size (mm)")
+        ax.set_ylabel("Population density ln(n) mm-4)")
+        pts = ax.scatter(l, np.log(n), s=30, c="k")
+        selector = SelectFromCollection(ax, pts)
+        cid = fig.canvas.mpl_connect("key_press_event", accept)
+        ax.set_title("Select points and press enter to accept")
+        plt.show()
+        return float(res["a"]), float(res["n0"])
+
 
 class Boundaries(PolySet):
     """Class to store set of ``Boundaries`` objects"""
@@ -3324,24 +3399,22 @@ class Sample(object):
         for r, p1 in enumerate(phlist):
             for c, p2 in enumerate(phlist):
                 bt = "{}-{}".format(*sorted([p1, p2]))
-                hl = len(self.b[bt])/2
+                hl = len(self.b[bt]) / 2
                 obtn[r, c] += hl
                 obtn[c, r] += hl
 
         # Calculate probability table for randomness distribution
         expn = np.outer(obtn.sum(axis=0), obtn.sum(axis=1)) / np.sum(obtn)
 
-        obn = np.triu(2*obtn - np.diag(np.diag(obtn)))
-        exn = np.triu(2*expn - np.diag(np.diag(expn)))
+        obn = np.triu(2 * obtn - np.diag(np.diag(obtn)))
+        exn = np.triu(2 * expn - np.diag(np.diag(expn)))
 
-        obn = obn[obn>0]
-        exn = exn[exn>0]
+        obn = obn[obn > 0]
+        exn = exn[exn > 0]
         return pd.DataFrame(
-            dict(
-                Obtained=obn,
-                Expected=exn,
-                chi=(obn-exn)/np.sqrt(exn)
-            ), index=self.b.names)
+            dict(Obtained=obn, Expected=exn, chi=(obn - exn) / np.sqrt(exn)),
+            index=self.b.names,
+        )
 
     def neighbors_dist(self, show=False, name=None):
         """Return array of nearest neighbors distances.

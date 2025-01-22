@@ -16,6 +16,8 @@ from __future__ import division
 from copy import deepcopy
 import numpy as np
 import matplotlib.cm as cm
+from matplotlib.path import Path
+from matplotlib.widgets import LassoSelector
 import seaborn as sns
 import jenkspy
 
@@ -820,3 +822,37 @@ class gaussian_kde(object):
         self._norm_factor = np.sqrt(
             np.linalg.det(2 * np.pi * self.covariance)
         )  # * self.n
+
+
+class SelectFromCollection:
+    def __init__(self, ax, collection, alpha_other=0.3):
+        self.canvas = ax.figure.canvas
+        self.collection = collection
+        self.alpha_other = alpha_other
+
+        self.xys = collection.get_offsets()
+        self.Npts = len(self.xys)
+
+        # Ensure that we have separate colors for each object
+        self.fc = collection.get_facecolors()
+        if len(self.fc) == 0:
+            raise ValueError("Collection must have a facecolor")
+        elif len(self.fc) == 1:
+            self.fc = np.tile(self.fc, (self.Npts, 1))
+
+        self.lasso = LassoSelector(ax, onselect=self.onselect)
+        self.ind = []
+
+    def onselect(self, verts):
+        path = Path(verts)
+        self.ind = np.nonzero(path.contains_points(self.xys))[0]
+        self.fc[:, -1] = self.alpha_other
+        self.fc[self.ind, -1] = 1
+        self.collection.set_facecolors(self.fc)
+        self.canvas.draw_idle()
+
+    def disconnect(self):
+        self.lasso.disconnect_events()
+        # self.fc[:, -1] = 1
+        self.collection.set_facecolors(self.fc)
+        self.canvas.draw_idle()
