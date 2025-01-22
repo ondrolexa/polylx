@@ -111,8 +111,11 @@ class circular:
 class ortensor:
     @staticmethod
     def ot(x):
-        v = np.array([np.cos(np.deg2rad(x)), np.sin(np.deg2rad(x))]).T
-        return np.dot(v.T, v) / len(v)
+        if np.iscomplexobj(x):
+            v = np.array([np.real(x), np.imag(x)]).T
+        else:
+            v = np.array([np.cos(np.deg2rad(x)), np.sin(np.deg2rad(x))]).T
+        return np.dot(v.T, v) / len(x)
 
     @staticmethod
     def eigenvalues(x):
@@ -137,7 +140,7 @@ class ortensor:
 
     @staticmethod
     def sa(x):
-        return ortensor.eigenvalues(x)[0]
+        return ortensor.eigenvalues(x)[1]
 
     @staticmethod
     def lao(x):

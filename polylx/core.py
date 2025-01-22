@@ -154,6 +154,16 @@ class PolyShape(object):
         pp = np.dot(self.xy.T, np.array([deg.sin(angle), deg.cos(angle)]))
         return abs(np.diff(pp, axis=0)).sum(axis=0)
 
+    @property
+    def uvec(self):
+        """Returns complex number representation of unit length lao vector"""
+        return np.exp(1j * np.deg2rad(self.lao))
+
+    @property
+    def vec(self):
+        """Returns complex number representation of lao vector"""
+        return self.la * self.uvec
+
     def boundary_segments(self):
         """Create Boundaries from object boundary segments.
 
@@ -1725,6 +1735,18 @@ class PolySet(object):
         return np.array([p.sao for p in self])
 
     @property
+    def uvec(self):
+        """Return complex array of vector representations of unit length
+        long axes according to shape_method"""
+        return np.array([p.uvec for p in self])
+
+    @property
+    def vec(self):
+        """Return complex array of vector representations of long axes
+        according to shape_method"""
+        return np.array([p.vec for p in self])
+
+    @property
     def fid(self):
         """Return array of fids of objects."""
         return np.array([p.fid for p in self])
@@ -3293,6 +3315,33 @@ class Sample(object):
                 )
                 fid += 1
         return Grains(grains)
+
+    def contact_frequency(self):
+        phlist = self.g.names
+
+        # Calculate observed frequencies table
+        obtn = np.zeros((len(phlist), len(phlist)))
+        for r, p1 in enumerate(phlist):
+            for c, p2 in enumerate(phlist):
+                bt = "{}-{}".format(*sorted([p1, p2]))
+                hl = len(self.b[bt])/2
+                obtn[r, c] += hl
+                obtn[c, r] += hl
+
+        # Calculate probability table for randomness distribution
+        expn = np.outer(obtn.sum(axis=0), obtn.sum(axis=1)) / np.sum(obtn)
+
+        obn = np.triu(2*obtn - np.diag(np.diag(obtn)))
+        exn = np.triu(2*expn - np.diag(np.diag(expn)))
+
+        obn = obn[obn>0]
+        exn = exn[exn>0]
+        return pd.DataFrame(
+            dict(
+                Obtained=obn,
+                Expected=exn,
+                chi=(obn-exn)/np.sqrt(exn)
+            ), index=self.b.names)
 
     def neighbors_dist(self, show=False, name=None):
         """Return array of nearest neighbors distances.
