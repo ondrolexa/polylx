@@ -1453,8 +1453,6 @@ class PolySet(object):
                 if index.dtype == "bool":
                     index = np.flatnonzero(index)
                 return type(self)([self.polys[ix] for ix in index], self.classes[index])
-            else:
-                print("No result...")
         else:
             return self.polys[index]
 
@@ -2884,6 +2882,34 @@ class Grains(PolySet):
                 )
         return ax
 
+    def contact_frequency(self):
+        b = self.boundaries()
+
+        # Calculate observed frequencies table
+        obtn = np.zeros((len(self.names), len(self.names)))
+        for r, p1 in enumerate(self.names):
+            for c, p2 in enumerate(self.names):
+                bt = "{}-{}".format(*sorted([p1, p2]))
+                if b[bt] is not None:
+                    hl = len(b[bt]) / 2
+                else:
+                    hl = 0
+                obtn[r, c] += hl
+                obtn[c, r] += hl
+
+        # Calculate probability table for randomness distribution
+        expn = np.outer(obtn.sum(axis=0), obtn.sum(axis=1)) / np.sum(obtn)
+
+        obn = np.triu(2 * obtn - np.diag(np.diag(obtn)))
+        exn = np.triu(2 * expn - np.diag(np.diag(expn)))
+
+        obn = obn[obn > 0]
+        exn = exn[exn > 0]
+        return pd.DataFrame(
+            dict(Obtained=obn, Expected=exn, chi=(obn - exn) / np.sqrt(exn)),
+            index=b.names,
+        )
+
     def grainsize_plot(self, areaweighted=True, **kwargs):
         from .plots import grainsize_plot
 
@@ -3261,41 +3287,36 @@ class Sample(object):
     """Class to store both ``Grains`` and ``Boundaries`` objects
 
     Properties:
+      name: Sample name
       g: Grains object
       b: Boundaries.objects
       T: ``networkx.Graph`` storing grain topology
 
     """
 
-    def __init__(self, name=""):
-        self.g = None
-        self.b = None
-        self.T = None
+    def __init__(self, g, b, T, name="Default"):
+        self.g = g
+        self.b = b
+        self.T = T
         self.name = name
+        self.pairs = {}
+        for id1, id2 in self.T.edges():
+            for bid in self.T[id1][id2]["bids"]:
+                self.pairs[bid] = (id1, id2)
 
     def __repr__(self):
-        return "Sample with %s grains and %s boundaries." % (
-            len(self.g.polys),
-            len(self.b.polys),
-        )
+        return f"Sample {self.name} with {len(self.g)} grains and {len(self.b)} boundaries."
 
     @classmethod
     def example(cls):
         """Returns example Sample"""
-        return cls.from_grains(Grains.example())
+        return cls.from_grains(Grains.example(), name="EX1")
 
     @classmethod
-    def from_grains(cls, grains, name=""):
-        obj = cls()
-        obj.T = nx.Graph()
-        obj.g = grains
-        obj.b = obj.g.boundaries(obj.T)
-        obj.name = name
-        obj.pairs = {}
-        for id1, id2 in obj.T.edges():
-            for bid in obj.T[id1][id2]["bids"]:
-                obj.pairs[bid] = (id1, id2)
-        return obj
+    def from_grains(cls, grains, name="Default"):
+        T = nx.Graph()
+        b = grains.boundaries(T)
+        return cls(grains, b, T, name=name)
 
     def neighbors(self, idx, name=None, inc=False):
         """Returns array of indexes of neighbouring grains.
@@ -3391,31 +3412,6 @@ class Sample(object):
                 fid += 1
         return Grains(grains)
 
-    def contact_frequency(self):
-        phlist = self.g.names
-
-        # Calculate observed frequencies table
-        obtn = np.zeros((len(phlist), len(phlist)))
-        for r, p1 in enumerate(phlist):
-            for c, p2 in enumerate(phlist):
-                bt = "{}-{}".format(*sorted([p1, p2]))
-                hl = len(self.b[bt]) / 2
-                obtn[r, c] += hl
-                obtn[c, r] += hl
-
-        # Calculate probability table for randomness distribution
-        expn = np.outer(obtn.sum(axis=0), obtn.sum(axis=1)) / np.sum(obtn)
-
-        obn = np.triu(2 * obtn - np.diag(np.diag(obtn)))
-        exn = np.triu(2 * expn - np.diag(np.diag(expn)))
-
-        obn = obn[obn > 0]
-        exn = exn[exn > 0]
-        return pd.DataFrame(
-            dict(Obtained=obn, Expected=exn, chi=(obn - exn) / np.sqrt(exn)),
-            index=self.b.names,
-        )
-
     def neighbors_dist(self, show=False, name=None):
         """Return array of nearest neighbors distances.
 
@@ -3486,7 +3482,6 @@ class Fractnet(object):
     Properties:
       G: ``networkx.Graph`` storing fracture network topology
       pos: a dictionary with nodes as keys and positions as values
-
 
     """
 
