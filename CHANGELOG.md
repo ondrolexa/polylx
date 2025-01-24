@@ -1,6 +1,10 @@
 # Changes
 
-### 0.6.0 (master)
+### 0.6.1 (24 Jan 2025)
+ * csd_plot() is interactive only from terminal
+ * contact_frequency() bug fix
+
+### 0.6.0 (22 Jan 2025)
  * fiona added to dependencies
  * csd_plot after Peterson 1996 added
  * contact_frequency Grains method added

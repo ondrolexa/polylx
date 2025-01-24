@@ -105,7 +105,7 @@ class circstat:
         cs = Circular(x)
         r = cs.R * cs.n
         c2 = gamma.ppf(cl, 0.5, scale=2)
-        if cs.R < 0.9 and cs.R > np.sqrt(c2 / 2 / n):
+        if cs.R < 0.9 and cs.R > np.sqrt(c2 / 2 / cs.n):
             t = np.sqrt((2 * cs.n * (2 * r**2 - cs.n * c2)) / (4 * cs.n - c2))
         elif cs.R >= 0.9:
             t = np.sqrt(cs.n**2 - (cs.n**2 - r**2) * np.exp(c2 / cs.n))
@@ -852,3 +852,16 @@ class SelectFromCollection:
         # self.fc[:, -1] = 1
         self.collection.set_facecolors(self.fc)
         self.canvas.draw_idle()
+
+
+def is_notebook() -> bool:
+    try:
+        shell = get_ipython().__class__.__name__
+        if shell == "ZMQInteractiveShell":
+            return True  # Jupyter notebook or qtconsole
+        elif shell == "TerminalInteractiveShell":
+            return False  # Terminal running IPython
+        else:
+            return False  # Other type (?)
+    except NameError:
+        return False  # Probably standard Python interpreter

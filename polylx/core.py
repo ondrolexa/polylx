@@ -43,10 +43,9 @@ except ImportError:
 
 from .utils import fixratio, fixzero, deg, Classify
 from .utils import find_ellipse, densify, inertia_moments
-from .utils import _chaikin, _visvalingam_whyatt
-from .utils import _spline_ring
+from .utils import _chaikin, _visvalingam_whyatt, _spline_ring
 from .utils import weighted_avg_and_std
-from .utils import SelectFromCollection
+from .utils import SelectFromCollection, is_notebook
 
 from importlib import resources
 
@@ -2888,23 +2887,23 @@ class Grains(PolySet):
         # Calculate observed frequencies table
         obtn = np.zeros((len(self.names), len(self.names)))
         for r, p1 in enumerate(self.names):
-            for c, p2 in enumerate(self.names):
+            for c, p2 in enumerate(self.names[r:]):
                 bt = "{}-{}".format(*sorted([p1, p2]))
                 if b[bt] is not None:
                     hl = len(b[bt]) / 2
                 else:
                     hl = 0
-                obtn[r, c] += hl
-                obtn[c, r] += hl
+                obtn[r, r + c] += hl
+                obtn[r + c, r] += hl
 
         # Calculate probability table for randomness distribution
         expn = np.outer(obtn.sum(axis=0), obtn.sum(axis=1)) / np.sum(obtn)
 
         obn = np.triu(2 * obtn - np.diag(np.diag(obtn)))
         exn = np.triu(2 * expn - np.diag(np.diag(expn)))
-
-        obn = obn[obn > 0]
-        exn = exn[exn > 0]
+        existing = obn > 0
+        obn = obn[existing]
+        exn = exn[existing]
         return pd.DataFrame(
             dict(Obtained=obn, Expected=exn, chi=(obn - exn) / np.sqrt(exn)),
             index=b.names,
@@ -3049,9 +3048,17 @@ class Grains(PolySet):
         ax.set_xlabel("Size (mm)")
         ax.set_ylabel("Population density ln(n) mm-4)")
         pts = ax.scatter(l, np.log(n), s=30, c="k")
-        selector = SelectFromCollection(ax, pts)
-        cid = fig.canvas.mpl_connect("key_press_event", accept)
-        ax.set_title("Select points and press enter to accept")
+        if is_notebook():
+            pp = np.polyfit(l, np.log(n), deg=1)
+            ly = np.polyval(pp, l)
+            plt.plot(l, ly)
+            res["a"] = -1 / pp[0]
+            res["n0"] = np.exp(pp[1])
+            ax.set_title(f"CSD Plot [alfa={res['a']:g} mm  n0={res['n0']:g} mm-4]")
+        else:
+            selector = SelectFromCollection(ax, pts)
+            cid = fig.canvas.mpl_connect("key_press_event", accept)
+            ax.set_title("Select points and press enter to accept")
         plt.show()
         return float(res["a"]), float(res["n0"])
 

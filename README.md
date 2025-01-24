@@ -9,30 +9,32 @@
 
 ### PyPI
 
-To install PolyLX, just execute
+To install PolyLX, create virtual environment, activate it and install with pip:
 ```
+python -m venv polylx
+source polylx/bin/activate
 pip install polylx
 ```
 
 #### Upgrading via pip
 
-To upgrade an existing version of PolyLX from PyPI, execute
+To upgrade an existing version of PolyLX from PyPI, execute:
 ```
-pip install polylx --upgrade --no-deps
+pip install polylx --upgrade
 ```
-Please note that the dependencies (Matplotlib, NumPy, Pandas, NetworkX, seaborn, shapely, pyshp and SciPy) will also be upgraded if you omit the `--no-deps` flag; use the `--no-deps` ("no dependencies") flag if you don't want this.
 
-#### Installing PolyLX with conda or mamba
+### Installing PolyLX with mamba
 
-Another common way to install is create environment using conda or mamba. Download latest version of [polylx](https://github.com/ondrolexa/polylx/archive/refs/heads/master.zip) and unzip to folder of your choice. Use conda or mamba to create an environment from an ``environment.yml`` file. Open the terminal, change directory where you unzip the source and execute following command:
-
-```
-conda env create -f environment.yml
-```
-Activate the new environment and install from current directory::
+Another common way to install is create environment using mamba (or conda with conda-forge repository):
 
 ```
-conda activate polylx
+mamba create -n polylx numpy matplotlib scipy pandas pyarrow seaborn networkx shapely pyshp fiona jupyterlab pyefd jenkspy shapelysmooth
+```
+
+Activate the new environment and install with pip:
+
+```
+mamba activate polylx
 pip install polylx
 ```
 
