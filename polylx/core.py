@@ -24,7 +24,7 @@ from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 from shapely.geometry import shape, Point, Polygon, LinearRing, LineString, MultiPoint
 from shapely.geometry.polygon import orient
 from shapely import affinity
-from shapely.ops import cascaded_union, unary_union, linemerge
+from shapely.ops import unary_union, linemerge
 from shapely.plotting import patch_from_polygon, _path_from_polygon
 import networkx as nx
 import pandas as pd
@@ -3414,7 +3414,7 @@ class Sample(object):
         for name in clusters:
             for cidx in clusters[name]:
                 grains.append(
-                    Grain(cascaded_union([g.shape for g in self.g[cidx]]), name, fid)
+                    Grain(unary_union([g.shape for g in self.g[cidx]]), name, fid)
                 )
                 fid += 1
         return Grains(grains)
