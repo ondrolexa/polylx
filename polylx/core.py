@@ -2881,34 +2881,6 @@ class Grains(PolySet):
                 )
         return ax
 
-    def contact_frequency(self):
-        b = self.boundaries()
-
-        # Calculate observed frequencies table
-        obtn = np.zeros((len(self.names), len(self.names)))
-        for r, p1 in enumerate(self.names):
-            for c, p2 in enumerate(self.names[r:]):
-                bt = "{}-{}".format(*sorted([p1, p2]))
-                if b[bt] is not None:
-                    hl = len(b[bt]) / 2
-                else:
-                    hl = 0
-                obtn[r, r + c] += hl
-                obtn[r + c, r] += hl
-
-        # Calculate probability table for randomness distribution
-        expn = np.outer(obtn.sum(axis=0), obtn.sum(axis=1)) / np.sum(obtn)
-
-        obn = np.triu(2 * obtn - np.diag(np.diag(obtn)))
-        exn = np.triu(2 * expn - np.diag(np.diag(expn)))
-        existing = obn > 0
-        obn = obn[existing]
-        exn = exn[existing]
-        return pd.DataFrame(
-            dict(Obtained=obn, Expected=exn, chi=(obn - exn) / np.sqrt(exn)),
-            index=b.names,
-        )
-
     def grainsize_plot(self, areaweighted=True, **kwargs):
         from .plots import grainsize_plot
 
@@ -3419,6 +3391,33 @@ class Sample(object):
                 fid += 1
         return Grains(grains)
 
+    def contact_frequency(self):
+        """Return phase contact frequencies and expected values for random distribution."""
+        # Calculate observed frequencies table
+        obtn = np.zeros((len(self.g.names), len(self.g.names)))
+        for r, p1 in enumerate(self.g.names):
+            for c, p2 in enumerate(self.g.names[r:]):
+                bt = "{}-{}".format(*sorted([p1, p2]))
+                if self.b[bt] is not None:
+                    hl = len(self.b[bt]) / 2
+                else:
+                    hl = 0
+                obtn[r, r + c] += hl
+                obtn[r + c, r] += hl
+
+        # Calculate probability table for random distribution
+        expn = np.outer(obtn.sum(axis=0), obtn.sum(axis=1)) / np.sum(obtn)
+
+        obn = np.triu(2 * obtn - np.diag(np.diag(obtn)))
+        exn = np.triu(2 * expn - np.diag(np.diag(expn)))
+        existing = obn > 0
+        obn = obn[existing]
+        exn = exn[existing]
+        return pd.DataFrame(
+            dict(Obtained=obn, Expected=exn, chi=(obn - exn) / np.sqrt(exn)),
+            index=self.b.names,
+        )
+
     def neighbors_dist(self, show=False, name=None):
         """Return array of nearest neighbors distances.
 
@@ -3448,7 +3447,14 @@ class Sample(object):
         return [np.sqrt(np.sum((pts[e[0]] - pts[e[1]]) ** 2)) for e in T.edges()]
 
     def phase_connectivity(self):
-        """Return calculated phase connectivity."""
+        """Return calculated phase connectivity.
+
+        The connectivity C is calculated as sum of individual phase clusters
+        connectivities Ck = Nk / (Bc + B0), where Nk is number of grains in
+        cluster, Bc is number of grains in all clusters and B0 is number of
+        isolated grains.
+
+        """
         c = self.get_clusters()
         res = {}
         for phase in c:
@@ -3461,10 +3467,9 @@ class Sample(object):
                 for k, b in zip(un[1:], uc[1:]):
                     Ck.append(k * b / (B0 + Bc))
             else:
-                B0 = 0
                 Bc = sum(uc * un)
                 for k, b in zip(un, uc):
-                    Ck.append(k * b / (B0 + Bc))
+                    Ck.append(k * b / Bc)
 
             res[phase] = [B0, Bc, sum(Ck)]
 
