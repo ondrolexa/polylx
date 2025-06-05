@@ -2996,18 +2996,18 @@ class Grains(PolySet):
         scalefactor = kwargs.get("scalefactor", 1.269)
         beta = kwargs.get("beta", 0.4286)
         gamma = kwargs.get("gamma", 0.833)
-        area = kwargs.get("area", self.area.sum())
+        area = kwargs.get("area", self.area.sum() * tomm**2)
 
         def accept(event):
             if event.key == "enter":
                 selector.disconnect()
                 if len(selector.ind) > 1:
-                    x, y = l[selector.ind], np.log(n[selector.ind])
+                    x, y = locs[selector.ind], np.log(n[selector.ind])
                 else:
-                    x, y = l, np.log(n)
+                    x, y = locs, np.log(n)
                 pp = np.polyfit(x, y, deg=1)
-                ly = np.polyval(pp, l)
-                plt.plot(l, ly)
+                ly = np.polyval(pp, locs)
+                plt.plot(locs, ly)
                 res["a"] = -1 / pp[0]
                 res["n0"] = np.exp(pp[1])
                 ax.set_title(f"CSD Plot [alfa={res['a']:g} mm  n0={res['n0']:g} mm-4]")
@@ -3041,17 +3041,17 @@ class Grains(PolySet):
             print("Nonstable solution of alpha")
         dn3d = np.diff(np.exp(ln3d))
         n = -dn3d / dl
-        l = bins[1:-2] + dl / 2
+        locs = bins[1:-2] + dl / 2
         res = {}
 
         fig, ax = plt.subplots()
         ax.set_xlabel("Size (mm)")
         ax.set_ylabel("Population density ln(n) mm-4)")
-        pts = ax.scatter(l, np.log(n), s=30, c="k")
+        pts = ax.scatter(locs, np.log(n), s=30, c="k")
         if is_notebook():
-            pp = np.polyfit(l, np.log(n), deg=1)
-            ly = np.polyval(pp, l)
-            plt.plot(l, ly)
+            pp = np.polyfit(locs, np.log(n), deg=1)
+            ly = np.polyval(pp, locs)
+            plt.plot(locs, ly)
             res["a"] = -1 / pp[0]
             res["n0"] = np.exp(pp[1])
             ax.set_title(f"CSD Plot [alfa={res['a']:g} mm  n0={res['n0']:g} mm-4]")
@@ -3446,6 +3446,29 @@ class Sample(object):
             ax.plot(x, y, "k")
             plt.show()
         return [np.sqrt(np.sum((pts[e[0]] - pts[e[1]]) ** 2)) for e in T.edges()]
+
+    def phase_connectivity(self):
+        """Return calculated phase connectivity."""
+        c = self.get_clusters()
+        res = {}
+        for phase in c:
+            counts = np.array([len(cc) for cc in c[phase]])
+            un, uc = np.unique(counts, return_counts=True)
+            Ck = []
+            if un[0] == 1:
+                B0 = uc[0]
+                Bc = sum(uc[1:] * un[1:])
+                for k, b in zip(un[1:], uc[1:]):
+                    Ck.append(k * b / (B0 + Bc))
+            else:
+                B0 = 0
+                Bc = sum(uc * un)
+                for k, b in zip(un, uc):
+                    Ck.append(k * b / (B0 + Bc))
+
+            res[phase] = [B0, Bc, sum(Ck)]
+
+        return pd.DataFrame(res, index=["B0", "Bc", "C"]).T
 
     def plot(self, **kwargs):
         """Plot overlay of ``Grains`` and ``Boundaries`` of ``Sample`` object.
