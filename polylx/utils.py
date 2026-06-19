@@ -13,8 +13,6 @@ g.plot(cmap=optimize_colormap('jet'))
 g.groups('lao').agg(circular.csd)
 """
 
-from __future__ import division
-
 from copy import deepcopy
 
 import jenkspy
@@ -218,7 +216,8 @@ class Classify:
             bins = quantiles_bins(vals, k=k)
             index = np.digitize(vals, bins[:-1]) - 1
             counts = np.bincount(index)
-            prec = int(max(-np.floor(np.log10(np.diff(bins).min())) + 1, 0))
+            diff_min = np.diff(bins).min()
+            prec = int(max(-np.floor(np.log10(diff_min)) + 1, 0)) if diff_min > 0 else 3
             self.index = [
                 "{:.{prec}f}-{:.{prec}f}".format(bins[i], bins[i + 1], prec=prec)
                 for i in range(len(counts))
@@ -235,7 +234,10 @@ class Classify:
         return np.flatnonzero(self.names == self.index[num])
 
     def __getitem__(self, index):
-        cl = deepcopy(self)
+        cl = object.__new__(Classify)
+        cl.rule = self.rule
+        cl.label = self.label
+        cl._colors_dict = self._colors_dict
         cl.vals = [self.vals[ix] for ix in index]
         cl.names = self.names[index]
         cl.index = list(np.unique(cl.names))
@@ -332,13 +334,15 @@ def quantiles_bins(values, k=5):
     Quantile classification bins
     """
     if values.size <= k:
-        return np.sort(values)
+        return np.unique(values)
     q = np.linspace(0, 1, k + 1)
     bins = np.quantile(values, q)
     uniq, counts = np.unique(bins, return_counts=True)
     dup = uniq[counts > 1]
     if len(dup):
         new = values[values != dup[0]]
+        if new.size == 0:
+            return np.unique(values)
         return np.sort(np.hstack((dup[0], quantiles_bins(new, k - 1))))
     return bins
 
@@ -357,7 +361,15 @@ def find_ellipse(x, y):
     C[0, 2] = C[2, 0] = 2
     C[1, 1] = -1
     E, V = np.linalg.eig(np.dot(np.linalg.inv(S), C))
-    n = np.argmax(np.abs(E))
+    # Select the eigenvector whose eigenvalue is uniquely positive (ellipse constraint).
+    # Fallback to largest-magnitude if no positive eigenvalue exists (degenerate case).
+    real_E = np.real(E)
+    pos_mask = real_E > 0
+    n = (
+        int(np.where(pos_mask, real_E, -np.inf).argmax())
+        if pos_mask.any()
+        else int(np.argmax(np.abs(E)))
+    )
     q = V[:, n]
     # get parameters
     b, c, d, f, g, a = q[1] / 2, q[2], q[3] / 2, q[4] / 2, q[5], q[0]
@@ -776,7 +788,6 @@ class gaussian_kde(object):
         >>> plt.show()
 
         """
-        from six import string_types
 
         if bw_method is None:
             pass
@@ -784,7 +795,7 @@ class gaussian_kde(object):
             self.covariance_factor = self.scotts_factor
         elif bw_method == "silverman":
             self.covariance_factor = self.silverman_factor
-        elif np.isscalar(bw_method) and not isinstance(bw_method, string_types):
+        elif np.isscalar(bw_method) and not isinstance(bw_method, str):
             self._bw_method = "use constant"
             self.covariance_factor = lambda: bw_method
         elif callable(bw_method):

@@ -13,6 +13,7 @@ Examples:
 
 import itertools
 import os
+import logging
 import warnings
 from collections import defaultdict
 
@@ -35,6 +36,7 @@ from shapely.geometry import LinearRing, LineString, MultiPoint, Point, Polygon,
 from shapely.geometry.polygon import orient
 from shapely.ops import linemerge, unary_union
 from shapely.plotting import _path_from_polygon, patch_from_polygon
+from shapely.wkb import dumps as wkb_dumps
 
 try:
     import fiona
@@ -61,6 +63,7 @@ from .utils import (
     weighted_avg_and_std,
 )
 
+_log = logging.getLogger(__name__)
 respath = resources.files("polylx") / "example"
 # ignore matplotlib deprecation warnings
 warnings.filterwarnings("ignore", category=matplotlib.MatplotlibDeprecationWarning)
@@ -380,7 +383,7 @@ class PolyShape(object):
                     - y[i2] * x[i1]
                 ) / np.sqrt((y[i2] - y[i1]) ** 2 + (x[i2] - x[i1]) ** 2)
                 tolerance = d.mean()
-                print(f"Using tolerance {tolerance:g}")
+                _log.info(f"Using tolerance {tolerance:g}")
             else:
                 tolerance = kwargs.get("tolerance")
             shape = self.shape.simplify(tolerance, False)
@@ -388,10 +391,8 @@ class PolyShape(object):
                 shape = self.shape.simplify(tolerance, True)
             if shape.is_empty:
                 shape = self.shape
-                print(
-                    "Invalid shape produced during smoothing for FID={}".format(
-                        self.fid
-                    )
+                warnings.warn(
+                    f"Invalid shape produced during smoothing for FID={self.fid}"
                 )
         else:
             shape = self.shape
@@ -416,10 +417,8 @@ class PolyShape(object):
             res = type(self)(shape, self.name, self.fid)
         else:
             res = self
-            print(
-                "Invalid shape produced during smoothing of feature FID={}".format(
-                    self.fid
-                )
+            warnings.warn(
+                f"Invalid shape produced during smoothing of feature FID={self.fid}"
             )
         return res
 
@@ -441,10 +440,8 @@ class PolyShape(object):
             res = type(self)(shape, self.name, self.fid)
         else:
             res = self
-            print(
-                "Invalid shape produced during smoothing of feature FID={}".format(
-                    self.fid
-                )
+            warnings.warn(
+                f"Invalid shape produced during smoothing of feature FID={self.fid}"
             )
         return res
 
@@ -465,10 +462,8 @@ class PolyShape(object):
             res = type(self)(shape, self.name, self.fid)
         else:
             res = self
-            print(
-                "Invalid shape produced during smoothing of feature FID={}".format(
-                    self.fid
-                )
+            warnings.warn(
+                f"Invalid shape produced during smoothing of feature FID={self.fid}"
             )
         return res
 
@@ -504,7 +499,7 @@ class Grain(PolyShape):
         return Grain(self.shape, self.name, self.fid)
 
     @classmethod
-    def from_coords(self, x, y, name="None", fid=0):
+    def from_coords(cls, x, y, name="None", fid=0):
         """Create ``Grain`` from coordinate arrays
 
         Example:
@@ -519,9 +514,9 @@ class Grain(PolyShape):
         if not geom.is_valid:
             geom = geom.buffer(0)
         if geom.is_valid and geom.geom_type == "Polygon":
-            return self(orient(geom), name, fid)
+            return cls(orient(geom), name, fid)
         else:
-            print("Invalid geometry.")
+            warnings.warn("Invalid geometry.")
 
     @property
     def xy(self):
@@ -738,10 +733,8 @@ class Grain(PolyShape):
             res = Grain(shape, self.name, self.fid)
         else:
             res = self
-            print(
-                "Invalid shape produced during smoothing of grain FID={}".format(
-                    self.fid
-                )
+            warnings.warn(
+                f"Invalid shape produced during smoothing of grain FID={self.fid}"
             )
         return res
 
@@ -763,10 +756,8 @@ class Grain(PolyShape):
             res = Grain(shape, self.name, self.fid)
         else:
             res = self
-            print(
-                "Invalid shape produced during smoothing of grain FID={}".format(
-                    self.fid
-                )
+            warnings.warn(
+                f"Invalid shape produced during smoothing of grain FID={self.fid}"
             )
         return res
 
@@ -792,10 +783,8 @@ class Grain(PolyShape):
             res = Grain(shape, self.name, self.fid)
         else:
             res = self
-            print(
-                "Invalid shape produced during smoothing of grain FID={}".format(
-                    self.fid
-                )
+            warnings.warn(
+                f"Invalid shape produced during smoothing of grain FID={self.fid}"
             )
         return res
 
@@ -859,10 +848,8 @@ class Grain(PolyShape):
             res = Grain(shape, self.name, self.fid)
         else:
             res = self
-            print(
-                "Invalid shape produced during smoothing of grain FID={}".format(
-                    self.fid
-                )
+            warnings.warn(
+                f"Invalid shape produced during smoothing of grain FID={self.fid}"
             )
         return res
 
@@ -968,10 +955,8 @@ class Grain(PolyShape):
             self.lao, self.sao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
             self._shape_method = "moment"
         else:
-            print(
-                "Moment fit failed for grain fid={} due to too small area. Fallback to maxferet.".format(
-                    self.fid
-                )
+            _log.info(
+                f"Moment fit failed for grain fid={self.fid} due to too small area. Fallback to maxferet."
             )
             self.maxferet()
 
@@ -995,10 +980,8 @@ class Grain(PolyShape):
             res = res1
             mx += 1
         if mx == 10:
-            print(
-                "Direct ellipse fit failed for grain fid={}. Fallback to moment.".format(
-                    self.fid
-                )
+            warnings.warn(
+                f"Direct ellipse fit failed for grain fid={self.fid}. Fallback to moment."
             )
             self.moment()
         else:
@@ -1140,7 +1123,7 @@ class Boundary(PolyShape):
         return Boundary(self.shape, self.name, self.fid)
 
     @classmethod
-    def from_coords(self, x, y, name="None", fid=0):
+    def from_coords(cls, x, y, name="None", fid=0):
         """Create ``Boundary`` from coordinate arrays
 
         Example:
@@ -1152,9 +1135,9 @@ class Boundary(PolyShape):
         """
         geom = LineString([(xx, yy) for xx, yy in zip(x, y)])
         if geom.is_valid and geom.geom_type == "LineString":
-            return self(geom, name, fid)
+            return cls(geom, name, fid)
         else:
-            print("Invalid geometry.")
+            warnings.warn("Invalid geometry.")
 
     @property
     def xy(self):
@@ -1280,10 +1263,8 @@ class Boundary(PolyShape):
             res = Boundary(shape, self.name, self.fid)
         else:
             res = self
-            print(
-                "Invalid shape produced during smoothing of boundary FID={}".format(
-                    self.fid
-                )
+            warnings.warn(
+                f"Invalid shape produced during smoothing of boundary FID={self.fid}"
             )
         return res
 
@@ -1405,7 +1386,9 @@ class PolySet(object):
             if len(fids) != len(np.unique(fids)):
                 for ix, s in enumerate(self.polys):
                     s.fid = ix
-                # print('FIDs are not unique and have been automatically changed.')
+                warnings.warn(
+                    "FIDs are not unique and have been automatically changed."
+                )
             if classification is None:
                 self.classify("name", rule="unique")
             else:
@@ -1655,9 +1638,11 @@ class PolySet(object):
 
         for iy in range(m):
             for ix in range(n):
-                yield self.clip_by_shape(
+                result = self.clip_by_shape(
                     affinity.translate(o, xoff=ix * xoff, yoff=iy * yoff)
                 )
+                if result is not None:
+                    yield result
 
     def clipstrap(self, num=100, f=0.3):
         """Bootstrap random rectangular clip generator.
@@ -1676,9 +1661,11 @@ class PolySet(object):
         for i in range(num):
             x = xmin + (1 - f) * (xmax - xmin) * np.random.random()
             y = ymin + (1 - f) * (ymax - ymin) * np.random.random()
-            yield self.clip_by_shape(
+            result = self.clip_by_shape(
                 Polygon([(x, y), (x + w, y), (x + w, y + h), (x, y + h)])
             )
+            if result is not None:
+                yield result
 
     @property
     def width(self):
@@ -1764,7 +1751,7 @@ class PolySet(object):
     def _fid(self, fid, first=True):
         """Return the indices of the objects with given fid."""
         ix = np.flatnonzero(self.fid == fid)
-        if ix and first:
+        if ix.size > 0 and first:
             return self[ix[0]]
         else:
             return self[ix]
@@ -2527,9 +2514,7 @@ class Grains(PolySet):
                     "GeometryCollection",
                 ]:
                     if "Polygon" in [seg.geom_type for seg in shared.geoms]:
-                        print(
-                            "Overlap between polygons {} {}.".format(edge[0], edge[1])
-                        )
+                        warnings.warn(f"Overlap between polygons {edge[0]} {edge[1]}.")
                     # Skip points if polygon just touch
                     shared = linemerge(
                         [seg for seg in shared.geoms if seg.geom_type == "LineString"]
@@ -2545,19 +2530,19 @@ class Grains(PolySet):
                             bids.append(bid)
                         T[edge[0]][edge[1]]["bids"] = bids
                     else:
-                        print(
+                        warnings.warn(
                             "Wrong topology between polygons {} {}. Shared geometry is {}.".format(
                                 edge[0], edge[1], shared.geom_type
                             )
                         )
                 else:
-                    print(
+                    warnings.warn(
                         "Wrong topology between polygons {} {}. Shared geometry is {}.".format(
                             edge[0], edge[1], shared.geom_type
                         )
                     )
         if not shapes:
-            print("No shared boundaries found.")
+            warnings.warn("No shared boundaries found.")
         else:
             return Boundaries(shapes)
 
@@ -2569,6 +2554,7 @@ class Grains(PolySet):
           >>> b = g.boundaries()
 
         """
+        from shapely import STRtree
         from shapely.ops import linemerge
 
         def add_shared(gid, grain, oid, other, boundaries, T):
@@ -2591,7 +2577,7 @@ class Grains(PolySet):
                 T.add_node(oid, name=other.name)
                 T.add_edge(gid, oid, type=bt, bids=bids)
             else:
-                print(
+                warnings.warn(
                     "Unpredicted intersection geometry {} for polygons {}-{}".format(
                         shared.geom_type, gid, oid
                     )
@@ -2600,12 +2586,17 @@ class Grains(PolySet):
         if T is None:
             T = nx.Graph()
 
-        allgrains = [(gid, grain) for gid, grain in enumerate(self)]
+        shapes = [g.shape for g in self]
+        tree = STRtree(shapes)
         boundaries = []
-        while allgrains:
-            gid, grain = allgrains.pop(0)
+        for gid, grain in enumerate(self):
             T.add_node(gid, name=grain.name)
-            for oid, other in allgrains:
+            # Only check candidates whose bounding boxes overlap
+            candidate_ids = tree.query(grain.shape, predicate="touches")
+            for oid in candidate_ids:
+                if oid <= gid:
+                    continue  # already procesed or self
+                other = self[oid]
                 rel = grain.relate(other)
                 if rel != "FF2FF1212":  # disconnected
                     if rel == "FF2F11212":  # shared boundary
@@ -2617,16 +2608,19 @@ class Grains(PolySet):
                     elif rel == "FF2F01212":  # Silently skip shared point for polygons
                         pass
                     elif rel == "212111212":
-                        print("Skipping overlapping polygons {}-{}".format(gid, oid))
+                        warnings.warn(
+                            "Skipping overlapping polygons {}-{}".format(gid, oid)
+                        )
                     else:
-                        print(
+                        warnings.warn(
                             "Hoops!!! Polygons {}-{} have relation {}".format(
                                 gid, oid, rel
                             )
                         )
 
         if not boundaries:
-            print("No shared boundaries found.")
+            warnings.warn("No shared boundaries found.")
+            return None
         else:
             return Boundaries(boundaries)
 
@@ -2661,6 +2655,7 @@ class Grains(PolySet):
                             )
                         )
                 shapes = []
+                seen = set()
                 for pos, rec in enumerate(sf.shapeRecords()):
                     # A valid polygon must have at least 4 coordinate tuples
                     if len(rec.shape.points) > 3:
@@ -2669,7 +2664,7 @@ class Grains(PolySet):
                         # geom = geom.simplify(0)
                         # try  to "clean" self-touching or self-crossing polygons
                         if not geom.is_valid:
-                            print("Cleaning FID={}...".format(pos))
+                            _log.info("Cleaning FID={}...".format(pos))
                             geom = geom.buffer(0)
                         if geom.is_valid:
                             if not geom.is_empty:
@@ -2680,37 +2675,39 @@ class Grains(PolySet):
                                 if geom.geom_type == "MultiPolygon":
                                     for g in geom.geoms:
                                         go = orient(g)
-                                        if not any(
-                                            go.equals(gr.shape) for gr in shapes
-                                        ):
+                                        wkb = wkb_dumps(go, hex=False)
+                                        if wkb not in seen:
+                                            seen.add(wkb)
                                             shapes.append(Grain(go, ph, len(shapes)))
                                         else:
-                                            print(
-                                                "Duplicate polygon (FID={}) skipped.".format(
-                                                    pos
-                                                )
+                                            warnings.warn(
+                                                f"Duplicate polygon (FID={pos}) skipped."
                                             )
-                                    print("Multipolygon (FID={}) exploded.".format(pos))
+                                    warnings.warn(f"Multipolygon (FID={pos}) exploded.")
                                 elif geom.geom_type == "Polygon":
                                     go = orient(geom)
-                                    if not any(go.equals(gr.shape) for gr in shapes):
+                                    wkb = wkb_dumps(go, hex=False)
+                                    if wkb not in seen:
+                                        seen.add(wkb)
                                         shapes.append(Grain(go, ph, len(shapes)))
                                     else:
-                                        print(
-                                            "Duplicate polygon (FID={}) skipped.".format(
-                                                pos
-                                            )
+                                        warnings.warn(
+                                            f"Duplicate polygon (FID={pos}) skipped."
                                         )
                                 else:
                                     raise Exception(
                                         "Unexpected geometry type (FID={})!".format(pos)
                                     )
                             else:
-                                print("Empty geometry (FID={}) skipped.".format(pos))
+                                warnings.warn(
+                                    "Empty geometry (FID={}) skipped.".format(pos)
+                                )
                         else:
-                            print("Invalid geometry (FID={}) skipped.".format(pos))
+                            warnings.warn(
+                                "Invalid geometry (FID={}) skipped.".format(pos)
+                            )
                     else:
-                        print("Invalid geometry (FID={}) skipped.".format(pos))
+                        warnings.warn("Invalid geometry (FID={}) skipped.".format(pos))
                 return cls(shapes)
             else:
                 raise Exception("Shapefile must contains polygons!")
@@ -2738,7 +2735,7 @@ class Grains(PolySet):
                 if "grains" in layers:
                     kwargs["layer"] = "grains"
                 else:
-                    print(
+                    warnings.warn(
                         "There is {} layers in file: {}. To choose other than first one, provide layer kwarg.".format(
                             len(layers), layers
                         )
@@ -2746,28 +2743,30 @@ class Grains(PolySet):
 
             with fiona.open(filename, **kwargs) as src:
                 schema = src.schema
-                assert (
-                    schema["geometry"] == "Polygon"
-                ), "The file geometry must be Polygon, not {}!".format(
-                    schema["geometry"]
-                )
+                if schema["geometry"] != "Polygon":
+                    raise ValueError(
+                        "The file geometry must be Polygon, not {}!".format(
+                            schema["geometry"]
+                        )
+                    )
                 fieldnames = list(schema["properties"].keys())
                 if namefield is not None:
                     if namefield not in fieldnames:
-                        print(
+                        warnings.warn(
                             "There is no field '{}'.\nProvide namefield kwarg with value from available fields:\n{}".format(
                                 namefield, fieldnames
                             )
                         )
                         return
                 shapes = []
+                seen = set()
                 for feature in src:
                     geom = shape(feature["geometry"])
                     # remove duplicate and subsequent colinear vertexes
                     # geom = geom.simplify(0)
                     # try  to "clean" self-touching or self-crossing polygons
                     if not geom.is_valid:
-                        print("Cleaning FID={}...".format(feature["id"]))
+                        _log.info("Cleaning FID={}...".format(feature["id"]))
                         geom = geom.buffer(0)
                     if geom.is_valid:
                         if not geom.is_empty:
@@ -2778,46 +2777,44 @@ class Grains(PolySet):
                             if geom.geom_type == "MultiPolygon":
                                 for g in geom.geoms:
                                     go = orient(g)
-                                    if not any(go.equals(gr.shape) for gr in shapes):
+                                    wkb = wkb_dumps(go, hex=False)
+                                    if wkb not in seen:
+                                        seen.add(wkb)
                                         shapes.append(Grain(go, ph, len(shapes)))
                                     else:
-                                        print(
-                                            "Duplicate polygon (FID={}) skipped.".format(
-                                                feature["id"]
-                                            )
+                                        warnings.warn(
+                                            f"Duplicate polygon (FID={feature['id']}) skipped."
                                         )
-                                print(
+                                _log.info(
                                     "Multipolygon (FID={}) exploded.".format(
                                         feature["id"]
                                     )
                                 )
                             elif geom.geom_type == "Polygon":
                                 go = orient(geom)
-                                if not any(go.equals(gr.shape) for gr in shapes):
+                                wkb = wkb_dumps(go, hex=False)
+                                if wkb not in seen:
+                                    seen.add(wkb)
                                     shapes.append(Grain(go, ph, len(shapes)))
                                 else:
-                                    print(
-                                        "Duplicate polygon (FID={}) skipped.".format(
-                                            feature["id"]
-                                        )
+                                    warnings.warn(
+                                        f"Duplicate polygon (FID={feature['id']}) skipped."
                                     )
                             else:
-                                print(
-                                    "Unexpected geometry type {} (FID={}) skipped ".format(
-                                        geom.geom_type, feature["id"]
-                                    )
+                                warnings.warn(
+                                    f"Unexpected geometry type {geom.geom_type} (FID={feature['id']}) skipped "
                                 )
                         else:
-                            print(
-                                "Empty geometry (FID={}) skipped.".format(feature["id"])
+                            warnings.warn(
+                                f"Empty geometry (FID={feature['id']}) skipped."
                             )
                     else:
-                        print(
-                            "Invalid geometry (FID={}) skipped.".format(feature["id"])
+                        warnings.warn(
+                            f"Invalid geometry (FID={feature['id']}) skipped."
                         )
                 return cls(shapes)
         else:
-            print("Fiona package is not installed.")
+            warnings.warn("Fiona package is not installed.")
 
     def to_file(self, filename, **kwargs):
         """
@@ -2841,7 +2838,7 @@ class Grains(PolySet):
             with fiona.open(filename, "w", **kwargs) as dst:
                 dst.writerecords(self.features)
         else:
-            print("Fiona package is not installed.")
+            warnings.warn("Fiona package is not installed.")
 
     def _plot(self, ax, **kwargs):
         alpha = kwargs.get("alpha", 0.8)
@@ -2873,15 +2870,14 @@ class Grains(PolySet):
                         zorder=2,
                     )
             else:
-                if legend:
-                    patch = PathPatch(
-                        Path([[None, None]]),
-                        fc=self.classes.color(key),
-                        ec=ec,
-                        alpha=alpha,
-                        zorder=2,
-                        label="{} ({})".format(key, 0),
-                    )
+                patch = PathPatch(
+                    Path([[None, None]]),
+                    fc=self.classes.color(key),
+                    ec=ec,
+                    alpha=alpha,
+                    zorder=2,
+                    **({"label": f"{key} (0)"} if legend else {}),
+                )
             ax.add_patch(patch)
         if kwargs.get("show_index", False):
             for idx, p in enumerate(self):
@@ -2981,6 +2977,7 @@ class Grains(PolySet):
         beta = kwargs.get("beta", 0.4286)
         gamma = kwargs.get("gamma", 0.833)
         area = kwargs.get("area", self.area.sum() * tomm**2)
+        res = {"a": None, "n0": None}
 
         def accept(event):
             if event.key == "enter":
@@ -3022,7 +3019,7 @@ class Grains(PolySet):
             cc += 1
 
         if cc == 20:
-            print("Nonstable solution of alpha")
+            warnings.warn("Nonstable solution of alpha")
         dn3d = np.diff(np.exp(ln3d))
         n = -dn3d / dl
         locs = bins[1:-2] + dl / 2
@@ -3044,6 +3041,10 @@ class Grains(PolySet):
             cid = fig.canvas.mpl_connect("key_press_event", accept)
             ax.set_title("Select points and press enter to accept")
         plt.show()
+        if res["a"] is None:
+            raise RuntimeError(
+                "CSD fit was not accepted. Press Enter to accept a selection"
+            )
         return float(res["a"]), float(res["n0"])
 
 
@@ -3104,7 +3105,9 @@ class Boundaries(PolySet):
                                 if geom.geom_type == "MultiLineString":
                                     for g in geom:
                                         shapes.append(Boundary(g, ph, len(shapes)))
-                                    print("Multiline (FID={}) exploded.".format(pos))
+                                    warnings.warn(
+                                        "Multiline (FID={}) exploded.".format(pos)
+                                    )
                                 elif geom.geom_type == "LineString":
                                     shapes.append(Boundary(geom, ph, len(shapes)))
                                 else:
@@ -3112,11 +3115,15 @@ class Boundaries(PolySet):
                                         "Unexpected geometry type (FID={})!".format(pos)
                                     )
                             else:
-                                print("Empty geometry (FID={}) skipped.".format(pos))
+                                warnings.warn(
+                                    "Empty geometry (FID={}) skipped.".format(pos)
+                                )
                         else:
-                            print("Invalid geometry (FID={}) skipped.".format(pos))
+                            warnings.warn(
+                                "Invalid geometry (FID={}) skipped.".format(pos)
+                            )
                     else:
-                        print("Invalid geometry (FID={}) skipped.".format(pos))
+                        warnings.warn("Invalid geometry (FID={}) skipped.".format(pos))
                 return cls(shapes)
             else:
                 raise Exception("Shapefile must contains polylines!")
@@ -3144,7 +3151,7 @@ class Boundaries(PolySet):
                 if "boundaries" in layers:
                     kwargs["layer"] = "boundaries"
                 else:
-                    print(
+                    warnings.warn(
                         "There is {} layers in file: {}. To choose other than first one, provide layer kwarg.".format(
                             len(layers), layers
                         )
@@ -3152,15 +3159,16 @@ class Boundaries(PolySet):
 
             with fiona.open(filename, **kwargs) as src:
                 schema = src.schema
-                assert (
-                    schema["geometry"] == "LineString"
-                ), "The file geometry must be LineString, not {}!".format(
-                    schema["geometry"]
-                )
+                if schema["geometry"] != "LineString":
+                    raise ValueError(
+                        "The file geometry must be LineString, not {}!".format(
+                            schema["geometry"]
+                        )
+                    )
                 fieldnames = list(schema["properties"].keys())
                 if namefield is not None:
                     if namefield not in fieldnames:
-                        print(
+                        warnings.warn(
                             "There is no field '{}'.\nProvide namefield kwarg with value from available fields:\n{}".format(
                                 namefield, fieldnames
                             )
@@ -3182,40 +3190,40 @@ class Boundaries(PolySet):
                                     if not any(g.equals(gr.shape) for gr in shapes):
                                         shapes.append(Boundary(g, ph, len(shapes)))
                                     else:
-                                        print(
+                                        warnings.warn(
                                             "Duplicate line (FID={}) skipped.".format(
                                                 feature["id"]
                                             )
                                         )
-                                print(
+                                warnings.warn(
                                     "Multiline (FID={}) exploded.".format(feature["id"])
                                 )
                             elif geom.geom_type == "LineString":
                                 if not any(geom.equals(gr.shape) for gr in shapes):
                                     shapes.append(Boundary(geom, ph, len(shapes)))
                                 else:
-                                    print(
+                                    warnings.warn(
                                         "Duplicate line (FID={}) skipped.".format(
                                             feature["id"]
                                         )
                                     )
                             else:
-                                print(
+                                warnings.warn(
                                     "Unexpected geometry type {} (FID={}) skipped.".format(
                                         geom.geom_type, feature["id"]
                                     )
                                 )
                         else:
-                            print(
+                            warnings.warn(
                                 "Empty geometry (FID={}) skipped.".format(feature["id"])
                             )
                     else:
-                        print(
+                        warnings.warn(
                             "Invalid geometry (FID={}) skipped.".format(feature["id"])
                         )
                 return cls(shapes)
         else:
-            print("Fiona package is not installed.")
+            warnings.warn("Fiona package is not installed.")
 
     def to_file(self, filename, **kwargs):
         """
@@ -3239,13 +3247,16 @@ class Boundaries(PolySet):
             with fiona.open(filename, "w", **kwargs) as dst:
                 dst.writerecords(self.features)
         else:
-            print("Fiona package is not installed.")
+            warnings.warn("Fiona package is not installed.")
 
     def _plot(self, ax, **kwargs):
         alpha = kwargs.get("alpha", 0.8)
         legend = kwargs.get("legend", True)
         groups = self.groups("shape")
+        keys = groups.groups.keys()
         for key in self.class_names:
+            if key not in keys:
+                continue
             group = groups.get_group(key)
             x = []
             y = []
@@ -3691,7 +3702,7 @@ class Fractnet(object):
                 if "fractnet" in layers:
                     kwargs["layer"] = "fractnet"
                 else:
-                    print(
+                    warnings.warn(
                         "There is {} layers in file: {}. To choose other than first one, provide layer kwarg.".format(
                             len(layers), layers
                         )
@@ -3716,40 +3727,40 @@ class Fractnet(object):
                                     if not any(g.equals(gr.shape) for gr in shapes):
                                         shapes.append(Boundary(g, "none", len(shapes)))
                                     else:
-                                        print(
+                                        warnings.warn(
                                             "Duplicate line (FID={}) skipped.".format(
                                                 feature["id"]
                                             )
                                         )
-                                print(
+                                warnings.warn(
                                     "Multiline (FID={}) exploded.".format(feature["id"])
                                 )
                             elif geom.geom_type == "LineString":
                                 if not any(geom.equals(gr.shape) for gr in shapes):
                                     shapes.append(Boundary(geom, "none", len(shapes)))
                                 else:
-                                    print(
+                                    warnings.warn(
                                         "Duplicate line (FID={}) skipped.".format(
                                             feature["id"]
                                         )
                                     )
                             else:
-                                print(
+                                warnings.warn(
                                     "Unexpected geometry type {} (FID={}) skipped.".format(
                                         geom.geom_type, feature["id"]
                                     )
                                 )
                         else:
-                            print(
+                            warnings.warn(
                                 "Empty geometry (FID={}) skipped.".format(feature["id"])
                             )
                     else:
-                        print(
+                        warnings.warn(
                             "Invalid geometry (FID={}) skipped.".format(feature["id"])
                         )
                 return cls.from_boundaries(Boundaries(shapes))
         else:
-            print("Fiona package is not installed.")
+            warnings.warn("Fiona package is not installed.")
 
     def reduce(self):
         """Remove 2 degree nodes. Usefull for connectivity calculation Zhang et al., 1992"""
@@ -3809,7 +3820,7 @@ class Fractnet(object):
             if ln.geom_type == "LineString":
                 shapes.append(Boundary(ln, name="branch", fid=fid))
             else:
-                print(
+                warnings.warn(
                     "Edges with FID:{} do not form branch but {}".format(
                         fid, ln.geom_type
                     )

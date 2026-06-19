@@ -27,8 +27,6 @@ Example:
   r.write_pdf()
 
 """
-from __future__ import print_function
-
 import tempfile
 import subprocess
 
@@ -134,7 +132,7 @@ class Report(object):
         rows = [row.split(",") for row in df.to_csv().split()]
         if not header:
             header = [df.index.name] + list(df.columns)
-        rows = [[df.ix[i].name] + list(df.ix[i]) for i in range(len(df))]
+        rows = [[df.iloc[i].name] + list(df.iloc[i]) for i in range(len(df))]
         self.table(rows, title, header, format, stub_columns, widths)
 
     def write_rst(self, file="report.rst"):

@@ -100,11 +100,18 @@ def paror_plot(ob, **kwargs):
 
 
 def logdist_plot(d, **kwargs):
-    kwargs["fit"] = stats.lognorm
-    if "kde" not in kwargs:
-        kwargs["kde"] = False
-    ax = sns.distplot(d, **kwargs)
+    ax = kwargs.pop("ax", None)
+    if ax is None:
+        fig, ax = plt.subplots(figsize=kwargs.pop("figsize", None))
+    else:
+        kwargs.pop("figsize", None)
+    # drop distplot-specific kwargs that histplot does not accept
+    kwargs.pop("fit", None)
+    kwargs.pop("kde", None)
+    sns.histplot(d, stat="density", ax=ax, **kwargs)
     shape, loc, scale = stats.lognorm.fit(d)
+    x = np.linspace(d.min(), d.max(), 300)
+    ax.plot(x, stats.lognorm.pdf(x, shape, loc=loc, scale=scale), color="r")
     mode = loc + np.exp(np.log(scale) - shape**2)
     sts = np.asarray(stats.lognorm.stats(shape, loc=loc, scale=scale, moments="mv"))
     ax.set_title("Mode:{:g} Mean:{:g} Var:{:g}".format(mode, *sts))
@@ -112,11 +119,17 @@ def logdist_plot(d, **kwargs):
 
 
 def normdist_plot(d, **kwargs):
-    kwargs["fit"] = stats.norm
-    if "kde" not in kwargs:
-        kwargs["kde"] = False
-    ax = sns.distplot(d, **kwargs)
+    ax = kwargs.pop("ax", None)
+    if ax is None:
+        fig, ax = plt.subplots(figsize=kwargs.pop("figsize", None))
+    else:
+        kwargs.pop("figsize", None)
+    kwargs.pop("fit", None)
+    kwargs.pop("kde", None)
+    sns.histplot(d, stat="density", ax=ax, **kwargs)
     loc, scale = stats.norm.fit(d)
+    x = np.linspace(d.min(), d.max(), 300)
+    ax.plot(x, stats.norm.pdf(x, loc=loc, scale=scale), color="r")
     sts = np.asarray(stats.norm.stats(loc=loc, scale=scale, moments="mv"))
     ax.set_title("Mean:{:g} Var:{:g}".format(*sts))
     plt.show()
