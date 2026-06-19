@@ -12,15 +12,18 @@ g.plot(cmap=optimize_colormap('jet'))
 # use circular statistics for agg
 g.groups('lao').agg(circular.csd)
 """
+
 from __future__ import division
+
 from copy import deepcopy
+
+import jenkspy
+import matplotlib.pyplot as plt
 import numpy as np
-import matplotlib.cm as cm
+import seaborn as sns
 from matplotlib.path import Path
 from matplotlib.widgets import LassoSelector
 from scipy.stats import gamma
-import seaborn as sns
-import jenkspy
 
 
 def fixzero(x):
@@ -255,7 +258,7 @@ class Classify:
 
         """
         if isinstance(cmap, str):
-            cmap = cm.get_cmap(cmap)
+            cmap = plt.get_cmap(cmap)
         n = len(self.index)
         if n > 1:
             pos = np.round(np.linspace(0, cmap.N - 1, n))
@@ -298,9 +301,9 @@ class Classify:
 def optimize_colormap(name):
     # optimize lightness to the desired value
     import matplotlib.cm as cm
-    from matplotlib.colors import LinearSegmentedColormap
-    from colormath.color_objects import LabColor, sRGBColor
     from colormath.color_conversions import convert_color
+    from colormath.color_objects import LabColor, sRGBColor
+    from matplotlib.colors import LinearSegmentedColormap
 
     cmap = cm.get_cmap(name)
     values = cmap(np.linspace(0, 1, 256))[:, :3]
@@ -501,9 +504,9 @@ def weighted_avg_and_std(values, weights):
 
 
 def classify_shapes(g, **kwargs):
+    from sklearn.cluster import KMeans
     from sklearn.decomposition import PCA
     from sklearn.preprocessing import StandardScaler
-    from sklearn.cluster import KMeans
 
     N = kwargs.get("N", 128)
     X = StandardScaler().fit_transform(g.shape_vector(N=N))

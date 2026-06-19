@@ -10,29 +10,31 @@ Examples:
   >>> b = g.boundaries()
 
 """
-import os
+
 import itertools
-from collections import defaultdict
-import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib.patches import PathPatch
-from matplotlib.path import Path
-import matplotlib.colors as mcolors
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
-from shapely.geometry import shape, Point, Polygon, LinearRing, LineString, MultiPoint
-from shapely.geometry.polygon import orient
-from shapely import affinity
-from shapely.ops import unary_union, linemerge
-from shapely.plotting import patch_from_polygon, _path_from_polygon
-import networkx as nx
-import pandas as pd
-import seaborn as sns
+import os
 import warnings
+from collections import defaultdict
+
+import matplotlib
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+import pandas as pd
 import pyefd
+import seaborn as sns
 import shapefile
 import shapelysmooth
+from matplotlib.patches import PathPatch
+from matplotlib.path import Path
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
+from shapely import affinity
+from shapely.geometry import LinearRing, LineString, MultiPoint, Point, Polygon, shape
+from shapely.geometry.polygon import orient
+from shapely.ops import linemerge, unary_union
+from shapely.plotting import _path_from_polygon, patch_from_polygon
 
 try:
     import fiona
@@ -41,13 +43,23 @@ try:
 except ImportError:
     fiona_OK = False
 
-from .utils import fixratio, fixzero, deg, Classify
-from .utils import find_ellipse, densify, inertia_moments
-from .utils import _chaikin, _visvalingam_whyatt, _spline_ring
-from .utils import weighted_avg_and_std
-from .utils import SelectFromCollection, is_notebook
-
 from importlib import resources
+
+from .utils import (
+    Classify,
+    SelectFromCollection,
+    _chaikin,
+    _spline_ring,
+    _visvalingam_whyatt,
+    deg,
+    densify,
+    find_ellipse,
+    fixratio,
+    fixzero,
+    inertia_moments,
+    is_notebook,
+    weighted_avg_and_std,
+)
 
 respath = resources.files("polylx") / "example"
 # ignore matplotlib deprecation warnings
@@ -2480,14 +2492,14 @@ class Grains(PolySet):
                 if co not in lookup:
                     lookup[co] = len(lookup)
                 path.append(lookup[co])
-            G.add_path(path, fid=fid, name=g.name)
+            nx.add_path(G, path, fid=fid, name=g.name)
             for holes in g.shape.interiors:
                 path = []
                 for co in holes.coords:
                     if co not in lookup:
                         lookup[co] = len(lookup)
                     path.append(lookup[co])
-                G.add_path(path, fid=fid, name=g.name)
+                nx.add_path(G, path, fid=fid, name=g.name)
         # Create topology graph
         H = G.to_undirected(reciprocal=True)
         # for edge in H.edges_iter():
@@ -2514,20 +2526,20 @@ class Grains(PolySet):
                     "MultiLineString",
                     "GeometryCollection",
                 ]:
-                    if "Polygon" in [seg.geom_type for seg in shared]:
+                    if "Polygon" in [seg.geom_type for seg in shared.geoms]:
                         print(
                             "Overlap between polygons {} {}.".format(edge[0], edge[1])
                         )
                     # Skip points if polygon just touch
                     shared = linemerge(
-                        [seg for seg in list(shared) if seg.geom_type == "LineString"]
+                        [seg for seg in shared.geoms if seg.geom_type == "LineString"]
                     )
                     if shared.geom_type == "LineString":
                         shapes.append(Boundary(shared, bt, bid))
                         T[edge[0]][edge[1]]["bids"] = [bid]
                     elif shared.geom_type == "MultiLineString":
                         bids = []
-                        for sub in list(shared):
+                        for sub in shared.geoms:
                             bid = len(shapes)
                             shapes.append(Boundary(sub, bt, bid))
                             bids.append(bid)
