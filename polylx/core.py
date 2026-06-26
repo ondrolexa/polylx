@@ -12,8 +12,8 @@ Examples:
 """
 
 import itertools
-import os
 import logging
+import os
 import warnings
 from collections import defaultdict
 
@@ -947,10 +947,7 @@ class Grain(PolyShape):
             CM = np.array([[M[1], -M[2]], [-M[2], M[0]]]) / (
                 4 * (M[0] * M[1] - M[2] ** 2)
             )
-            evals, evecs = np.linalg.eig(CM)
-            idx = evals.argsort()
-            evals = evals[idx]
-            evecs = evecs[:, idx]
+            evals, evecs = np.linalg.eigh(CM)
             self.la, self.sa = 2 / np.sqrt(evals)
             self.lao, self.sao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
             self._shape_method = "moment"
@@ -1012,10 +1009,7 @@ class Grain(PolyShape):
         x, y = self.xy[:, :-1]
         self.xc, self.yc = self.shape.exterior.centroid.coords[0]
         s = np.cov(x - self.xc, y - self.yc)
-        evals, evecs = np.linalg.eig(s)
-        idx = evals.argsort()
-        evals = evals[idx]
-        evecs = evecs[:, idx]
+        evals, evecs = np.linalg.eigh(s)
         self.sa, self.la = np.sqrt(8) * np.sqrt(evals)
         self.sao, self.lao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
         self._shape_method = "cov"
@@ -1029,10 +1023,7 @@ class Grain(PolyShape):
         """
         x, y = self.xy
         s = np.cov(np.diff(x), np.diff(y))
-        evals, evecs = np.linalg.eig(s)
-        idx = evals.argsort()
-        evals = evals[idx]
-        evecs = evecs[:, idx]
+        evals, evecs = np.linalg.eigh(s)
         self.sa, self.la = np.sqrt(8) * np.sqrt(evals)
         self.sao, self.lao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
         self.xc, self.yc = self.shape.exterior.centroid.coords[0]
@@ -1072,10 +1063,7 @@ class Grain(PolyShape):
         U = np.diag(u)
         # A = np.linalg.inv(P @ U @ P.T - np.outer(P @ u, P @ u)) / d
         A = np.linalg.inv(P.dot(U).dot(P.T) - np.outer(P.dot(u), P.dot(u))) / d
-        evals, evecs = np.linalg.eig(A)
-        idx = evals.argsort()
-        evals = evals[idx]
-        evecs = evecs[:, idx]
+        evals, evecs = np.linalg.eigh(A)
         self.la, self.sa = 2 / np.sqrt(evals)
         self.lao, self.sao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
         self.xc, self.yc = P.dot(u)
@@ -1341,10 +1329,7 @@ class Boundary(PolyShape):
         """
         x, y = self.xy
         s = np.cov(x - x.mean(), y - y.mean())
-        evals, evecs = np.linalg.eig(s)
-        idx = evals.argsort()
-        evals = evals[idx]
-        evecs = evecs[:, idx]
+        evals, evecs = np.linalg.eigh(s)
         self.sa, self.la = np.sqrt(8) * np.sqrt(evals)
         self.sa = fixzero(self.sa)
         self.sao, self.lao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
@@ -1360,10 +1345,7 @@ class Boundary(PolyShape):
         """
         x, y = self.xy
         s = np.cov(np.diff(x), np.diff(y))
-        evals, evecs = np.linalg.eig(s)
-        idx = evals.argsort()
-        evals = evals[idx]
-        evecs = evecs[:, idx]
+        evals, evecs = np.linalg.eigh(s)
         self.sa, self.la = np.sqrt(8) * np.sqrt(evals)
         self.sao, self.lao = np.mod(deg.atan2(evecs[0, :], evecs[1, :]), 180)
         self.xc, self.yc = self.shape.centroid.coords[0]
@@ -2457,12 +2439,14 @@ class Grains(PolySet):
         """Returns array of number of holes (shape interiors)"""
         return np.array([p.nholes for p in self])
 
-    def boundaries_fast(self, T=None):
-        """Create Boundaries from Grains. Faster but not always safe implementation
+    def boundaries_depreceated(self, T=None):
+        """Create Boundaries from Grains.
+
+        Note: This implementation is not always safe
 
         Example:
           >>> g = Grains.example()
-          >>> b = g.boundaries_fast()
+          >>> b = g.boundaries_depreceated()
 
         """
         from shapely.ops import linemerge
@@ -2574,8 +2558,8 @@ class Grains(PolySet):
                     bid = len(boundaries)
                     boundaries.append(Boundary(bnd, bt, bid))
                     bids.append(bid)
-                T.add_node(oid, name=other.name)
-                T.add_edge(gid, oid, type=bt, bids=bids)
+                T.add_node(int(oid), name=other.name)
+                T.add_edge(gid, int(oid), type=bt, bids=bids)
             else:
                 warnings.warn(
                     "Unpredicted intersection geometry {} for polygons {}-{}".format(
